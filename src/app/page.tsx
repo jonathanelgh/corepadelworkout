@@ -64,11 +64,15 @@ export default function Home() {
 
   useEffect(() => {
     const handleScroll = () => {
+      // Use window.scrollY with a fallback for older browsers
       const scrollPosition = window.scrollY || document.documentElement.scrollTop;
-      setIsScrolled(scrollPosition > 10);
+      setIsScrolled(scrollPosition > 10); // Lowered threshold for mobile responsiveness
     };
     
-    window.addEventListener("scroll", handleScroll);
+    // Add passive listener for better scroll performance on mobile
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    
+    // Initial check in case page is loaded already scrolled
     handleScroll();
     
     const statInterval = setInterval(() => {
@@ -84,12 +88,11 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white font-sans text-black selection:bg-[#ccff00] selection:text-black">
       {/* Navbar */}
-      <nav 
-        className={`fixed top-0 left-0 right-0 z-[90] flex items-center justify-between px-6 md:px-12 py-4 w-full transition-all duration-300 ${
-          isScrolled ? "bg-white/60 text-black shadow-sm" : "bg-transparent text-white"
-        }`}
-        style={isScrolled ? { WebkitBackdropFilter: 'blur(20px)', backdropFilter: 'blur(20px)' } : {}}
-      >
+      <nav className={`fixed top-0 left-0 right-0 z-[90] flex items-center justify-between px-6 md:px-12 py-4 w-full transition-all duration-300 ${
+        isScrolled 
+          ? "bg-white/90 backdrop-blur-xl [-webkit-backdrop-filter:blur(24px)] text-black shadow-sm" 
+          : "bg-transparent text-white"
+      }`}>
         <div className="max-w-[1400px] mx-auto w-full flex items-center justify-between">
           <div className="text-xl font-bold tracking-wider uppercase">Core Padel Workout</div>
           <div className="hidden md:flex space-x-8 text-sm font-medium">
@@ -108,14 +111,12 @@ export default function Home() {
           
           {/* Mobile Menu Button */}
           <button 
-            className="md:hidden p-3 -mr-3 relative z-[100] cursor-pointer"
-            onClick={(e) => {
-              e.preventDefault();
-              setIsMobileMenuOpen(true);
-            }}
+            className="md:hidden p-2 -mr-2 relative z-[100]"
+            onClick={() => setIsMobileMenuOpen(true)}
             aria-label="Open menu"
+            style={{ cursor: 'pointer', touchAction: 'manipulation' }}
           >
-            <Menu className="w-7 h-7" />
+            <Menu className="w-6 h-6" />
           </button>
         </div>
       </nav>
@@ -173,14 +174,14 @@ export default function Home() {
         
         <div className="relative z-10 max-w-[1400px] mx-auto w-full flex flex-col md:flex-row justify-between items-end gap-12">
           <div className="max-w-3xl">
-            <div className="relative h-12 mb-6">
+            <div className="relative h-12 mb-6 overflow-hidden">
               {heroStats.map((stat, index) => (
                 <div 
                   key={index}
                   className={`absolute top-0 left-0 transition-all duration-500 ease-in-out ${
                     index === currentStatIndex 
-                      ? "opacity-100 translate-y-0 visible" 
-                      : "opacity-0 translate-y-4 invisible"
+                      ? "opacity-100 translate-y-0 z-10" 
+                      : "opacity-0 translate-y-4 -z-10"
                   }`}
                 >
                   <div className="text-sm text-gray-200 leading-tight">
