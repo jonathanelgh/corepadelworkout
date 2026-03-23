@@ -1,8 +1,7 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, Star, Menu, X, Smartphone, Play } from "lucide-react";
+import { ArrowRight, CheckCircle2, Star, Menu, X, Smartphone, Play, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
-
 import Link from "next/link";
 
 const heroStats = [
@@ -57,10 +56,38 @@ const testimonials = [
   }
 ];
 
+const faqs = [
+  {
+    question: "Is it beginner-friendly?",
+    answer: "Absolutely! Our Year-Round Programs are designed for all level club players.\n\nHome workouts:\nEach workout is led by two coaches: one demonstrates beginner-friendly exercises, while the other shows more advanced variations. Plus, we offer a range of challenges tailored to different experience levels, so everyone can find the right fit and progress at their own pace.\n\nFitness workouts:\nEvery exercise includes a short video demo, with modified versions available for more challenging movements."
+  },
+  {
+    question: "Do I need equipment?",
+    answer: "Many of our programs require no equipment and can be done at home or on the court. For gym-based programs, standard fitness equipment is recommended. Each program clearly lists any required gear before you start."
+  },
+  {
+    question: "Do I need to download anything from the App Store?",
+    answer: "No! Core Padel Workout is a web-based platform. You can access all your programs directly through your browser on any device—phone, tablet, or computer."
+  },
+  {
+    question: "Can I watch the workouts on my TV?",
+    answer: "Yes! You can easily cast or AirPlay the workout videos from your phone or computer to your smart TV for a bigger screen experience."
+  },
+  {
+    question: "Can I try it for free?",
+    answer: "Yes, you can start with our Free 15-Min Pre-Match Warmup to get a taste of our training style before committing to a full program."
+  },
+  {
+    question: "Can I cancel my membership anytime?",
+    answer: "Absolutely. If you choose our Monthly Package, you can cancel your subscription at any time with no hidden fees or lock-in contracts."
+  }
+];
+
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [currentStatIndex, setCurrentStatIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -204,9 +231,9 @@ export default function Home() {
               <Link href="/programs" className="bg-[#ccff00] text-black px-8 py-3.5 rounded-full font-semibold hover:bg-[#b3e600] transition-colors">
                 Browse Our Padel Programs
               </Link>
-              <button className="bg-white text-black px-8 py-3.5 rounded-full font-semibold hover:bg-gray-100 transition-colors">
+              <Link href="/free-warmup" className="bg-white text-black px-8 py-3.5 rounded-full font-semibold hover:bg-gray-100 transition-colors">
                 Free 15-Min Pre-Match Warmup
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -266,6 +293,68 @@ export default function Home() {
               View all programs
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* App Showcase Section */}
+      <section className="py-12 md:py-24 px-6 md:px-12 bg-[#f9f9f9] overflow-hidden">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center gap-12 md:gap-20">
+          <div className="flex-1 text-center md:text-left">
+            <div className="inline-block border border-gray-200 bg-white rounded-full px-5 py-1.5 text-sm font-medium mb-8 text-gray-600">
+              Train Anywhere
+            </div>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium leading-[1.1] tracking-tight mb-6">
+              Your Personal Padel Coach In Your Pocket.
+            </h2>
+            <p className="text-gray-500 text-lg md:text-xl leading-relaxed mb-10 max-w-xl mx-auto md:mx-0">
+              Access all programs, track your progress, and get AI-powered personalized routines directly from our mobile app. Available on iOS and Android.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start mb-10">
+              <button className="flex items-center justify-center gap-3 bg-black text-white px-8 py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors">
+                <Smartphone className="w-6 h-6" />
+                <div className="text-left">
+                  <div className="text-[10px] uppercase tracking-wider opacity-80 leading-none mb-1">Download on the</div>
+                  <div className="text-sm leading-none">App Store</div>
+                </div>
+              </button>
+              <button className="flex items-center justify-center gap-3 bg-white border border-gray-200 text-black px-8 py-4 rounded-full font-semibold hover:bg-gray-50 transition-colors">
+                <Play className="w-6 h-6" />
+                <div className="text-left">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 leading-none mb-1">Get it on</div>
+                  <div className="text-sm leading-none">Google Play</div>
+                </div>
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-center md:justify-start gap-4">
+              <div className="flex -space-x-3">
+                <img src="https://i.pravatar.cc/100?img=1" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
+                <img src="https://i.pravatar.cc/100?img=2" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
+                <img src="https://i.pravatar.cc/100?img=3" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
+                <img src="https://i.pravatar.cc/100?img=4" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
+              </div>
+              <div className="text-sm">
+                <div className="flex text-[#ccff00]">
+                  <Star className="w-4 h-4 fill-current" />
+                  <Star className="w-4 h-4 fill-current" />
+                  <Star className="w-4 h-4 fill-current" />
+                  <Star className="w-4 h-4 fill-current" />
+                  <Star className="w-4 h-4 fill-current" />
+                </div>
+                <div className="text-gray-500 font-medium mt-0.5">5.0 from 2,000+ reviews</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex-1 w-full max-w-md mx-auto relative">
+            <div className="absolute inset-0 bg-[#ccff00]/20 blur-[100px] rounded-full"></div>
+            <img 
+              src="/Core Padel Workout 2-left.png" 
+              alt="Core Padel Workout App" 
+              className="relative z-10 w-full h-auto drop-shadow-2xl"
+            />
           </div>
         </div>
       </section>
@@ -430,6 +519,49 @@ export default function Home() {
                 Start Free Trial
               </button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-20 md:py-32 px-6 md:px-12 bg-white">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-medium mb-6 tracking-tight">Frequently Asked Questions</h2>
+            <p className="text-gray-500 text-lg">Everything you need to know about Core Padel Workout.</p>
+          </div>
+          
+          <div className="space-y-4">
+            {faqs.map((faq, index) => (
+              <div 
+                key={index} 
+                className={`border border-gray-200 rounded-2xl overflow-hidden transition-all duration-300 ${
+                  openFaqIndex === index ? "bg-gray-50 shadow-sm" : "bg-white hover:border-gray-300"
+                }`}
+              >
+                <button
+                  className="w-full px-6 py-5 flex items-center justify-between text-left focus:outline-none"
+                  onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+                >
+                  <span className="font-medium text-lg pr-8">{faq.question}</span>
+                  <ChevronDown 
+                    className={`w-5 h-5 text-gray-400 transition-transform duration-300 shrink-0 ${
+                      openFaqIndex === index ? "rotate-180" : ""
+                    }`} 
+                  />
+                </button>
+                
+                <div 
+                  className={`px-6 overflow-hidden transition-all duration-300 ease-in-out ${
+                    openFaqIndex === index ? "max-h-[500px] pb-6 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="text-gray-600 whitespace-pre-line leading-relaxed">
+                    {faq.answer}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
