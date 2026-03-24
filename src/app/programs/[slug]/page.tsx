@@ -1,158 +1,329 @@
-import { ArrowLeft, CheckCircle2, Clock, PlayCircle, Star, Target, Zap } from "lucide-react";
-import Link from "next/link";
+import type { Metadata } from "next";
+import { CheckCircle2, PlayCircle } from "lucide-react";
+import { notFound } from "next/navigation";
+import { createClient } from "@/utils/supabase/server";
+import { userHasProgramAccess } from "@/lib/programs/check-program-access";
+import { ProgramEnrollBar } from "../program-enroll-bar";
+import { ProgramExperienceLayout } from "../program-experience-layout";
 
-export default function ProgramDetail() {
+export const dynamic = "force-dynamic";
+
+type ProgramRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  body: string | null;
+  cover_image_url: string | null;
+  promo_video_url: string | null;
+  price: number | null;
+  duration_weeks: number | null;
+  sessions_per_week: number | null;
+  minutes_per_session: number | null;
+  outcomes: unknown;
+  difficulty_levels: { name: string } | { name: string }[] | null;
+};
+
+function firstDifficultyName(
+  v: ProgramRow["difficulty_levels"]
+): string | null {
+  if (v == null) return null;
+  const row = Array.isArray(v) ? v[0] : v;
+  if (!row || typeof row !== "object" || !("name" in row)) return null;
+  return String((row as { name: string }).name);
+}
+
+function normalizeOutcomes(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x): x is string => typeof x === "string")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function bodyParagraphs(body: string | null, description: string | null): string[] {
+  const primary = (body?.trim() || description?.trim() || "").trim();
+  if (!primary) return [];
+  return primary.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+}
+
+function formatStatWeeks(n: number | null): string {
+  if (n == null) return "—";
+  return `${n} Week${n === 1 ? "" : "s"}`;
+}
+
+function formatStatFrequency(n: number | null): string {
+  if (n == null) return "—";
+  return `${n}x / Week`;
+}
+
+function formatStatMins(n: number | null): string {
+  if (n == null) return "—";
+  return `${n} Min${n === 1 ? "" : "s"}`;
+}
+
+function formatPriceEur(price: number | null): string {
+  if (price == null) return "—";
+  try {
+    return new Intl.NumberFormat("en-IE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(Number(price));
+  } catch {
+    return `€${Number(price).toFixed(2)}`;
+  }
+}
+
+type CurriculumSession = {
+  id: string;
+  name: string;
+  description: string | null;
+  duration_minutes: number | null;
+  sort_order: number;
+};
+
+type CurriculumTrack = {
+  sort_order: number;
+  locationName: string | null;
+  sessions: CurriculumSession[];
+};
+
+function firstLocationName(
+  v: { name: string } | { name: string }[] | null | undefined
+): string | null {
+  if (v == null) return null;
+  const row = Array.isArray(v) ? v[0] : v;
+  if (!row || typeof row !== "object" || !("name" in row)) return null;
+  const n = String((row as { name: string }).name).trim();
+  return n.length > 0 ? n : null;
+}
+
+function normalizeSessionsList(
+  raw: CurriculumSession | CurriculumSession[] | null | undefined
+): CurriculumSession[] {
+  if (raw == null) return [];
+  const arr = Array.isArray(raw) ? raw : [raw];
+  return arr
+    .filter((s) => s && typeof s.id === "string")
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+function formatSessionMeta(mins: number | null): string {
+  if (mins == null || !Number.isFinite(mins) || mins < 0) return "—";
+  return `${Math.round(mins)} min`;
+}
+
+function buildCurriculumPreview(
+  rows: Array<{
+    sort_order: number;
+    locations: { name: string } | { name: string }[] | null;
+    program_sessions: CurriculumSession | CurriculumSession[] | null;
+  }> | null
+): CurriculumTrack[] {
+  if (!rows?.length) return [];
+  const tracks = [...rows]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((row) => ({
+      sort_order: row.sort_order,
+      locationName: firstLocationName(row.locations),
+      sessions: normalizeSessionsList(row.program_sessions),
+    }));
+  return tracks.filter((t) => t.sessions.length > 0);
+}
+
+type PageProps = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("programs")
+    .select("title, description")
+    .eq("slug", slug)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (!data) {
+    return { title: "Program" };
+  }
+
+  const row = data as { title: string; description: string | null };
+  return {
+    title: row.title,
+    description: row.description?.trim() || undefined,
+  };
+}
+
+export default async function ProgramDetail({ params }: PageProps) {
+  const { slug } = await params;
+  const supabase = await createClient();
+
+  const { data: raw, error } = await supabase
+    .from("programs")
+    .select(
+      `
+      id,
+      title,
+      description,
+      body,
+      cover_image_url,
+      promo_video_url,
+      price,
+      duration_weeks,
+      sessions_per_week,
+      minutes_per_session,
+      outcomes,
+      difficulty_levels ( name )
+    `
+    )
+    .eq("slug", slug)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (error) {
+    console.error("program detail:", error.message);
+    notFound();
+  }
+  if (!raw) {
+    notFound();
+  }
+
+  const program = raw as ProgramRow;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const hasAccess =
+    user != null ? await userHasProgramAccess(supabase, user.id, program.id) : false;
+
+  const { data: curriculumRows } = await supabase
+    .from("program_location_tracks")
+    .select(
+      `
+      sort_order,
+      locations ( name ),
+      program_sessions (
+        id,
+        name,
+        description,
+        duration_minutes,
+        sort_order
+      )
+    `
+    )
+    .eq("program_id", program.id)
+    .order("sort_order", { ascending: true });
+
+  const curriculumTracks = buildCurriculumPreview(
+    (curriculumRows ?? []) as Array<{
+      sort_order: number;
+      locations: { name: string } | { name: string }[] | null;
+      program_sessions: CurriculumSession | CurriculumSession[] | null;
+    }>
+  );
+  const outcomes = normalizeOutcomes(program.outcomes);
+  const aboutBlocks = bodyParagraphs(program.body, program.description);
+  const difficultyLabel = firstDifficultyName(program.difficulty_levels) ?? "Program";
+  const heroImage =
+    program.cover_image_url?.trim() || "/Padel_player_makes_202603231105.jpeg";
+  const subtitle =
+    program.description?.trim() ||
+    "Structured training to level up your game on and off the court.";
+  const priceLabel = formatPriceEur(program.price);
+
   return (
-    <div className="min-h-screen bg-white font-sans text-black selection:bg-[#ccff00] selection:text-black pb-24 md:pb-0">
-      
-      {/* Mobile Sticky Header (Visible on scroll) */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-white via-white/80 to-transparent pb-6 pt-4 px-4 flex items-center justify-between md:hidden">
-        <Link href="/" className="p-2 -ml-2 text-gray-800 hover:text-black bg-white/50 backdrop-blur-md rounded-full shadow-sm">
-          <ArrowLeft className="w-6 h-6" />
-        </Link>
-        <span className="font-semibold text-sm bg-white/50 backdrop-blur-md px-4 py-1.5 rounded-full shadow-sm">Smash Power</span>
-        <div className="w-10"></div> {/* Spacer for alignment */}
-      </div>
-
-      <div className="flex flex-col md:flex-row min-h-screen">
-        
-        {/* Left Column: Image & Mobile Hero */}
-        <div className="w-full md:w-1/2 md:fixed md:left-0 md:top-0 md:bottom-0 md:h-screen relative h-[60vh] md:h-auto">
-          <img 
-            src="/Padel_player_makes_202603231105.jpeg" 
-            alt="Smash Power Program" 
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20 md:bg-black/40"></div>
-          
-          {/* Desktop Back Button */}
-          <Link href="/" className="hidden md:flex absolute top-8 left-8 items-center gap-2 text-white/80 hover:text-white transition-colors z-10 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm font-medium">Back to Home</span>
-          </Link>
-
-          {/* Mobile Hero Content (Over image) */}
-          <div className="absolute bottom-0 left-0 right-0 p-6 text-white md:hidden">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="bg-[#ccff00] text-black text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Advanced</span>
-              <span className="bg-white/20 backdrop-blur-md text-white text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
-                <Star className="w-3 h-3 fill-current" /> 4.9 (128 reviews)
-              </span>
-            </div>
-            <h1 className="text-4xl font-medium leading-tight mb-2">Smash Power</h1>
-            <p className="text-gray-300 text-sm">Get a better smash through physics & strength.</p>
+    <ProgramExperienceLayout
+      programTitle={program.title}
+      subtitle={subtitle}
+      difficultyLabel={difficultyLabel}
+      heroImage={heroImage}
+      promoVideoUrl={program.promo_video_url}
+      statWeeks={formatStatWeeks(program.duration_weeks)}
+      statFrequency={formatStatFrequency(program.sessions_per_week)}
+      statMinutes={formatStatMins(program.minutes_per_session)}
+      backHref="/programs"
+      backLabel="Back to programs"
+      footer={
+        <ProgramEnrollBar programSlug={slug} priceLabel={priceLabel} hasAccess={hasAccess} />
+      }
+    >
+      {aboutBlocks.length > 0 && (
+        <div className="mb-12">
+          <h2 className="mb-4 text-2xl font-medium">About this program</h2>
+          <div className="space-y-4 leading-relaxed text-gray-600">
+            {aboutBlocks.map((block, i) => (
+              <p key={i}>{block}</p>
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Right Column: Content */}
-        <div className="w-full md:w-1/2 md:ml-[50%] bg-white relative z-10 rounded-t-3xl -mt-6 md:mt-0 md:rounded-none overflow-hidden">
-          <div className="max-w-2xl mx-auto p-6 md:p-12 lg:p-16">
-            
-            {/* Desktop Hero Content */}
-            <div className="hidden md:block mb-12">
-              <div className="flex items-center gap-3 mb-6">
-                <span className="bg-[#ccff00] text-black text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Advanced</span>
-                <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-current text-[#ffc107]" /> 4.9 (128 reviews)
-                </span>
-              </div>
-              <h1 className="text-5xl lg:text-6xl font-medium leading-tight mb-4 tracking-tight">Smash Power</h1>
-              <p className="text-gray-500 text-lg">Get a better smash through physics & strength.</p>
-            </div>
+      {outcomes.length > 0 && (
+        <div className="mb-12 rounded-3xl bg-gray-50 p-8">
+          <h3 className="mb-6 text-lg font-medium">What you&apos;ll achieve</h3>
+          <ul className="space-y-4">
+            {outcomes.map((item, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-black" />
+                <span className="text-gray-700">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-12 py-6 border-y border-gray-100">
-              <div className="flex flex-col items-center text-center">
-                <Clock className="w-6 h-6 text-gray-400 mb-2" />
-                <span className="text-sm font-semibold">4 Weeks</span>
-                <span className="text-xs text-gray-500">Duration</span>
-              </div>
-              <div className="flex flex-col items-center text-center border-x border-gray-100">
-                <Target className="w-6 h-6 text-gray-400 mb-2" />
-                <span className="text-sm font-semibold">3x / Week</span>
-                <span className="text-xs text-gray-500">Frequency</span>
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <Zap className="w-6 h-6 text-gray-400 mb-2" />
-                <span className="text-sm font-semibold">30 Mins</span>
-                <span className="text-xs text-gray-500">Per Session</span>
-              </div>
-            </div>
-
-            {/* About Program */}
-            <div className="mb-12">
-              <h2 className="text-2xl font-medium mb-4">About this program</h2>
-              <p className="text-gray-600 leading-relaxed mb-6">
-                Stop hitting the net and start finishing points. This 4-week program breaks down the biomechanics of the perfect padel smash and builds the specific muscular strength required to execute it flawlessly. 
-              </p>
-              <p className="text-gray-600 leading-relaxed">
-                You'll work on rotational core power, shoulder mobility, and explosive leg drive. Whether you're struggling with the kick smash (por tres) or just want more raw power, this is your blueprint.
-              </p>
-            </div>
-
-            {/* What you'll learn */}
-            <div className="mb-12 bg-gray-50 rounded-3xl p-8">
-              <h3 className="text-lg font-medium mb-6">What you'll achieve</h3>
-              <ul className="space-y-4">
-                {[
-                  "Increase racket head speed by up to 25%",
-                  "Master the kinetic chain from feet to wrist",
-                  "Develop explosive rotational core strength",
-                  "Learn the exact footwork for overhead positioning",
-                  "Prevent common shoulder and elbow injuries"
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-black shrink-0 mt-0.5" />
-                    <span className="text-gray-700">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Curriculum Preview */}
-            <div className="mb-12">
-              <h2 className="text-2xl font-medium mb-6">Curriculum Preview</h2>
-              <div className="space-y-4">
-                {[
-                  { week: "Week 1", title: "Mobility & The Kinetic Chain", duration: "3 sessions" },
-                  { week: "Week 2", title: "Core Rotation & Stability", duration: "3 sessions" },
-                  { week: "Week 3", title: "Explosive Leg Drive", duration: "3 sessions" },
-                  { week: "Week 4", title: "Putting It All Together on Court", duration: "3 sessions" }
-                ].map((module, i) => (
-                  <div key={i} className="flex items-center justify-between p-5 rounded-2xl border border-gray-100 hover:border-gray-300 transition-colors cursor-pointer group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                        <PlayCircle className="w-5 h-5" />
+      <div className="mb-12">
+        <h2 className="mb-6 text-2xl font-medium">Curriculum Preview</h2>
+        {curriculumTracks.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 px-5 py-8 text-center text-sm text-gray-500">
+            Session details for this program aren&apos;t available yet.
+          </p>
+        ) : (
+          <div className="space-y-8">
+            {curriculumTracks.map((track, trackIndex) => (
+              <div key={`${track.sort_order}-${trackIndex}`} className="space-y-4">
+                {curriculumTracks.length > 1 && track.locationName && (
+                  <p className="text-xs font-bold tracking-wider text-gray-400 uppercase">
+                    {track.locationName}
+                  </p>
+                )}
+                {track.sessions.map((session, si) => {
+                  const label = `Session ${si + 1}`;
+                  const desc = session.description?.trim();
+                  return (
+                    <div
+                      key={session.id}
+                      className="flex items-start justify-between gap-4 rounded-2xl border border-gray-100 p-5 transition-colors hover:border-gray-300"
+                    >
+                      <div className="flex min-w-0 flex-1 items-start gap-4">
+                        <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700">
+                          <PlayCircle className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 text-xs font-bold tracking-wider text-gray-400 uppercase">
+                            {label}
+                          </div>
+                          <div className="font-medium text-gray-900">
+                            {session.name?.trim() || `Session ${si + 1}`}
+                          </div>
+                          {desc && (
+                            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-gray-500">
+                              {desc}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{module.week}</div>
-                        <div className="font-medium">{module.title}</div>
+                      <div className="shrink-0 text-sm tabular-nums text-gray-500">
+                        {formatSessionMeta(session.duration_minutes)}
                       </div>
                     </div>
-                    <div className="text-sm text-gray-500">{module.duration}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
-
-            {/* Spacer for mobile bottom bar */}
-            <div className="h-24 md:h-0"></div>
-
+            ))}
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Sticky Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 md:left-1/2 bg-white border-t border-gray-100 p-4 md:p-6 z-50 flex items-center justify-between">
-        <div className="hidden md:block">
-          <div className="text-sm text-gray-500 mb-1">One-time payment</div>
-          <div className="text-2xl font-medium">$49.00</div>
-        </div>
-        <button className="w-full md:w-auto bg-[#ccff00] text-black px-8 py-4 rounded-full font-semibold hover:bg-[#b3e600] transition-colors flex items-center justify-center gap-2 text-lg">
-          Start Program Now <span className="md:hidden ml-2 font-normal opacity-50">· $49</span>
-        </button>
-      </div>
-
-    </div>
+    </ProgramExperienceLayout>
   );
 }
