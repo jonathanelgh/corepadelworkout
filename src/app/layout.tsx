@@ -22,11 +22,37 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://corepadelworkout.com"),
   title: {
     default: "Core Padel Workout",
     template: "%s · Core Padel Workout",
   },
-  description: "Padel-focused training and workouts.",
+  description:
+    "Padel-focused strength, conditioning, and rehab programs to help you move better, hit harder, and stay injury-free.",
+  openGraph: {
+    title: "Core Padel Workout",
+    description:
+      "Padel-focused strength, conditioning, and rehab programs to help you move better, hit harder, and stay injury-free.",
+    url: "/",
+    siteName: "Core Padel Workout",
+    images: [
+      {
+        url: "/hero-bg.webp",
+        width: 1200,
+        height: 630,
+        alt: "Core Padel Workout landing page",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Core Padel Workout",
+    description:
+      "Padel-focused strength, conditioning, and rehab programs to help you move better, hit harder, and stay injury-free.",
+    images: ["/hero-bg.webp"],
+  },
 };
 
 export default function RootLayout({

@@ -181,14 +181,26 @@ export default function ElbowPainPage() {
               Pricing
             </a>
           </div>
-          <Link
-            href="/onboarding/apply"
-            className={`hidden md:block px-6 py-2.5 rounded-full text-sm font-semibold transition-colors ${
-              isScrolled ? "bg-black text-white hover:bg-gray-800" : "bg-white text-black hover:bg-gray-100"
-            }`}
-          >
-            Start your plan
-          </Link>
+          <div className="hidden items-center gap-3 md:flex">
+            <Link
+              href="/login"
+              className={`px-4 py-2.5 rounded-full text-sm font-semibold transition-colors ${
+                isScrolled
+                  ? "bg-white text-black hover:bg-gray-100 border border-gray-200"
+                  : "bg-black/35 text-white hover:bg-black/50 border border-white/30"
+              }`}
+            >
+              Login
+            </Link>
+            <Link
+              href="/onboarding/apply"
+              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-colors ${
+                isScrolled ? "bg-black text-white hover:bg-gray-800" : "bg-white text-black hover:bg-gray-100"
+              }`}
+            >
+              Start your plan
+            </Link>
+          </div>
 
           <button
             className="md:hidden p-2 -mr-2 relative z-[100]"
@@ -239,6 +251,12 @@ export default function ElbowPainPage() {
           </a>
         </div>
         <div className="mt-auto p-6 border-t border-gray-100">
+          <Link
+            href="/login"
+            className="mb-3 block w-full border border-gray-200 bg-white px-6 py-4 rounded-full font-semibold text-black hover:bg-gray-50 transition-colors text-center"
+          >
+            Login
+          </Link>
           <Link
             href="/onboarding/apply"
             className="block w-full bg-black text-white px-6 py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors text-center"
