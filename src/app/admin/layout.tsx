@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Users, 
@@ -15,11 +15,23 @@ import {
   Bell,
   User
 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function signOut() {
+    setSigningOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setIsProfileOpen(false);
+    router.push("/login");
+    router.refresh();
+  }
 
   const navItems = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -71,9 +83,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <User className="w-4 h-4" />
                     Profile
                   </Link>
-                  <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                  <button
+                    type="button"
+                    disabled={signingOut}
+                    onClick={() => void signOut()}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
                     <LogOut className="w-4 h-4" />
-                    Sign out
+                    {signingOut ? "Signing out…" : "Sign out"}
                   </button>
                 </div>
               </>

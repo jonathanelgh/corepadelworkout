@@ -88,6 +88,7 @@ export default function Home() {
   const [currentStatIndex, setCurrentStatIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [showMobileStickyCta, setShowMobileStickyCta] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -112,6 +113,46 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    const heroCta = document.getElementById("home-hero-cta");
+    if (!heroCta) return;
+
+    const mql = window.matchMedia("(max-width: 767px)");
+    let isMobile = mql.matches;
+    let heroInView = true;
+
+    function update() {
+      setShowMobileStickyCta(isMobile && !heroInView);
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        heroInView = Boolean(entry?.isIntersecting);
+        update();
+      },
+      { threshold: 0.2 }
+    );
+
+    observer.observe(heroCta);
+
+    const onMqlChange = (e: MediaQueryListEvent) => {
+      isMobile = e.matches;
+      update();
+    };
+
+    // Safari compat
+    if (typeof mql.addEventListener === "function") mql.addEventListener("change", onMqlChange);
+    else mql.addListener(onMqlChange);
+
+    update();
+
+    return () => {
+      observer.disconnect();
+      if (typeof mql.removeEventListener === "function") mql.removeEventListener("change", onMqlChange);
+      else mql.removeListener(onMqlChange);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white font-sans text-black selection:bg-[#ccff00] selection:text-black">
       {/* Navbar */}
@@ -128,13 +169,14 @@ export default function Home() {
             <a href="#" className={`transition-colors ${isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]"}`}>Programs</a>
             <a href="#" className={`transition-colors ${isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]"}`}>Pricing</a>
           </div>
-          <button className={`hidden md:block px-6 py-2.5 rounded-full text-sm font-semibold transition-colors ${
-            isScrolled 
-              ? "bg-black text-white hover:bg-gray-800" 
-              : "bg-white text-black hover:bg-gray-100"
-          }`}>
-            Contact Us
-          </button>
+          <Link
+            href="/onboarding/apply"
+            className={`hidden md:block px-6 py-2.5 rounded-full text-sm font-semibold transition-colors ${
+              isScrolled ? "bg-black text-white hover:bg-gray-800" : "bg-white text-black hover:bg-gray-100"
+            }`}
+          >
+            Get Started Now
+          </Link>
           
           {/* Mobile Menu Button */}
           <button 
@@ -178,9 +220,12 @@ export default function Home() {
           <a href="#" className="hover:text-gray-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Pricing</a>
         </div>
         <div className="mt-auto p-6 border-t border-gray-100">
-          <button className="w-full bg-black text-white px-6 py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors">
-            Contact Us
-          </button>
+          <Link
+            href="/onboarding/apply"
+            className="block w-full bg-black text-white px-6 py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors text-center"
+          >
+            Get Started Now
+          </Link>
         </div>
       </div>
 
@@ -228,8 +273,12 @@ export default function Home() {
               Professional training programs for Padel. Move faster, hit harder, and stay injury-free with workouts you can do at the gym, at home, or on the court.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Link href="/programs" className="bg-[#ccff00] text-black px-8 py-3.5 rounded-full font-semibold hover:bg-[#b3e600] transition-colors">
-                Browse Our Padel Programs
+              <Link
+                id="home-hero-cta"
+                href="/onboarding/apply"
+                className="bg-[#ccff00] text-black px-8 py-3.5 rounded-full font-semibold hover:bg-[#b3e600] transition-colors"
+              >
+                Get Started Now
               </Link>
               <Link href="/free-warmup" className="bg-white text-black px-8 py-3.5 rounded-full font-semibold hover:bg-gray-100 transition-colors">
                 Free 15-Min Pre-Match Warmup
@@ -591,6 +640,23 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Mobile sticky CTA (shows when hero CTA is off-screen) */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-[120] md:hidden transition-transform duration-300 ${
+          showMobileStickyCta && !isMobileMenuOpen ? "translate-y-0" : "translate-y-full"
+        }`}
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="w-full border-t border-black/10 bg-white/95 p-3 backdrop-blur">
+          <Link
+            href="/onboarding/apply"
+            className="flex w-full items-center justify-center rounded-xl bg-[#ccff00] px-5 py-3.5 text-sm font-semibold text-black hover:bg-[#b3e600] transition-colors"
+          >
+            Get Started Now
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
