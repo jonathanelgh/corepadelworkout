@@ -298,7 +298,7 @@ export default function ElbowPainPage() {
             </div>
             <p className="text-sm font-semibold uppercase tracking-widest text-[#ccff00] mb-4">Elbow pain from padel</p>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-medium leading-[1.08] tracking-tight">
-              When every match makes your elbow worse, the problem is not motivation. It is overload.
+              Fix padel elbow pain — and play again without the flare-ups.
             </h1>
           </div>
 
