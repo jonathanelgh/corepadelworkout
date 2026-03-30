@@ -19,9 +19,7 @@ type Props = {
 
 function categoryOptionsFor(programs: ProgramCard[]): string[] {
   const names = [
-    ...new Set(
-      programs.map((p) => p.categoryName).filter((n): n is string => n != null && n.length > 0 && n !== "All")
-    ),
+    ...new Set(programs.flatMap((p) => p.categoryNames).filter((n) => n.length > 0 && n !== "All")),
   ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   return ["All", ...names];
 }

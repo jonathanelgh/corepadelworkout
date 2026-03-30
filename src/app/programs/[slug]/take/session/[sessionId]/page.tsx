@@ -83,6 +83,10 @@ export default async function SessionWorkoutPage({ params }: PageProps) {
     .select(
       `
       sort_order,
+      duration_minutes,
+      sets,
+      reps,
+      rest_after_seconds,
       exercises (
         id,
         title,
@@ -101,6 +105,10 @@ export default async function SessionWorkoutPage({ params }: PageProps) {
 
   type PeIn = {
     sort_order: number;
+    duration_minutes: number | null;
+    sets: number | null;
+    reps: number | null;
+    rest_after_seconds: number | null;
     exercises: WorkoutExercise | WorkoutExercise[] | null;
   };
 
@@ -115,6 +123,10 @@ export default async function SessionWorkoutPage({ params }: PageProps) {
         description: ex.description ?? null,
         how_to: ex.how_to ?? null,
         video_url: ex.video_url ?? null,
+        duration_minutes: row.duration_minutes,
+        sets: row.sets,
+        reps: row.reps,
+        rest_after_seconds: row.rest_after_seconds,
       });
     }
   }

@@ -18,7 +18,10 @@ export default async function ProgramsPage() {
         cover_image_url,
         duration_weeks,
         price,
-        categories ( name ),
+        program_categories (
+          sort_order,
+          categories ( name )
+        ),
         difficulty_levels ( name )
       `
       )
@@ -37,9 +40,7 @@ export default async function ProgramsPage() {
 
   const namesFromPrograms = [
     ...new Set(
-      programs
-        .map((p) => p.categoryName)
-        .filter((n): n is string => n != null && n.length > 0 && n !== "All")
+      programs.flatMap((p) => p.categoryNames).filter((n) => n.length > 0 && n !== "All")
     ),
   ];
 

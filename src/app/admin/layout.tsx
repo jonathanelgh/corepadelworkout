@@ -8,6 +8,8 @@ import {
   Users, 
   Dumbbell, 
   Activity,
+  Package,
+  Tag,
   Settings, 
   LogOut, 
   ChevronLeft, 
@@ -38,6 +40,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Programs", href: "/admin/programs", icon: Dumbbell },
     { name: "Exercises", href: "/admin/exercises", icon: Activity },
+    { name: "Equipment", href: "/admin/exercises/equipment", icon: Package },
+    { name: "Exercise tags", href: "/admin/exercises/tags", icon: Tag },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 

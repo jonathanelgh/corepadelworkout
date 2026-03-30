@@ -53,8 +53,7 @@ export function ProgramsCatalog({
         program.title.toLowerCase().includes(q) ||
         program.description.toLowerCase().includes(q);
       const matchesCategory =
-        activeCategory === "All" ||
-        (program.categoryName != null && program.categoryName === activeCategory);
+        activeCategory === "All" || program.categoryNames.includes(activeCategory);
       return matchesSearch && matchesCategory;
     });
   }, [programs, searchQuery, activeCategory]);
@@ -133,7 +132,8 @@ export function ProgramsCatalog({
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
           {filteredPrograms.map((program) => {
             const priceStr = formatPriceEur(program.price);
-            const categoryBadge = program.categoryName ?? "Program";
+            const categoryBadge =
+              program.categoryNames.length > 0 ? program.categoryNames.join(" · ") : (program.categoryName ?? "Program");
             const levelLabel = program.difficultyName ?? "All levels";
             return (
               <Link
@@ -149,8 +149,8 @@ export function ProgramsCatalog({
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-60" />
-                  <div className="absolute top-4 left-4 flex gap-2">
-                    <span className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold tracking-wider text-black uppercase backdrop-blur-sm">
+                  <div className="absolute top-4 left-4 flex max-w-[calc(100%-5rem)] gap-2">
+                    <span className="line-clamp-2 rounded-full bg-white/90 px-3 py-1.5 text-left text-xs font-bold tracking-wider text-black uppercase backdrop-blur-sm">
                       {categoryBadge}
                     </span>
                   </div>

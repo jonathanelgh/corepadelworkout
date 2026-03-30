@@ -53,3 +53,58 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
   revalidatePath("/admin/exercises");
   return { ok: true };
 }
+
+export async function updateExercise(formData: FormData): Promise<CreateExerciseResult> {
+  const id = (formData.get("id") as string)?.trim();
+  const title = (formData.get("title") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() || null;
+  const how_to = (formData.get("how_to") as string)?.trim() || null;
+  const video_url = (formData.get("video_url") as string)?.trim() || null;
+  const image_url = (formData.get("image_url") as string)?.trim() || null;
+  const location_id = formData.get("location_id") as string;
+
+  if (!id) {
+    return { error: "Missing exercise id." };
+  }
+  if (!title) {
+    return { error: "Title is required." };
+  }
+  if (!location_id) {
+    return { error: "Location is required." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "You must be signed in (open /login)." };
+  }
+
+  const isAdmin = await getIsAdmin(supabase);
+  if (!isAdmin) {
+    return {
+      error:
+        "Not authorized: add your auth user id to public.admin_users in Supabase, then try again.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("exercises")
+    .update({
+      title,
+      description,
+      how_to,
+      video_url,
+      image_url,
+      location_id,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/admin/exercises");
+  return { ok: true };
+}

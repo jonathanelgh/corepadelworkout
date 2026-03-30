@@ -36,7 +36,10 @@ export default async function MemberProgramsPage() {
         cover_image_url,
         duration_weeks,
         price,
-        categories ( name ),
+        program_categories (
+          sort_order,
+          categories ( name )
+        ),
         difficulty_levels ( name )
       `
       )
@@ -54,7 +57,10 @@ export default async function MemberProgramsPage() {
           cover_image_url,
           duration_weeks,
           price,
-          categories ( name ),
+          program_categories (
+            sort_order,
+            categories ( name )
+          ),
           difficulty_levels ( name )
         )
       `
@@ -75,11 +81,7 @@ export default async function MemberProgramsPage() {
     .filter((n): n is string => typeof n === "string" && n.length > 0 && n !== "All");
 
   const namesFromPrograms = [
-    ...new Set(
-      allPrograms
-        .map((p) => p.categoryName)
-        .filter((n): n is string => n != null && n.length > 0 && n !== "All")
-    ),
+    ...new Set(allPrograms.flatMap((p) => p.categoryNames).filter((n) => n.length > 0 && n !== "All")),
   ];
 
   const categoryOptionsAll = [

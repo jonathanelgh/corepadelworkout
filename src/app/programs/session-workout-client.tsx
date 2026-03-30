@@ -11,7 +11,37 @@ export type WorkoutExercise = {
   description: string | null;
   how_to: string | null;
   video_url: string | null;
+  /** Prescription for this exercise in this program session */
+  duration_minutes?: number | null;
+  sets?: number | null;
+  reps?: number | null;
+  /** Pause after this exercise before the next (seconds) */
+  rest_after_seconds?: number | null;
 };
+
+function formatExercisePrescription(ex: WorkoutExercise): string | null {
+  const parts: string[] = [];
+  const sets = ex.sets;
+  const reps = ex.reps;
+  if (sets != null && Number.isFinite(sets) && sets > 0 && reps != null && Number.isFinite(reps) && reps > 0) {
+    parts.push(`${sets}×${reps}`);
+  } else if (sets != null && Number.isFinite(sets) && sets > 0) {
+    parts.push(`${sets} set${sets === 1 ? "" : "s"}`);
+  } else if (reps != null && Number.isFinite(reps) && reps > 0) {
+    parts.push(`${reps} reps`);
+  }
+  const mins = ex.duration_minutes;
+  if (mins != null && Number.isFinite(mins) && mins > 0) {
+    parts.push(`${mins} min`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function restAfterLabel(ex: WorkoutExercise): string | null {
+  const r = ex.rest_after_seconds;
+  if (r == null || !Number.isFinite(r) || r <= 0) return null;
+  return `${Math.round(r)}s rest after`;
+}
 
 function howToBlocks(text: string | null): string[] {
   if (!text?.trim()) return [];
@@ -35,23 +65,67 @@ export function SessionWorkoutClient({
 }: Props) {
   const [index, setIndex] = useState(0);
   const [listOpen, setListOpen] = useState(false);
+  /** Countdown seconds while resting between exercises; null = not in rest phase */
+  const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
 
   const safeLen = exercises.length;
   const current = safeLen > 0 ? exercises[Math.min(index, safeLen - 1)] : null;
   const isLast = safeLen > 0 && index >= safeLen - 1;
+  const nextExercise = !isLast && safeLen > 0 ? exercises[index + 1] : null;
+  const inRest = restSecondsLeft !== null && restSecondsLeft > 0;
 
   const steps = useMemo(() => howToBlocks(current?.how_to ?? null), [current?.how_to]);
+  const prescription = useMemo(
+    () => (current ? formatExercisePrescription(current) : null),
+    [current]
+  );
 
-  const goNext = useCallback(() => {
-    if (safeLen === 0) return;
+  useEffect(() => {
+    if (restSecondsLeft === null || restSecondsLeft <= 0) return;
+    const t = window.setTimeout(() => {
+      setRestSecondsLeft((r) => {
+        if (r === null || r <= 1) {
+          setIndex((i) => Math.min(i + 1, safeLen - 1));
+          return null;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => window.clearTimeout(t);
+  }, [restSecondsLeft, safeLen]);
+
+  const clearRest = useCallback(() => {
+    setRestSecondsLeft(null);
+  }, []);
+
+  const startRestOrAdvance = useCallback(() => {
+    if (safeLen === 0 || !current) return;
+    const raw = current.rest_after_seconds;
+    const sec =
+      raw != null && Number.isFinite(raw) && raw > 0 ? Math.min(Math.floor(Number(raw)), 3600) : 0;
+    if (sec > 0 && !isLast) {
+      setRestSecondsLeft(sec);
+      setListOpen(false);
+    } else if (!isLast) {
+      setIndex((i) => Math.min(i + 1, safeLen - 1));
+      setListOpen(false);
+    }
+  }, [safeLen, current, isLast]);
+
+  const skipRestAndAdvance = useCallback(() => {
+    setRestSecondsLeft(null);
     setIndex((i) => Math.min(i + 1, safeLen - 1));
     setListOpen(false);
   }, [safeLen]);
 
   const goPrev = useCallback(() => {
+    if (restSecondsLeft !== null) {
+      setRestSecondsLeft(null);
+      return;
+    }
     setIndex((i) => Math.max(0, i - 1));
     setListOpen(false);
-  }, []);
+  }, [restSecondsLeft]);
 
   useEffect(() => {
     if (listOpen) {
@@ -77,19 +151,26 @@ export function SessionWorkoutClient({
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">Session</p>
+            <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+              {inRest ? "Rest" : "Session"}
+            </p>
             <h1 className="truncate text-base font-semibold text-gray-900">{sessionName}</h1>
           </div>
-          {safeLen > 0 && (
+          {safeLen > 0 && !inRest && (
             <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium tabular-nums text-gray-600">
               {index + 1} / {safeLen}
+            </span>
+          )}
+          {inRest && (
+            <span className="shrink-0 rounded-full bg-[#ccff00] px-2.5 py-1 text-xs font-semibold tabular-nums text-black">
+              {restSecondsLeft}s
             </span>
           )}
         </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-4 pt-6">
-        {sessionDescription?.trim() && (
+        {sessionDescription?.trim() && !inRest && (
           <p className="mb-6 text-sm leading-relaxed text-gray-600">{sessionDescription.trim()}</p>
         )}
 
@@ -97,6 +178,26 @@ export function SessionWorkoutClient({
           <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-12 text-center text-sm text-gray-500">
             No exercises in this session yet.
           </p>
+        ) : inRest ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 px-6 py-16 text-center">
+            <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">Rest</p>
+            <p className="mt-4 font-mono text-6xl font-semibold tabular-nums text-gray-900">
+              {restSecondsLeft}
+            </p>
+            <p className="mt-2 text-sm text-gray-500">seconds</p>
+            {nextExercise && (
+              <p className="mt-8 max-w-sm text-sm text-gray-700">
+                Up next: <span className="font-medium text-gray-900">{nextExercise.title}</span>
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={skipRestAndAdvance}
+              className="mt-8 rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+            >
+              Skip rest
+            </button>
+          </div>
         ) : current ? (
           <article className="space-y-5">
             {current.video_url?.trim() ? (
@@ -110,6 +211,12 @@ export function SessionWorkoutClient({
             <div>
               <p className="text-xs font-bold tracking-wider text-gray-400 uppercase">Exercise {index + 1}</p>
               <h2 className="mt-1 text-2xl font-medium tracking-tight text-gray-900">{current.title}</h2>
+              {prescription && (
+                <p className="mt-2 text-sm font-medium tabular-nums text-gray-600">{prescription}</p>
+              )}
+              {restAfterLabel(current) && (
+                <p className="mt-1 text-xs tabular-nums text-gray-500">{restAfterLabel(current)}</p>
+              )}
               {current.description?.trim() && (
                 <p className="mt-3 text-base leading-relaxed text-gray-600">{current.description.trim()}</p>
               )}
@@ -151,23 +258,36 @@ export function SessionWorkoutClient({
               </button>
             </div>
             <ul className="max-h-[55vh] overflow-y-auto py-2">
-              {exercises.map((ex, i) => (
-                <li key={ex.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIndex(i);
-                      setListOpen(false);
-                    }}
-                    className={`flex w-full items-start gap-3 px-4 py-3 text-left text-sm transition-colors ${
-                      i === index ? "bg-[#ccff00]/25 font-medium" : "hover:bg-gray-50"
-                    }`}
-                  >
-                    <span className="mt-0.5 w-6 shrink-0 tabular-nums text-gray-400">{i + 1}.</span>
-                    <span className="text-gray-900">{ex.title}</span>
-                  </button>
-                </li>
-              ))}
+              {exercises.map((ex, i) => {
+                const sub = formatExercisePrescription(ex);
+                const rest = restAfterLabel(ex);
+                return (
+                  <li key={`${ex.id}-${i}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearRest();
+                        setIndex(i);
+                        setListOpen(false);
+                      }}
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left text-sm transition-colors ${
+                        i === index ? "bg-[#ccff00]/25 font-medium" : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="mt-0.5 w-6 shrink-0 tabular-nums text-gray-400">{i + 1}.</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-gray-900">{ex.title}</span>
+                        {sub && (
+                          <span className="mt-0.5 block text-xs tabular-nums text-gray-500">{sub}</span>
+                        )}
+                        {rest && (
+                          <span className="mt-0.5 block text-xs tabular-nums text-gray-400">{rest}</span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
@@ -182,17 +302,19 @@ export function SessionWorkoutClient({
           <button
             type="button"
             onClick={goPrev}
-            disabled={index <= 0 || safeLen === 0}
+            disabled={(index <= 0 && restSecondsLeft === null) || safeLen === 0}
             className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-xl border border-gray-200 py-3.5 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-35"
           >
             <ArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="truncate">Back</span>
+            <span className="truncate">{restSecondsLeft !== null ? "Cancel rest" : "Back"}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setListOpen(true)}
-            disabled={safeLen === 0}
+            onClick={() => {
+              if (!inRest) setListOpen(true);
+            }}
+            disabled={safeLen === 0 || inRest}
             className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-900 text-white transition-colors hover:bg-gray-800 disabled:opacity-35"
             aria-label="Exercise list"
           >
@@ -209,8 +331,8 @@ export function SessionWorkoutClient({
           ) : (
             <button
               type="button"
-              onClick={goNext}
-              disabled={safeLen === 0}
+              onClick={startRestOrAdvance}
+              disabled={safeLen === 0 || inRest}
               className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition-colors hover:bg-[#b3e600] disabled:opacity-35"
             >
               <span className="truncate">Next exercise</span>

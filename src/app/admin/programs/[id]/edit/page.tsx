@@ -5,12 +5,20 @@ import {
   CreateProgramForm,
   type ProgramFormInitialValues,
   type SessionBlock,
+  type SessionExerciseEntry,
   type TrackBlock,
 } from "../../new/create-program-form";
 
 export const dynamic = "force-dynamic";
 
-type ExerciseRow = { exercise_id: string; sort_order: number };
+type ExerciseRow = {
+  exercise_id: string;
+  sort_order: number;
+  duration_minutes: number | null;
+  sets: number | null;
+  reps: number | null;
+  rest_after_seconds: number | null;
+};
 type SessionRow = {
   name: string;
   description: string | null;
@@ -44,7 +52,7 @@ function mapTracks(rows: TrackRow[] | null, fallbackLocationId: string): TrackBl
             name: "Day 1",
             description: "",
             durationMinutes: "",
-            exerciseIds: [],
+            exercises: [],
           },
         ],
       },
@@ -61,6 +69,20 @@ function mapTracks(rows: TrackRow[] | null, fallbackLocationId: string): TrackBl
       const pe = s.program_exercises;
       const exList = Array.isArray(pe) ? pe : pe != null ? [pe] : [];
       const ex = exList.slice().sort((a, b) => a.sort_order - b.sort_order);
+      const exercises: SessionExerciseEntry[] = ex.map((e) => ({
+        key: randomUUID(),
+        exerciseId: e.exercise_id,
+        durationMinutes:
+          e.duration_minutes != null && Number.isFinite(e.duration_minutes)
+            ? String(e.duration_minutes)
+            : "",
+        sets: e.sets != null && Number.isFinite(e.sets) ? String(e.sets) : "",
+        reps: e.reps != null && Number.isFinite(e.reps) ? String(e.reps) : "",
+        restAfterSeconds:
+          e.rest_after_seconds != null && Number.isFinite(e.rest_after_seconds)
+            ? String(e.rest_after_seconds)
+            : "",
+      }));
       return {
         key: randomUUID(),
         name: s.name?.trim() || `Day ${idx + 1}`,
@@ -69,7 +91,7 @@ function mapTracks(rows: TrackRow[] | null, fallbackLocationId: string): TrackBl
           s.duration_minutes != null && Number.isFinite(s.duration_minutes)
             ? String(s.duration_minutes)
             : "",
-        exerciseIds: ex.map((e) => e.exercise_id),
+        exercises,
       };
     });
     return {
@@ -81,7 +103,7 @@ function mapTracks(rows: TrackRow[] | null, fallbackLocationId: string): TrackBl
           name: "Day 1",
           description: "",
           durationMinutes: "",
-          exerciseIds: [],
+          exercises: [],
         },
       ],
     };
@@ -111,7 +133,6 @@ export default async function EditProgramPage({ params }: PageProps) {
         slug,
         description,
         body,
-        category_id,
         difficulty_level_id,
         status,
         cover_image_url,
@@ -121,7 +142,8 @@ export default async function EditProgramPage({ params }: PageProps) {
         duration_weeks,
         sessions_per_week,
         minutes_per_session,
-        outcomes
+        outcomes,
+        program_categories ( category_id, sort_order )
       `
       )
       .eq("id", id)
@@ -139,7 +161,11 @@ export default async function EditProgramPage({ params }: PageProps) {
           sort_order,
           program_exercises (
             exercise_id,
-            sort_order
+            sort_order,
+            duration_minutes,
+            sets,
+            reps,
+            rest_after_seconds
           )
         )
       `
@@ -161,7 +187,6 @@ export default async function EditProgramPage({ params }: PageProps) {
     title: string;
     description: string | null;
     body: string | null;
-    category_id: string | null;
     difficulty_level_id: string | null;
     status: string;
     cover_image_url: string | null;
@@ -172,7 +197,15 @@ export default async function EditProgramPage({ params }: PageProps) {
     sessions_per_week: number | null;
     minutes_per_session: number | null;
     outcomes: unknown;
+    program_categories: { category_id: string; sort_order: number }[] | { category_id: string; sort_order: number } | null;
   };
+
+  const pcRaw = p.program_categories;
+  const pcArr = Array.isArray(pcRaw) ? pcRaw : pcRaw != null ? [pcRaw] : [];
+  const sortedCategoryIds = [...pcArr]
+    .filter((x) => x && typeof x.category_id === "string")
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((x) => x.category_id);
 
   const locations = locationsRes.data ?? [];
   const defaultLocationId = locations[0]?.id ?? "";
@@ -183,7 +216,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     title: p.title,
     description: p.description ?? "",
     body: p.body ?? "",
-    categoryId: p.category_id ?? "",
+    categoryIds: sortedCategoryIds,
     difficultyLevelId: p.difficulty_level_id ?? "",
     coverImageUrl: p.cover_image_url ?? "",
     promoVideoUrl: p.promo_video_url ?? "",

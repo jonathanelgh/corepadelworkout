@@ -34,13 +34,24 @@ type CategoryOption = { id: string; name: string; slug: string };
 type DifficultyOption = { id: string; name: string; slug: string };
 type LocationOption = { id: string; name: string; slug: string };
 
+export type SessionExerciseEntry = {
+  key: string;
+  exerciseId: string;
+  /** Minutes for this exercise in this program; empty = not set */
+  durationMinutes: string;
+  sets: string;
+  reps: string;
+  /** Seconds of pause after this exercise before the next; empty = none */
+  restAfterSeconds: string;
+};
+
 export type SessionBlock = {
   key: string;
   name: string;
   description: string;
   /** Plain input value; empty = no duration stored */
   durationMinutes: string;
-  exerciseIds: string[];
+  exercises: SessionExerciseEntry[];
 };
 
 export type TrackBlock = {
@@ -53,7 +64,7 @@ export type ProgramFormInitialValues = {
   title: string;
   description: string;
   body: string;
-  categoryId: string;
+  categoryIds: string[];
   difficultyLevelId: string;
   coverImageUrl: string;
   promoVideoUrl: string;
@@ -75,7 +86,7 @@ function newSession(dayIndex: number): SessionBlock {
     name: dayIndex <= 1 ? "Day 1" : `Day ${dayIndex}`,
     description: "",
     durationMinutes: "",
-    exerciseIds: [],
+    exercises: [],
   };
 }
 
@@ -143,7 +154,12 @@ export function CreateProgramForm({
       ? initial.outcomes.map((text) => ({ key: crypto.randomUUID(), text }))
       : [{ key: crypto.randomUUID(), text: "" }]
   );
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(() => initial?.categoryIds ?? []);
   const [activeLocationTabKey, setActiveLocationTabKey] = useState<string | null>(null);
+
+  function toggleCategory(id: string) {
+    setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   const effectiveLocationTabKey =
     activeLocationTabKey != null && tracks.some((t) => t.key === activeLocationTabKey)
@@ -228,7 +244,7 @@ export function CreateProgramForm({
           ...t,
           locationId,
           sessions: changed
-            ? t.sessions.map((s) => ({ ...s, exerciseIds: [] }))
+            ? t.sessions.map((s) => ({ ...s, exercises: [] }))
             : t.sessions,
         };
       })
@@ -332,8 +348,21 @@ export function CreateProgramForm({
           ...t,
           sessions: t.sessions.map((s) => {
             if (s.key !== sessionKey) return s;
-            if (s.exerciseIds.includes(pick)) return s;
-            return { ...s, exerciseIds: [...s.exerciseIds, pick] };
+            if (s.exercises.some((e) => e.exerciseId === pick)) return s;
+            return {
+              ...s,
+              exercises: [
+                ...s.exercises,
+                {
+                  key: crypto.randomUUID(),
+                  exerciseId: pick,
+                  durationMinutes: "",
+                  sets: "",
+                  reps: "",
+                  restAfterSeconds: "",
+                },
+              ],
+            };
           }),
         };
       })
@@ -349,7 +378,7 @@ export function CreateProgramForm({
           ...t,
           sessions: t.sessions.map((s) => {
             if (s.key !== sessionKey) return s;
-            return { ...s, exerciseIds: s.exerciseIds.filter((_, i) => i !== index) };
+            return { ...s, exercises: s.exercises.filter((_, i) => i !== index) };
           }),
         };
       })
@@ -364,11 +393,38 @@ export function CreateProgramForm({
           ...t,
           sessions: t.sessions.map((s) => {
             if (s.key !== sessionKey) return s;
-            const ids = [...s.exerciseIds];
+            const list = [...s.exercises];
             const j = index + dir;
-            if (j < 0 || j >= ids.length) return s;
-            [ids[index], ids[j]] = [ids[j], ids[index]];
-            return { ...s, exerciseIds: ids };
+            if (j < 0 || j >= list.length) return s;
+            [list[index], list[j]] = [list[j], list[index]];
+            return { ...s, exercises: list };
+          }),
+        };
+      })
+    );
+  }
+
+  function setSessionExerciseNumericField(
+    trackKey: string,
+    sessionKey: string,
+    entryKey: string,
+    field: "durationMinutes" | "sets" | "reps" | "restAfterSeconds",
+    value: string
+  ) {
+    if (value !== "" && !/^\d*$/.test(value)) return;
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.key !== sessionKey) return s;
+            return {
+              ...s,
+              exercises: s.exercises.map((e) =>
+                e.key === entryKey ? { ...e, [field]: value } : e
+              ),
+            };
           }),
         };
       })
@@ -419,19 +475,51 @@ export function CreateProgramForm({
       const fd = new FormData(form);
       fd.set("cover_image_url", cover_image_url);
       fd.set("promo_video_url", promo_video_url);
+      for (const cid of selectedCategoryIds) {
+        fd.append("category_ids", cid);
+      }
       const curriculumPayload = tracks.map((tr) => ({
         location_id: tr.locationId,
-        sessions: tr.sessions.map(({ name, description, durationMinutes, exerciseIds }) => {
+        sessions: tr.sessions.map(({ name, description, durationMinutes, exercises }) => {
           let duration_minutes: number | null = null;
           if (durationMinutes.trim() !== "") {
             const n = Number.parseInt(durationMinutes, 10);
             if (Number.isFinite(n) && n >= 0) duration_minutes = n;
           }
+          const exerciseRows = exercises.map((e) => {
+            let exDur: number | null = null;
+            if (e.durationMinutes.trim() !== "") {
+              const n = Number.parseInt(e.durationMinutes, 10);
+              if (Number.isFinite(n) && n >= 0) exDur = n;
+            }
+            let sets: number | null = null;
+            if (e.sets.trim() !== "") {
+              const n = Number.parseInt(e.sets, 10);
+              if (Number.isFinite(n) && n >= 0) sets = n;
+            }
+            let reps: number | null = null;
+            if (e.reps.trim() !== "") {
+              const n = Number.parseInt(e.reps, 10);
+              if (Number.isFinite(n) && n >= 0) reps = n;
+            }
+            let rest_after_seconds: number | null = null;
+            if (e.restAfterSeconds.trim() !== "") {
+              const n = Number.parseInt(e.restAfterSeconds, 10);
+              if (Number.isFinite(n) && n >= 0) rest_after_seconds = n;
+            }
+            return {
+              exercise_id: e.exerciseId,
+              duration_minutes: exDur,
+              sets,
+              reps,
+              rest_after_seconds,
+            };
+          });
           return {
             name,
             description: description.trim() || null,
             duration_minutes,
-            exercise_ids: exerciseIds,
+            exercises: exerciseRows,
           };
         }),
       }));
@@ -577,25 +665,27 @@ export function CreateProgramForm({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label htmlFor="category_id" className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Category
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="category_id"
-                        name="category_id"
-                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent appearance-none"
-                        defaultValue={initial?.categoryId ?? ""}
-                      >
-                        <option value="">Select category…</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
+                  <div className="md:col-span-2">
+                    <p className="block text-sm font-medium text-gray-700 mb-2">Categories</p>
+                    <p className="text-xs text-gray-500 mb-3">Select one or more. Shown on program cards and filters.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {categories.map((c) => {
+                        const on = selectedCategoryIds.includes(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => toggleCategory(c.id)}
+                            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                              on
+                                ? "border-black bg-black text-white"
+                                : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                            }`}
+                          >
                             {c.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                   <div>
@@ -1177,7 +1267,7 @@ export function CreateProgramForm({
                                     [pickCompoundKey(activeTrack.key, session.key)]: id,
                                   }))
                                 }
-                                excludeIds={session.exerciseIds}
+                                excludeIds={session.exercises.map((e) => e.exerciseId)}
                                 disabled={!activeTrack.locationId}
                                 placeholder={
                                   activeTrack.locationId
@@ -1195,49 +1285,179 @@ export function CreateProgramForm({
                               </button>
                             </div>
 
-                            <ul className="space-y-2">
-                              {session.exerciseIds.map((id, index) => (
+                            <ul className="space-y-3">
+                              {session.exercises.map((entry, index) => (
                                 <li
-                                  key={`${activeTrack.key}-${session.key}-${id}-${index}`}
-                                  className="flex items-center justify-between gap-3 p-3 border border-gray-200 rounded-lg bg-white"
+                                  key={entry.key}
+                                  className="border border-gray-200 rounded-lg bg-white p-3 sm:p-4"
                                 >
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <GripVertical className="w-4 h-4 text-gray-300 shrink-0" />
-                                    <span className="text-sm font-medium text-gray-900 truncate">
-                                      {exerciseTitle(id)}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        moveExerciseInSession(activeTrack.key, session.key, index, -1)
-                                      }
-                                      disabled={index === 0}
-                                      className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded disabled:opacity-30"
-                                    >
-                                      Up
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        moveExerciseInSession(activeTrack.key, session.key, index, 1)
-                                      }
-                                      disabled={index === session.exerciseIds.length - 1}
-                                      className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded disabled:opacity-30"
-                                    >
-                                      Down
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        removeExerciseFromSession(activeTrack.key, session.key, index)
-                                      }
-                                      className="p-1.5 text-gray-400 hover:text-red-600 rounded"
-                                      aria-label="Remove"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="flex items-start gap-3 min-w-0">
+                                      <GripVertical className="w-4 h-4 text-gray-300 shrink-0 mt-1" />
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                          {exerciseTitle(entry.exerciseId)}
+                                        </p>
+                                        <p className="mt-2 text-xs text-gray-500">
+                                          Optional prescription for this program only. Rest applies after this exercise
+                                          before the next.
+                                        </p>
+                                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:max-w-2xl">
+                                          <div>
+                                            <label
+                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                              htmlFor={`ex-min-${entry.key}`}
+                                            >
+                                              Min
+                                            </label>
+                                            <input
+                                              id={`ex-min-${entry.key}`}
+                                              type="text"
+                                              inputMode="numeric"
+                                              pattern="[0-9]*"
+                                              value={entry.durationMinutes}
+                                              onChange={(e) =>
+                                                setSessionExerciseNumericField(
+                                                  activeTrack.key,
+                                                  session.key,
+                                                  entry.key,
+                                                  "durationMinutes",
+                                                  e.target.value
+                                                )
+                                              }
+                                              placeholder="—"
+                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label
+                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                              htmlFor={`ex-sets-${entry.key}`}
+                                            >
+                                              Sets
+                                            </label>
+                                            <input
+                                              id={`ex-sets-${entry.key}`}
+                                              type="text"
+                                              inputMode="numeric"
+                                              pattern="[0-9]*"
+                                              value={entry.sets}
+                                              onChange={(e) =>
+                                                setSessionExerciseNumericField(
+                                                  activeTrack.key,
+                                                  session.key,
+                                                  entry.key,
+                                                  "sets",
+                                                  e.target.value
+                                                )
+                                              }
+                                              placeholder="—"
+                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label
+                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                              htmlFor={`ex-reps-${entry.key}`}
+                                            >
+                                              Reps
+                                            </label>
+                                            <input
+                                              id={`ex-reps-${entry.key}`}
+                                              type="text"
+                                              inputMode="numeric"
+                                              pattern="[0-9]*"
+                                              value={entry.reps}
+                                              onChange={(e) =>
+                                                setSessionExerciseNumericField(
+                                                  activeTrack.key,
+                                                  session.key,
+                                                  entry.key,
+                                                  "reps",
+                                                  e.target.value
+                                                )
+                                              }
+                                              placeholder="—"
+                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label
+                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                              htmlFor={`ex-rest-${entry.key}`}
+                                            >
+                                              Rest (sec)
+                                            </label>
+                                            <input
+                                              id={`ex-rest-${entry.key}`}
+                                              type="text"
+                                              inputMode="numeric"
+                                              pattern="[0-9]*"
+                                              value={entry.restAfterSeconds}
+                                              onChange={(e) =>
+                                                setSessionExerciseNumericField(
+                                                  activeTrack.key,
+                                                  session.key,
+                                                  entry.key,
+                                                  "restAfterSeconds",
+                                                  e.target.value
+                                                )
+                                              }
+                                              placeholder="—"
+                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-end gap-1 shrink-0 sm:flex-col sm:items-end sm:pt-1">
+                                      <div className="flex gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            moveExerciseInSession(
+                                              activeTrack.key,
+                                              session.key,
+                                              index,
+                                              -1
+                                            )
+                                          }
+                                          disabled={index === 0}
+                                          className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded disabled:opacity-30"
+                                        >
+                                          Up
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            moveExerciseInSession(
+                                              activeTrack.key,
+                                              session.key,
+                                              index,
+                                              1
+                                            )
+                                          }
+                                          disabled={index === session.exercises.length - 1}
+                                          className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded disabled:opacity-30"
+                                        >
+                                          Down
+                                        </button>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeExerciseFromSession(
+                                            activeTrack.key,
+                                            session.key,
+                                            index
+                                          )
+                                        }
+                                        className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                                        aria-label="Remove"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                 </li>
                               ))}

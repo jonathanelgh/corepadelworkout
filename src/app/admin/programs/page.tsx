@@ -1,8 +1,11 @@
-import { Plus, Search, Edit, Trash2, Eye, Filter } from "lucide-react";
+import { Plus, Search, Edit, Eye, Filter } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
+import { DeleteProgramButton } from "./delete-program-button";
 
 export const dynamic = "force-dynamic";
+
+type PageSearch = Promise<{ error?: string; deleted?: string }>;
 
 type ProgramRow = {
   id: string;
@@ -11,7 +14,7 @@ type ProgramRow = {
   status: string;
   price: number | null;
   cover_image_url: string | null;
-  categories: { name: string } | null;
+  categoryLabels: string;
   difficulty_levels: { name: string } | null;
   duration_weeks: number | null;
   sessions_per_week: number | null;
@@ -35,7 +38,31 @@ function firstRel<T extends { name?: string }>(
   return { name: String((row as { name: string }).name) };
 }
 
-export default async function AdminPrograms() {
+function categoryLabelsFromLinks(
+  links:
+    | { sort_order?: number | null; categories?: { name: string } | { name: string }[] | null }[]
+    | { sort_order?: number | null; categories?: { name: string } | { name: string }[] | null }
+    | null
+    | undefined
+): string {
+  if (links == null) return "—";
+  const arr = Array.isArray(links) ? links : [links];
+  const pairs = arr
+    .map((l) => {
+      const cat = firstRel(l.categories);
+      const name = cat?.name?.trim();
+      if (!name) return null;
+      const order = typeof l.sort_order === "number" && Number.isFinite(l.sort_order) ? l.sort_order : 0;
+      return { order, name };
+    })
+    .filter((x): x is { order: number; name: string } => x != null);
+  pairs.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  const labels = [...new Set(pairs.map((p) => p.name))];
+  return labels.length > 0 ? labels.join(", ") : "—";
+}
+
+export default async function AdminPrograms({ searchParams }: { searchParams?: PageSearch }) {
+  const sp = (await searchParams) ?? {};
   const supabase = await createClient();
   const { data: raw, error } = await supabase
     .from("programs")
@@ -50,7 +77,10 @@ export default async function AdminPrograms() {
       duration_weeks,
       sessions_per_week,
       minutes_per_session,
-      categories ( name ),
+      program_categories (
+        sort_order,
+        categories ( name )
+      ),
       difficulty_levels ( name )
     `
     )
@@ -67,7 +97,16 @@ export default async function AdminPrograms() {
       duration_weeks: number | null;
       sessions_per_week: number | null;
       minutes_per_session: number | null;
-      categories: { name: string } | { name: string }[] | null;
+      program_categories:
+        | {
+            sort_order?: number | null;
+            categories?: { name: string } | { name: string }[] | null;
+          }[]
+        | {
+            sort_order?: number | null;
+            categories?: { name: string } | { name: string }[] | null;
+          }
+        | null;
       difficulty_levels: { name: string } | { name: string }[] | null;
     };
     return {
@@ -80,7 +119,7 @@ export default async function AdminPrograms() {
       duration_weeks: r.duration_weeks,
       sessions_per_week: r.sessions_per_week,
       minutes_per_session: r.minutes_per_session,
-      categories: firstRel(r.categories),
+      categoryLabels: categoryLabelsFromLinks(r.program_categories),
       difficulty_levels: firstRel(r.difficulty_levels),
     };
   });
@@ -134,7 +173,7 @@ export default async function AdminPrograms() {
                 <thead>
                   <tr className="bg-gray-50/50 text-gray-500 text-sm border-b border-gray-200">
                     <th className="px-6 py-4 font-medium w-96">Program</th>
-                    <th className="px-6 py-4 font-medium">Category</th>
+                    <th className="px-6 py-4 font-medium">Categories</th>
                     <th className="px-6 py-4 font-medium">Level</th>
                     <th className="px-6 py-4 font-medium whitespace-nowrap">Schedule</th>
                     <th className="px-6 py-4 font-medium">Price</th>
@@ -177,8 +216,19 @@ export default async function AdminPrograms() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-gray-600">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-xs font-medium">
-                              {program.categories?.name ?? "—"}
+                            <span className="inline-flex max-w-xs flex-wrap items-center gap-1">
+                              {program.categoryLabels === "—" ? (
+                                <span className="text-gray-400">—</span>
+                              ) : (
+                                program.categoryLabels.split(", ").map((label) => (
+                                  <span
+                                    key={label}
+                                    className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700"
+                                  >
+                                    {label}
+                                  </span>
+                                ))
+                              )}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-gray-600">
@@ -218,14 +268,7 @@ export default async function AdminPrograms() {
                               >
                                 <Edit className="w-4 h-4" />
                               </Link>
-                              <button
-                                type="button"
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                title="Delete"
-                                disabled
-                              >
-                                <Trash2 className="w-4 h-4 opacity-40" />
-                              </button>
+                              <DeleteProgramButton programId={program.id} programTitle={program.title} />
                             </div>
                           </td>
                         </tr>

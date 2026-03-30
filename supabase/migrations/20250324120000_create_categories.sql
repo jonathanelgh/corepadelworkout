@@ -12,7 +12,7 @@ create table public.categories (
   constraint categories_slug_format check (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$')
 );
 
-comment on table public.categories is 'Categories for programs; use category_id on programs when you add that column.';
+comment on table public.categories is 'Categories for programs; attach via public.program_categories (many-to-many).';
 
 create unique index categories_slug_key on public.categories (slug);
 create index categories_sort_order_idx on public.categories (sort_order);

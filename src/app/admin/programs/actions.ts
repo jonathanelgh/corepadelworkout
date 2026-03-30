@@ -3,6 +3,13 @@
 import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+
+const ADMIN_PROGRAMS_PATH = "/admin/programs";
+
+function redirectProgramsError(msg: string): never {
+  redirect(`${ADMIN_PROGRAMS_PATH}?error=${encodeURIComponent(msg)}`);
+}
 
 export type CreateProgramResult = { ok: true } | { error: string };
 
@@ -12,11 +19,19 @@ export type ProgramMediaUrls = {
   promo_video_url: string;
 };
 
+type ProgramExercisePayload = {
+  exercise_id: string;
+  duration_minutes: number | null;
+  sets: number | null;
+  reps: number | null;
+  rest_after_seconds: number | null;
+};
+
 type SessionPayload = {
   name: string;
   description: string | null;
   duration_minutes: number | null;
-  exercise_ids: string[];
+  exercises: ProgramExercisePayload[];
 };
 
 type TrackPayload = {
@@ -62,6 +77,31 @@ function parseOptionalNonNegInt(raw: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+function parseOptionalNonNegIntField(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return Math.floor(raw);
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = Number.parseInt(raw.trim(), 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+function parseOneProgramExercise(row: Record<string, unknown>): ProgramExercisePayload | null {
+  const exercise_id_raw = row.exercise_id ?? row.exerciseId;
+  const exercise_id =
+    typeof exercise_id_raw === "string" && exercise_id_raw.length > 0 ? exercise_id_raw : "";
+  if (!exercise_id) return null;
+  const duration_minutes = parseOptionalNonNegIntField(
+    row.duration_minutes ?? row.durationMinutes
+  );
+  const sets = parseOptionalNonNegIntField(row.sets);
+  const reps = parseOptionalNonNegIntField(row.reps);
+  const rest_after_seconds = parseOptionalNonNegIntField(
+    row.rest_after_seconds ?? row.restAfterSeconds ?? row.pause_seconds
+  );
+  return { exercise_id, duration_minutes, sets, reps, rest_after_seconds };
+}
+
 function parseOneSession(o: Record<string, unknown>): SessionPayload {
   const name = typeof o.name === "string" ? o.name : "";
   const descRaw = o.description;
@@ -75,14 +115,33 @@ function parseOneSession(o: Record<string, unknown>): SessionPayload {
     const n = Number.parseInt(durRaw, 10);
     if (Number.isFinite(n) && n >= 0) duration_minutes = n;
   }
-  const idsRaw = o.exercise_ids;
-  const exercise_ids: string[] = [];
-  if (Array.isArray(idsRaw)) {
-    for (const x of idsRaw) {
-      if (typeof x === "string" && x.length > 0) exercise_ids.push(x);
+  const exercises: ProgramExercisePayload[] = [];
+  const exRaw = o.exercises;
+  if (Array.isArray(exRaw)) {
+    for (const item of exRaw) {
+      if (item != null && typeof item === "object") {
+        const pe = parseOneProgramExercise(item as Record<string, unknown>);
+        if (pe) exercises.push(pe);
+      }
     }
   }
-  return { name, description, duration_minutes, exercise_ids };
+  if (exercises.length === 0) {
+    const idsRaw = o.exercise_ids;
+    if (Array.isArray(idsRaw)) {
+      for (const x of idsRaw) {
+        if (typeof x === "string" && x.length > 0) {
+          exercises.push({
+            exercise_id: x,
+            duration_minutes: null,
+            sets: null,
+            reps: null,
+            rest_after_seconds: null,
+          });
+        }
+      }
+    }
+  }
+  return { name, description, duration_minutes, exercises };
 }
 
 function parseCurriculumJson(raw: FormDataEntryValue | null): TrackPayload[] | { error: string } {
@@ -188,7 +247,6 @@ export async function createProgram(
       slug,
       description: fields.description,
       body: fields.body,
-      category_id: fields.category_id,
       difficulty_level_id: fields.difficulty_level_id,
       status: fields.status,
       cover_image_url: fields.cover_image_url,
@@ -208,6 +266,7 @@ export async function createProgram(
   }
 
   try {
+    await syncProgramCategories(supabase, program.id, fields.category_ids);
     await insertCurriculumForProgram(supabase, program.id, tracks);
   } catch (e) {
     await supabase.from("programs").delete().eq("id", program.id);
@@ -217,6 +276,23 @@ export async function createProgram(
   revalidatePath("/admin/programs");
   revalidatePath("/programs");
   return { ok: true };
+}
+
+async function syncProgramCategories(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  programId: string,
+  categoryIds: string[]
+): Promise<void> {
+  const { error: delErr } = await supabase.from("program_categories").delete().eq("program_id", programId);
+  if (delErr) throw new Error(delErr.message);
+  if (categoryIds.length === 0) return;
+  const rows = categoryIds.map((category_id, i) => ({
+    program_id: programId,
+    category_id,
+    sort_order: i,
+  }));
+  const { error: insErr } = await supabase.from("program_categories").insert(rows);
+  if (insErr) throw new Error(insErr.message);
 }
 
 async function insertCurriculumForProgram(
@@ -259,17 +335,30 @@ async function insertCurriculumForProgram(
         throw new Error(sErr?.message ?? "Could not create session.");
       }
 
-      if (s.exercise_ids.length > 0) {
-        const rows = s.exercise_ids.map((exercise_id, j) => ({
+      if (s.exercises.length > 0) {
+        const rows = s.exercises.map((ex, j) => ({
           session_id: sessionRow.id,
-          exercise_id,
+          exercise_id: ex.exercise_id,
           sort_order: j,
+          duration_minutes: ex.duration_minutes,
+          sets: ex.sets,
+          reps: ex.reps,
+          rest_after_seconds: ex.rest_after_seconds,
         }));
         const { error: peError } = await supabase.from("program_exercises").insert(rows);
         if (peError) throw new Error(peError.message);
       }
     }
   }
+}
+
+function parseCategoryIds(formData: FormData): string[] {
+  const raw = formData.getAll("category_ids");
+  const ids: string[] = [];
+  for (const x of raw) {
+    if (typeof x === "string" && x.trim().length > 0) ids.push(x.trim());
+  }
+  return [...new Set(ids)];
 }
 
 function parseProgramFields(
@@ -279,7 +368,7 @@ function parseProgramFields(
   title: string;
   description: string | null;
   body: string | null;
-  category_id: string | null;
+  category_ids: string[];
   difficulty_level_id: string | null;
   status: "draft" | "published";
   cover_image_url: string | null;
@@ -293,7 +382,6 @@ function parseProgramFields(
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() || null;
   const body = (formData.get("body") as string)?.trim() || null;
-  const categoryRaw = formData.get("category_id") as string | null;
   const difficultyRaw = formData.get("difficulty_level_id") as string | null;
   const status = formData.get("status") === "published" ? "published" : "draft";
   const cover_image_url = mediaUrls.cover_image_url.trim() || null;
@@ -304,7 +392,7 @@ function parseProgramFields(
   const sessions_per_week = parseOptionalNonNegInt(formData.get("sessions_per_week"));
   const minutes_per_session = parseOptionalNonNegInt(formData.get("minutes_per_session"));
 
-  const category_id = categoryRaw && categoryRaw.length > 0 ? categoryRaw : null;
+  const category_ids = parseCategoryIds(formData);
   const difficulty_level_id = difficultyRaw && difficultyRaw.length > 0 ? difficultyRaw : null;
 
   if (!title) {
@@ -315,7 +403,7 @@ function parseProgramFields(
     title,
     description,
     body,
-    category_id,
+    category_ids,
     difficulty_level_id,
     status,
     cover_image_url,
@@ -383,7 +471,6 @@ export async function updateProgram(
       title: fields.title,
       description: fields.description,
       body: fields.body,
-      category_id: fields.category_id,
       difficulty_level_id: fields.difficulty_level_id,
       status: fields.status,
       cover_image_url: fields.cover_image_url,
@@ -401,6 +488,12 @@ export async function updateProgram(
     return { error: updateErr.message };
   }
 
+  try {
+    await syncProgramCategories(supabase, programId, fields.category_ids);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not save categories." };
+  }
+
   const { error: delErr } = await supabase.from("program_location_tracks").delete().eq("program_id", programId);
   if (delErr) {
     return { error: delErr.message };
@@ -416,4 +509,35 @@ export async function updateProgram(
   revalidatePath("/programs");
   revalidatePath(`/programs/${existing.slug}`);
   return { ok: true };
+}
+
+export async function deleteProgram(formData: FormData) {
+  const programId = (formData.get("program_id") as string)?.trim();
+  if (!programId) redirectProgramsError("Missing program id.");
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirectProgramsError("You must be signed in.");
+  if (!(await getIsAdmin(supabase))) {
+    redirectProgramsError("Not authorized.");
+  }
+
+  const { data: row, error: fetchErr } = await supabase
+    .from("programs")
+    .select("slug")
+    .eq("id", programId)
+    .maybeSingle();
+
+  if (fetchErr) redirectProgramsError(fetchErr.message);
+  if (!row) redirectProgramsError("Program not found.");
+
+  const { error: delErr } = await supabase.from("programs").delete().eq("id", programId);
+  if (delErr) redirectProgramsError(delErr.message);
+
+  revalidatePath(ADMIN_PROGRAMS_PATH);
+  revalidatePath("/programs");
+  revalidatePath(`/programs/${row.slug}`);
+  redirect(`${ADMIN_PROGRAMS_PATH}?deleted=1`);
 }

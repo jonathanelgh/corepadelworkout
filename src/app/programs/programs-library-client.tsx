@@ -9,7 +9,10 @@ export type ProgramCard = {
   title: string;
   description: string;
   image: string;
+  /** Primary category for compact badges (first assigned). */
   categoryName: string | null;
+  /** All categories for filtering and display. */
+  categoryNames: string[];
   difficultyName: string | null;
   durationLabel: string;
   price: number | null;
