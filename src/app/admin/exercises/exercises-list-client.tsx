@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Pencil, Plus, Search } from "lucide-react";
 import { EditExerciseModal, type ExerciseListItem } from "./edit-exercise-modal";
+import type { MultiSelectOption } from "@/components/admin/multi-select-search-chips";
 
 type LocationOption = { id: string; name: string; slug: string };
 
@@ -20,9 +21,13 @@ function matchesExerciseQuery(ex: ExerciseListItem, q: string): boolean {
 export function ExercisesListClient({
   rows,
   locations,
+  equipmentOptions,
+  tagOptions,
 }: {
   rows: ExerciseListItem[];
   locations: LocationOption[];
+  equipmentOptions: MultiSelectOption[];
+  tagOptions: MultiSelectOption[];
 }) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ExerciseListItem | null>(null);
@@ -148,7 +153,13 @@ export function ExercisesListClient({
         )}
       </div>
 
-      <EditExerciseModal item={editing} locations={locations} onClose={() => setEditing(null)} />
+      <EditExerciseModal
+        item={editing}
+        locations={locations}
+        equipmentOptions={equipmentOptions}
+        tagOptions={tagOptions}
+        onClose={() => setEditing(null)}
+      />
     </>
   );
 }

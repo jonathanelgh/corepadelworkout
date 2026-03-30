@@ -17,6 +17,7 @@ export type CreateProgramResult = { ok: true } | { error: string };
 export type ProgramMediaUrls = {
   cover_image_url: string;
   promo_video_url: string;
+  song_url: string;
 };
 
 type ProgramExercisePayload = {
@@ -251,6 +252,7 @@ export async function createProgram(
       status: fields.status,
       cover_image_url: fields.cover_image_url,
       promo_video_url: fields.promo_video_url,
+      song_url: fields.song_url,
       price: fields.price,
       compare_at_price: fields.compare_at_price,
       duration_weeks: fields.duration_weeks,
@@ -373,6 +375,7 @@ function parseProgramFields(
   status: "draft" | "published";
   cover_image_url: string | null;
   promo_video_url: string | null;
+  song_url: string | null;
   price: number | null;
   compare_at_price: number | null;
   duration_weeks: number | null;
@@ -386,6 +389,7 @@ function parseProgramFields(
   const status = formData.get("status") === "published" ? "published" : "draft";
   const cover_image_url = mediaUrls.cover_image_url.trim() || null;
   const promo_video_url = mediaUrls.promo_video_url.trim() || null;
+  const song_url = mediaUrls.song_url.trim() || null;
   const price = parseOptionalNumber(formData.get("price"));
   const compare_at_price = parseOptionalNumber(formData.get("compare_at_price"));
   const duration_weeks = parseOptionalNonNegInt(formData.get("duration_weeks"));
@@ -408,6 +412,7 @@ function parseProgramFields(
     status,
     cover_image_url,
     promo_video_url,
+    song_url,
     price,
     compare_at_price,
     duration_weeks,
@@ -475,6 +480,7 @@ export async function updateProgram(
       status: fields.status,
       cover_image_url: fields.cover_image_url,
       promo_video_url: fields.promo_video_url,
+      song_url: fields.song_url,
       price: fields.price,
       compare_at_price: fields.compare_at_price,
       duration_weeks: fields.duration_weeks,

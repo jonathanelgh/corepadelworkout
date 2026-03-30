@@ -15,6 +15,7 @@ type ProgramRow = {
   description: string | null;
   cover_image_url: string | null;
   promo_video_url: string | null;
+  song_url: string | null;
   duration_weeks: number | null;
   sessions_per_week: number | null;
   minutes_per_session: number | null;
@@ -147,6 +148,7 @@ export default async function ProgramTakePage({ params }: PageProps) {
       description,
       cover_image_url,
       promo_video_url,
+      song_url,
       duration_weeks,
       sessions_per_week,
       minutes_per_session,
@@ -250,6 +252,7 @@ export default async function ProgramTakePage({ params }: PageProps) {
       difficultyLabel={difficultyLabel}
       heroImage={heroImage}
       promoVideoUrl={program.promo_video_url}
+      songUrl={program.song_url}
       statWeeks={formatStatWeeks(program.duration_weeks)}
       statFrequency={formatStatFrequency(program.sessions_per_week)}
       statMinutes={formatStatMins(program.minutes_per_session)}

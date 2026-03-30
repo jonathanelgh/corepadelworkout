@@ -137,6 +137,7 @@ export default async function EditProgramPage({ params }: PageProps) {
         status,
         cover_image_url,
         promo_video_url,
+        song_url,
         price,
         compare_at_price,
         duration_weeks,
@@ -191,6 +192,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     status: string;
     cover_image_url: string | null;
     promo_video_url: string | null;
+    song_url: string | null;
     price: number | null;
     compare_at_price: number | null;
     duration_weeks: number | null;
@@ -220,6 +222,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     difficultyLevelId: p.difficulty_level_id ?? "",
     coverImageUrl: p.cover_image_url ?? "",
     promoVideoUrl: p.promo_video_url ?? "",
+    songUrl: p.song_url ?? "",
     price: p.price != null ? String(p.price) : "",
     compareAtPrice: p.compare_at_price != null ? String(p.compare_at_price) : "",
     status: p.status === "published" ? "published" : "draft",

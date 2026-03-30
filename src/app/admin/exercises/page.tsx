@@ -13,9 +13,17 @@ function pickLocation(
   return Array.isArray(loc) ? loc[0] ?? null : loc;
 }
 
+function sortedJunctionIds<T extends { sort_order: number }>(
+  rows: T[] | null | undefined,
+  getId: (r: T) => string
+): string[] {
+  if (!rows?.length) return [];
+  return [...rows].sort((a, b) => a.sort_order - b.sort_order).map(getId);
+}
+
 export default async function AdminExercisesPage() {
   const supabase = await createClient();
-  const [exercisesRes, locationsRes] = await Promise.all([
+  const [exercisesRes, locationsRes, equipmentRes, tabsRes] = await Promise.all([
     supabase
       .from("exercises")
       .select(
@@ -28,18 +36,32 @@ export default async function AdminExercisesPage() {
       image_url,
       created_at,
       location_id,
-      locations ( name, slug )
+      locations ( name, slug ),
+      exercise_equipment ( equipment_id, sort_order ),
+      exercise_tab_links ( exercise_tab_id, sort_order )
     `
       )
       .order("created_at", { ascending: false }),
     supabase.from("locations").select("id, name, slug").order("sort_order", { ascending: true }),
+    supabase.from("equipment").select("id, title").order("title", { ascending: true }),
+    supabase.from("exercise_tabs").select("id, title").order("title", { ascending: true }),
   ]);
 
   const { data: exercises, error } = exercisesRes;
   const locations = locationsRes.data ?? [];
+  const equipmentOptions = (equipmentRes.data ?? []).map((r) => ({
+    id: r.id as string,
+    label: r.title as string,
+  }));
+  const tagOptions = (tabsRes.data ?? []).map((r) => ({
+    id: r.id as string,
+    label: r.title as string,
+  }));
 
   const rows: ExerciseListItem[] = (exercises ?? []).map((row) => {
     const loc = pickLocation(row.locations as { name: string; slug: string } | { name: string; slug: string }[] | null);
+    const ee = row.exercise_equipment as { equipment_id: string; sort_order: number }[] | null | undefined;
+    const tl = row.exercise_tab_links as { exercise_tab_id: string; sort_order: number }[] | null | undefined;
     return {
       id: row.id as string,
       title: row.title as string,
@@ -50,6 +72,8 @@ export default async function AdminExercisesPage() {
       location_id: row.location_id as string,
       created_at: row.created_at as string,
       locationName: loc?.name ?? null,
+      equipmentIds: sortedJunctionIds(ee, (r) => r.equipment_id),
+      tabIds: sortedJunctionIds(tl, (r) => r.exercise_tab_id),
     };
   });
 
@@ -90,7 +114,12 @@ export default async function AdminExercisesPage() {
             </div>
           )}
 
-          <ExercisesListClient rows={rows} locations={locations} />
+          <ExercisesListClient
+            rows={rows}
+            locations={locations}
+            equipmentOptions={equipmentOptions}
+            tagOptions={tagOptions}
+          />
         </div>
       </div>
     </div>

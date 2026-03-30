@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   Info,
   ListOrdered,
+  Music,
   Plus,
   Save,
   Settings,
@@ -68,6 +69,7 @@ export type ProgramFormInitialValues = {
   difficultyLevelId: string;
   coverImageUrl: string;
   promoVideoUrl: string;
+  songUrl: string;
   price: string;
   compareAtPrice: string;
   status: "draft" | "published";
@@ -104,6 +106,7 @@ function extFromFile(file: File, fallback: string) {
   if (file.type === "video/mp4") return "mp4";
   if (file.type === "video/webm") return "webm";
   if (file.type === "video/quicktime") return "mov";
+  if (file.type === "audio/mpeg" || file.type === "audio/mp3") return "mp3";
   return fallback;
 }
 
@@ -134,8 +137,10 @@ export function CreateProgramForm({
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [promoVideoFile, setPromoVideoFile] = useState<File | null>(null);
+  const [songFile, setSongFile] = useState<File | null>(null);
   const [coverDragging, setCoverDragging] = useState(false);
   const [promoVideoDragging, setPromoVideoDragging] = useState(false);
+  const [songDragging, setSongDragging] = useState(false);
 
   const [tracks, setTracks] = useState<TrackBlock[]>(() =>
     initial?.tracks?.length
@@ -188,10 +193,21 @@ export function CreateProgramForm({
     setPromoVideoFile(file);
   };
 
-  async function uploadToProgramsBucket(file: File, kind: "cover" | "promo"): Promise<string> {
+  const applySongFile = (file: File | undefined) => {
+    if (!file) return;
+    const okType = file.type === "audio/mpeg" || file.type === "audio/mp3" || file.type === "";
+    const okName = file.name.toLowerCase().endsWith(".mp3");
+    if (!okType && !okName) return;
+    setSongFile(file);
+  };
+
+  async function uploadToProgramsBucket(file: File, kind: "cover" | "promo" | "song"): Promise<string> {
     const supabase = createClient();
     const folder = crypto.randomUUID();
-    const ext = extFromFile(file, kind === "cover" ? "jpg" : "mp4");
+    const ext = extFromFile(
+      file,
+      kind === "cover" ? "jpg" : kind === "song" ? "mp3" : "mp4"
+    );
     const path = `${folder}/${kind}.${ext}`;
     const { error: upErr } = await supabase.storage.from(STORAGE_BUCKETS.programs).upload(path, file, {
       upsert: false,
@@ -454,12 +470,16 @@ export function CreateProgramForm({
     try {
       let cover_image_url = ((form.elements.namedItem("cover_image_url") as HTMLInputElement)?.value ?? "").trim();
       let promo_video_url = ((form.elements.namedItem("promo_video_url") as HTMLInputElement)?.value ?? "").trim();
+      let song_url = ((form.elements.namedItem("song_url") as HTMLInputElement)?.value ?? "").trim();
 
       if (coverFile) {
         cover_image_url = await uploadToProgramsBucket(coverFile, "cover");
       }
       if (promoVideoFile) {
         promo_video_url = await uploadToProgramsBucket(promoVideoFile, "promo");
+      }
+      if (songFile) {
+        song_url = await uploadToProgramsBucket(songFile, "song");
       }
 
       if (tracks.length > 0) {
@@ -475,6 +495,7 @@ export function CreateProgramForm({
       const fd = new FormData(form);
       fd.set("cover_image_url", cover_image_url);
       fd.set("promo_video_url", promo_video_url);
+      fd.set("song_url", song_url);
       for (const cid of selectedCategoryIds) {
         fd.append("category_ids", cid);
       }
@@ -531,7 +552,7 @@ export function CreateProgramForm({
         fd.set("program_id", programId);
       }
 
-      const mediaUrls = { cover_image_url, promo_video_url };
+      const mediaUrls = { cover_image_url, promo_video_url, song_url };
       const result = programId
         ? await updateProgram(fd, mediaUrls)
         : await createProgram(fd, mediaUrls);
@@ -1015,6 +1036,95 @@ export function CreateProgramForm({
                   name="promo_video_url"
                   type="url"
                   defaultValue={initial?.promoVideoUrl ?? ""}
+                  placeholder="https://…"
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Program music</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                Optional MP3 soundtrack for this program (upload or paste a direct link).
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload MP3</label>
+                <input
+                  id="program-song-upload"
+                  type="file"
+                  accept="audio/mpeg,.mp3,audio/mp3"
+                  className="sr-only"
+                  onChange={(e) => applySongFile(e.target.files?.[0])}
+                />
+                <label
+                  htmlFor="program-song-upload"
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    setSongDragging(true);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "copy";
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setSongDragging(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setSongDragging(false);
+                    applySongFile(e.dataTransfer.files?.[0]);
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors cursor-pointer group ${
+                    songDragging ? "border-black bg-gray-100" : "border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                    <Music className="w-6 h-6 text-gray-600" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 mb-1">Click to upload or drag and drop</p>
+                  <p className="text-xs text-gray-500">MP3</p>
+                </label>
+                {songFile && (
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <Music className="h-4 w-4 shrink-0 text-gray-500" />
+                      <span className="truncate text-sm font-medium text-gray-900">{songFile.name}</span>
+                      <span className="shrink-0 text-xs text-gray-500">
+                        ({(songFile.size / (1024 * 1024)).toFixed(1)} MB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSongFile(null);
+                        const input = document.getElementById("program-song-upload") as HTMLInputElement | null;
+                        if (input) input.value = "";
+                      }}
+                      className="shrink-0 text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative flex items-center gap-4 my-8">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-xs font-medium uppercase tracking-wider text-gray-400">or</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              <div>
+                <label htmlFor="song_url" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Audio URL
+                </label>
+                <input
+                  id="song_url"
+                  name="song_url"
+                  type="url"
+                  defaultValue={initial?.songUrl ?? ""}
                   placeholder="https://…"
                   className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                 />

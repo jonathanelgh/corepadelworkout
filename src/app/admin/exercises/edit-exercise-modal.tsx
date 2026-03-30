@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { updateExercise } from "./actions";
 import { createClient } from "@/utils/supabase/client";
 import { STORAGE_BUCKETS } from "@/utils/supabase/storage";
+import {
+  MultiSelectSearchChips,
+  type MultiSelectOption,
+} from "@/components/admin/multi-select-search-chips";
 
 export type ExerciseListItem = {
   id: string;
@@ -17,6 +21,8 @@ export type ExerciseListItem = {
   location_id: string;
   created_at: string;
   locationName: string | null;
+  equipmentIds: string[];
+  tabIds: string[];
 };
 
 type LocationOption = { id: string; name: string; slug: string };
@@ -50,10 +56,14 @@ async function uploadExerciseFile(file: File, kind: "image" | "video"): Promise<
 export function EditExerciseModal({
   item,
   locations,
+  equipmentOptions,
+  tagOptions,
   onClose,
 }: {
   item: ExerciseListItem | null;
   locations: LocationOption[];
+  equipmentOptions: MultiSelectOption[];
+  tagOptions: MultiSelectOption[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -62,6 +72,8 @@ export function EditExerciseModal({
   const [pending, setPending] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!item) return;
@@ -69,6 +81,8 @@ export function EditExerciseModal({
     setPending(false);
     setImageFile(null);
     setVideoFile(null);
+    setSelectedEquipmentIds(item.equipmentIds);
+    setSelectedTagIds(item.tabIds);
   }, [item?.id]);
 
   useEffect(() => {
@@ -102,6 +116,12 @@ export function EditExerciseModal({
       const fd = new FormData(form);
       fd.set("video_url", videoUrl);
       fd.set("image_url", imageUrl);
+      for (const id of selectedEquipmentIds) {
+        fd.append("equipment_ids", id);
+      }
+      for (const id of selectedTagIds) {
+        fd.append("exercise_tab_ids", id);
+      }
 
       const result = await updateExercise(fd);
       if ("error" in result) {
@@ -201,6 +221,26 @@ export function EditExerciseModal({
               className="w-full resize-none rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-black focus:outline-none"
             />
           </div>
+
+          <MultiSelectSearchChips
+            label="Equipment"
+            options={equipmentOptions}
+            value={selectedEquipmentIds}
+            onChange={setSelectedEquipmentIds}
+            searchPlaceholder="Search equipment…"
+            emptyListHint="Add equipment in Exercise equipment first."
+            disabled={pending}
+          />
+
+          <MultiSelectSearchChips
+            label="Tags"
+            options={tagOptions}
+            value={selectedTagIds}
+            onChange={setSelectedTagIds}
+            searchPlaceholder="Search tags…"
+            emptyListHint="Add tags in Exercise tags first."
+            disabled={pending}
+          />
 
           <div>
             <label htmlFor={`edit-ex-how-${item.id}`} className="mb-1.5 block text-sm font-medium text-gray-700">

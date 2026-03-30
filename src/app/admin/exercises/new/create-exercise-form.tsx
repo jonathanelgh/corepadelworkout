@@ -16,6 +16,10 @@ import {
 import { createExercise } from "../actions";
 import { createClient } from "@/utils/supabase/client";
 import { STORAGE_BUCKETS } from "@/utils/supabase/storage";
+import {
+  MultiSelectSearchChips,
+  type MultiSelectOption,
+} from "@/components/admin/multi-select-search-chips";
 
 type LocationOption = { id: string; name: string; slug: string };
 
@@ -40,14 +44,24 @@ function extFromFile(file: File, fallback: string) {
 export function CreateExerciseForm({
   locations,
   locationsError,
+  equipmentOptions,
+  tagOptions,
+  equipmentError,
+  tagsError,
 }: {
   locations: LocationOption[];
   locationsError?: string | null;
+  equipmentOptions: MultiSelectOption[];
+  tagOptions: MultiSelectOption[];
+  equipmentError?: string | null;
+  tagsError?: string | null;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("basic");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -97,6 +111,12 @@ export function CreateExerciseForm({
       const fd = new FormData(form);
       fd.set("video_url", videoUrl);
       fd.set("image_url", imageUrl);
+      for (const id of selectedEquipmentIds) {
+        fd.append("equipment_ids", id);
+      }
+      for (const id of selectedTagIds) {
+        fd.append("exercise_tab_ids", id);
+      }
 
       const result = await createExercise(fd);
       if ("error" in result) {
@@ -246,6 +266,33 @@ export function CreateExerciseForm({
                   />
                   <p className="mt-1.5 text-xs text-gray-500">Shown in lists and previews.</p>
                 </div>
+
+                {(equipmentError || tagsError) && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    {equipmentError && <p>Equipment list: {equipmentError}</p>}
+                    {tagsError && <p>Tags list: {tagsError}</p>}
+                  </div>
+                )}
+
+                <MultiSelectSearchChips
+                  label="Equipment"
+                  options={equipmentOptions}
+                  value={selectedEquipmentIds}
+                  onChange={setSelectedEquipmentIds}
+                  searchPlaceholder="Search equipment…"
+                  emptyListHint="Add equipment in Exercise equipment first."
+                  disabled={pending}
+                />
+
+                <MultiSelectSearchChips
+                  label="Tags"
+                  options={tagOptions}
+                  value={selectedTagIds}
+                  onChange={setSelectedTagIds}
+                  searchPlaceholder="Search tags…"
+                  emptyListHint="Add tags in Exercise tags first."
+                  disabled={pending}
+                />
               </div>
             </div>
 

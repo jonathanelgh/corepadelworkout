@@ -1,4 +1,4 @@
-import { ArrowLeft, Clock, Star, Target, Zap } from "lucide-react";
+import { ArrowLeft, Clock, Music, Star, Target, Zap } from "lucide-react";
 import Link from "next/link";
 import { ProgramHeroPlayer } from "./program-hero-player";
 
@@ -8,6 +8,8 @@ type Props = {
   difficultyLabel: string;
   heroImage: string;
   promoVideoUrl: string | null | undefined;
+  /** Optional MP3 or other audio URL for program soundtrack */
+  songUrl?: string | null | undefined;
   statWeeks: string;
   statFrequency: string;
   statMinutes: string;
@@ -25,6 +27,7 @@ export function ProgramExperienceLayout({
   difficultyLabel,
   heroImage,
   promoVideoUrl,
+  songUrl,
   statWeeks,
   statFrequency,
   statMinutes,
@@ -115,6 +118,25 @@ export function ProgramExperienceLayout({
                 <span className="text-xs text-gray-500">Per Session</span>
               </div>
             </div>
+
+            {songUrl?.trim() && (
+              <div className="mb-10 rounded-2xl border border-gray-100 bg-gray-50/80 p-5">
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-900">
+                  <Music className="h-4 w-4 shrink-0 text-gray-600" aria-hidden />
+                  Program music
+                </div>
+                <audio
+                  controls
+                  className="h-10 w-full max-w-full"
+                  preload="metadata"
+                  src={songUrl.trim()}
+                >
+                  <a href={songUrl.trim()} className="text-sm text-gray-600 underline">
+                    Download audio
+                  </a>
+                </audio>
+              </div>
+            )}
 
             {children}
 
