@@ -3,8 +3,10 @@
 import { useEffect, useId, useState } from "react";
 import { Plus, X } from "lucide-react";
 import {
+  createBodyPart,
   createBodyRegion,
   createCategoryType,
+  createExerciseLevel,
   createMovementPattern,
 } from "./actions";
 
@@ -154,6 +156,30 @@ export function AddBodyRegionModal() {
       action={createBodyRegion}
       namePlaceholder="e.g. Shoulders"
       slugPlaceholder="e.g. shoulders"
+    />
+  );
+}
+
+export function AddBodyPartModal() {
+  return (
+    <AddModal
+      title="New body part"
+      submitLabel="Create"
+      action={createBodyPart}
+      namePlaceholder="e.g. Knee"
+      slugPlaceholder="e.g. knee"
+    />
+  );
+}
+
+export function AddExerciseLevelModal() {
+  return (
+    <AddModal
+      title="New exercise level"
+      submitLabel="Create"
+      action={createExerciseLevel}
+      namePlaceholder="e.g. Intermediate"
+      slugPlaceholder="e.g. intermediate"
     />
   );
 }

@@ -22,10 +22,11 @@ export type ExerciseListItem = {
   created_at: string;
   locationName: string | null;
   equipmentIds: string[];
-  tabIds: string[];
   categoryTypeIds: string[];
   movementPatternIds: string[];
   bodyRegionIds: string[];
+  bodyPartIds: string[];
+  exerciseLevelId: string | null;
 };
 
 type LocationOption = { id: string; name: string; slug: string };
@@ -60,19 +61,21 @@ export function EditExerciseModal({
   item,
   locations,
   equipmentOptions,
-  tagOptions,
   categoryTypeOptions,
   movementPatternOptions,
   bodyRegionOptions,
+  bodyPartOptions,
+  exerciseLevelOptions,
   onClose,
 }: {
   item: ExerciseListItem | null;
   locations: LocationOption[];
   equipmentOptions: MultiSelectOption[];
-  tagOptions: MultiSelectOption[];
   categoryTypeOptions: MultiSelectOption[];
   movementPatternOptions: MultiSelectOption[];
   bodyRegionOptions: MultiSelectOption[];
+  bodyPartOptions: MultiSelectOption[];
+  exerciseLevelOptions: MultiSelectOption[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -82,10 +85,10 @@ export function EditExerciseModal({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [selectedCategoryTypeIds, setSelectedCategoryTypeIds] = useState<string[]>([]);
   const [selectedMovementPatternIds, setSelectedMovementPatternIds] = useState<string[]>([]);
   const [selectedBodyRegionIds, setSelectedBodyRegionIds] = useState<string[]>([]);
+  const [selectedBodyPartIds, setSelectedBodyPartIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!item) return;
@@ -94,10 +97,10 @@ export function EditExerciseModal({
     setImageFile(null);
     setVideoFile(null);
     setSelectedEquipmentIds(item.equipmentIds);
-    setSelectedTagIds(item.tabIds);
     setSelectedCategoryTypeIds(item.categoryTypeIds);
     setSelectedMovementPatternIds(item.movementPatternIds);
     setSelectedBodyRegionIds(item.bodyRegionIds);
+    setSelectedBodyPartIds(item.bodyPartIds);
   }, [item?.id]);
 
   useEffect(() => {
@@ -134,9 +137,6 @@ export function EditExerciseModal({
       for (const id of selectedEquipmentIds) {
         fd.append("equipment_ids", id);
       }
-      for (const id of selectedTagIds) {
-        fd.append("exercise_tab_ids", id);
-      }
       for (const id of selectedCategoryTypeIds) {
         fd.append("exercise_category_type_ids", id);
       }
@@ -145,6 +145,9 @@ export function EditExerciseModal({
       }
       for (const id of selectedBodyRegionIds) {
         fd.append("body_region_ids", id);
+      }
+      for (const id of selectedBodyPartIds) {
+        fd.append("body_part_ids", id);
       }
 
       const result = await updateExercise(fd);
@@ -234,6 +237,28 @@ export function EditExerciseModal({
           </div>
 
           <div>
+            <label htmlFor={`edit-ex-level-${item.id}`} className="mb-1.5 block text-sm font-medium text-gray-700">
+              Exercise level <span className="text-gray-400">(optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                id={`edit-ex-level-${item.id}`}
+                name="exercise_level_id"
+                defaultValue={item.exerciseLevelId ?? ""}
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-black focus:outline-none"
+              >
+                <option value="">None</option>
+                {exerciseLevelOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            </div>
+          </div>
+
+          <div>
             <label htmlFor={`edit-ex-desc-${item.id}`} className="mb-1.5 block text-sm font-medium text-gray-700">
               Short description
             </label>
@@ -253,16 +278,6 @@ export function EditExerciseModal({
             onChange={setSelectedEquipmentIds}
             searchPlaceholder="Search equipment…"
             emptyListHint="Add equipment in Exercise equipment first."
-            disabled={pending}
-          />
-
-          <MultiSelectSearchChips
-            label="Tags"
-            options={tagOptions}
-            value={selectedTagIds}
-            onChange={setSelectedTagIds}
-            searchPlaceholder="Search tags…"
-            emptyListHint="Add tags in Exercise tags first."
             disabled={pending}
           />
 
@@ -291,6 +306,15 @@ export function EditExerciseModal({
             onChange={setSelectedBodyRegionIds}
             searchPlaceholder="Search body regions…"
             emptyListHint="No body regions in the database yet."
+            disabled={pending}
+          />
+          <MultiSelectSearchChips
+            label="Body parts"
+            options={bodyPartOptions}
+            value={selectedBodyPartIds}
+            onChange={setSelectedBodyPartIds}
+            searchPlaceholder="Search body parts…"
+            emptyListHint="No body parts in the database yet."
             disabled={pending}
           />
 

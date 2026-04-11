@@ -517,6 +517,192 @@ export async function updateProgram(
   return { ok: true };
 }
 
+type DuplicateDbExerciseRow = {
+  exercise_id: string;
+  sort_order: number;
+  duration_minutes: number | null;
+  sets: number | null;
+  reps: number | null;
+  rest_after_seconds: number | null;
+};
+
+type DuplicateDbSessionRow = {
+  name: string;
+  description: string | null;
+  duration_minutes: number | null;
+  sort_order: number;
+  program_exercises: DuplicateDbExerciseRow[] | DuplicateDbExerciseRow | null;
+};
+
+type DuplicateDbTrackRow = {
+  location_id: string;
+  sort_order: number;
+  program_sessions: DuplicateDbSessionRow[] | DuplicateDbSessionRow | null;
+};
+
+function normalizeProgramOutcomes(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const x of v) {
+    if (typeof x === "string") {
+      const t = x.trim();
+      if (t.length > 0) out.push(t);
+    }
+  }
+  return out;
+}
+
+function dbTracksToDuplicatePayloads(rows: DuplicateDbTrackRow[] | null): TrackPayload[] {
+  if (!rows?.length) return [];
+  const sorted = [...rows].sort((a, b) => a.sort_order - b.sort_order);
+  return sorted.map((row) => {
+    const sess = row.program_sessions;
+    const sessionsRaw = Array.isArray(sess) ? sess : sess != null ? [sess] : [];
+    const sessionsSorted = [...sessionsRaw].sort((a, b) => a.sort_order - b.sort_order);
+    const sessions: SessionPayload[] = sessionsSorted.map((s) => {
+      const pe = s.program_exercises;
+      const exList = Array.isArray(pe) ? pe : pe != null ? [pe] : [];
+      const exSorted = [...exList].sort((a, b) => a.sort_order - b.sort_order);
+      const exercises: ProgramExercisePayload[] = exSorted.map((e) => ({
+        exercise_id: e.exercise_id,
+        duration_minutes: e.duration_minutes,
+        sets: e.sets,
+        reps: e.reps,
+        rest_after_seconds: e.rest_after_seconds,
+      }));
+      return {
+        name: typeof s.name === "string" ? s.name : "",
+        description: s.description,
+        duration_minutes: s.duration_minutes,
+        exercises,
+      };
+    });
+    return { location_id: row.location_id, sessions };
+  });
+}
+
+export async function duplicateProgram(formData: FormData) {
+  const programId = (formData.get("program_id") as string)?.trim();
+  if (!programId) redirectProgramsError("Missing program id.");
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirectProgramsError("You must be signed in.");
+  if (!(await getIsAdmin(supabase))) {
+    redirectProgramsError("Not authorized.");
+  }
+
+  const { data: src, error: pErr } = await supabase
+    .from("programs")
+    .select(
+      `
+      id,
+      title,
+      description,
+      body,
+      difficulty_level_id,
+      cover_image_url,
+      promo_video_url,
+      song_url,
+      price,
+      compare_at_price,
+      duration_weeks,
+      sessions_per_week,
+      minutes_per_session,
+      outcomes,
+      program_categories ( category_id, sort_order )
+    `
+    )
+    .eq("id", programId)
+    .maybeSingle();
+
+  if (pErr) redirectProgramsError(pErr.message);
+  if (!src) redirectProgramsError("Program not found.");
+
+  const { data: trackRows, error: tErr } = await supabase
+    .from("program_location_tracks")
+    .select(
+      `
+      location_id,
+      sort_order,
+      program_sessions (
+        name,
+        description,
+        duration_minutes,
+        sort_order,
+        program_exercises (
+          exercise_id,
+          sort_order,
+          duration_minutes,
+          sets,
+          reps,
+          rest_after_seconds
+        )
+      )
+    `
+    )
+    .eq("program_id", programId)
+    .order("sort_order", { ascending: true });
+
+  if (tErr) redirectProgramsError(tErr.message);
+
+  const newTitle = `${src.title} (copy)`;
+  const slug = await uniqueProgramSlug(supabase, slugifyTitle(newTitle));
+
+  const pcRaw = src.program_categories as
+    | { category_id: string; sort_order: number }[]
+    | { category_id: string; sort_order: number }
+    | null;
+  const pcArr = Array.isArray(pcRaw) ? pcRaw : pcRaw != null ? [pcRaw] : [];
+  const categoryIds = [...pcArr]
+    .filter((x) => x && typeof x.category_id === "string")
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((x) => x.category_id);
+
+  const outcomes = normalizeProgramOutcomes(src.outcomes);
+  const tracks = dbTracksToDuplicatePayloads((trackRows ?? null) as DuplicateDbTrackRow[] | null);
+
+  const { data: inserted, error: insErr } = await supabase
+    .from("programs")
+    .insert({
+      title: newTitle,
+      slug,
+      description: src.description,
+      body: src.body,
+      difficulty_level_id: src.difficulty_level_id,
+      status: "draft",
+      cover_image_url: src.cover_image_url,
+      promo_video_url: src.promo_video_url,
+      song_url: src.song_url,
+      price: src.price,
+      compare_at_price: src.compare_at_price,
+      duration_weeks: src.duration_weeks,
+      sessions_per_week: src.sessions_per_week,
+      minutes_per_session: src.minutes_per_session,
+      outcomes,
+    })
+    .select("id")
+    .single();
+
+  if (insErr || !inserted) {
+    redirectProgramsError(insErr?.message ?? "Could not duplicate program.");
+  }
+
+  try {
+    await syncProgramCategories(supabase, inserted.id, categoryIds);
+    await insertCurriculumForProgram(supabase, inserted.id, tracks);
+  } catch (e) {
+    await supabase.from("programs").delete().eq("id", inserted.id);
+    redirectProgramsError(e instanceof Error ? e.message : "Could not copy curriculum.");
+  }
+
+  revalidatePath(ADMIN_PROGRAMS_PATH);
+  revalidatePath("/programs");
+  redirect(`/admin/programs/${inserted.id}/edit`);
+}
+
 export async function deleteProgram(formData: FormData) {
   const programId = (formData.get("program_id") as string)?.trim();
   if (!programId) redirectProgramsError("Missing program id.");

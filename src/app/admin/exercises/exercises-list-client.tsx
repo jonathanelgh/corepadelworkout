@@ -22,18 +22,20 @@ export function ExercisesListClient({
   rows,
   locations,
   equipmentOptions,
-  tagOptions,
   categoryTypeOptions,
   movementPatternOptions,
   bodyRegionOptions,
+  bodyPartOptions,
+  exerciseLevelOptions,
 }: {
   rows: ExerciseListItem[];
   locations: LocationOption[];
   equipmentOptions: MultiSelectOption[];
-  tagOptions: MultiSelectOption[];
   categoryTypeOptions: MultiSelectOption[];
   movementPatternOptions: MultiSelectOption[];
   bodyRegionOptions: MultiSelectOption[];
+  bodyPartOptions: MultiSelectOption[];
+  exerciseLevelOptions: MultiSelectOption[];
 }) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ExerciseListItem | null>(null);
@@ -163,10 +165,11 @@ export function ExercisesListClient({
         item={editing}
         locations={locations}
         equipmentOptions={equipmentOptions}
-        tagOptions={tagOptions}
         categoryTypeOptions={categoryTypeOptions}
         movementPatternOptions={movementPatternOptions}
         bodyRegionOptions={bodyRegionOptions}
+        bodyPartOptions={bodyPartOptions}
+        exerciseLevelOptions={exerciseLevelOptions}
         onClose={() => setEditing(null)}
       />
     </>

@@ -2,16 +2,22 @@ import Link from "next/link";
 import { Layers } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import {
+  AddBodyPartModal,
   AddBodyRegionModal,
   AddCategoryTypeModal,
+  AddExerciseLevelModal,
   AddMovementPatternModal,
 } from "./add-taxonomy-modals";
 import {
+  deleteBodyPart,
   deleteBodyRegion,
   deleteCategoryType,
+  deleteExerciseLevel,
   deleteMovementPattern,
+  updateBodyPart,
   updateBodyRegion,
   updateCategoryType,
+  updateExerciseLevel,
   updateMovementPattern,
 } from "./actions";
 import { TaxonomyTableSection, type TaxonomyRow } from "./taxonomy-table-section";
@@ -25,17 +31,23 @@ export default async function ExerciseTaxonomyPage({ searchParams }: { searchPar
   const sp = (await searchParams) ?? {};
   const supabase = await createClient();
 
-  const [categoryRes, movementRes, regionRes] = await Promise.all([
+  const [categoryRes, movementRes, regionRes, partRes, levelRes] = await Promise.all([
     supabase.from("exercise_category_types").select("id, name, slug").order("name", { ascending: true }),
     supabase.from("movement_patterns").select("id, name, slug").order("name", { ascending: true }),
     supabase.from("body_regions").select("id, name, slug").order("name", { ascending: true }),
+    supabase.from("body_parts").select("id, name, slug").order("name", { ascending: true }),
+    supabase.from("exercise_levels").select("id, name, slug").order("sort_order", { ascending: true }),
   ]);
 
   const categoryTypes = (categoryRes.data ?? []) as TaxonomyRow[];
   const movementPatterns = (movementRes.data ?? []) as TaxonomyRow[];
   const bodyRegions = (regionRes.data ?? []) as TaxonomyRow[];
+  const bodyParts = (partRes.data ?? []) as TaxonomyRow[];
+  const exerciseLevels = (levelRes.data ?? []) as TaxonomyRow[];
 
-  const loadError = [categoryRes.error, movementRes.error, regionRes.error].filter(Boolean);
+  const loadError = [categoryRes.error, movementRes.error, regionRes.error, partRes.error, levelRes.error].filter(
+    Boolean
+  );
   const errorMessage = loadError.map((e) => e!.message).join(" · ");
 
   return (
@@ -46,7 +58,8 @@ export default async function ExerciseTaxonomyPage({ searchParams }: { searchPar
           <div className="min-w-0">
             <h1 className="text-lg font-semibold text-gray-900">Exercise taxonomy</h1>
             <p className="text-xs text-gray-500">
-              Category types, movement patterns, and body regions used when tagging exercises.
+              Category types, movement patterns, body regions, body parts, and exercise levels used when tagging
+              exercises.
             </p>
           </div>
         </div>
@@ -102,6 +115,26 @@ export default async function ExerciseTaxonomyPage({ searchParams }: { searchPar
             updateAction={updateBodyRegion}
             deleteAction={deleteBodyRegion}
             addSlot={<AddBodyRegionModal />}
+          />
+        }
+        bodyPartPanel={
+          <TaxonomyTableSection
+            heading="Body parts"
+            hint="Maps to body_parts (specific anatomy; distinct from coarse body regions)."
+            rows={bodyParts}
+            updateAction={updateBodyPart}
+            deleteAction={deleteBodyPart}
+            addSlot={<AddBodyPartModal />}
+          />
+        }
+        levelPanel={
+          <TaxonomyTableSection
+            heading="Exercise levels"
+            hint="Maps to exercise_levels — optional single select on each exercise (difficulty / experience)."
+            rows={exerciseLevels}
+            updateAction={updateExerciseLevel}
+            deleteAction={deleteExerciseLevel}
+            addSlot={<AddExerciseLevelModal />}
           />
         }
       />

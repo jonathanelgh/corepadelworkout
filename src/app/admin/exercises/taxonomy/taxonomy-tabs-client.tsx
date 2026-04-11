@@ -2,12 +2,14 @@
 
 import { useState, type ReactNode } from "react";
 
-type TaxonomyTabId = "category" | "movement" | "body";
+type TaxonomyTabId = "category" | "movement" | "body" | "bodyPart" | "level";
 
 const TABS: { id: TaxonomyTabId; label: string }[] = [
   { id: "category", label: "Category types" },
   { id: "movement", label: "Movement patterns" },
   { id: "body", label: "Body regions" },
+  { id: "bodyPart", label: "Body parts" },
+  { id: "level", label: "Exercise level" },
 ];
 
 export function TaxonomyTabsClient({
@@ -15,11 +17,15 @@ export function TaxonomyTabsClient({
   categoryPanel,
   movementPanel,
   bodyPanel,
+  bodyPartPanel,
+  levelPanel,
 }: {
   announcements?: ReactNode;
   categoryPanel: ReactNode;
   movementPanel: ReactNode;
   bodyPanel: ReactNode;
+  bodyPartPanel: ReactNode;
+  levelPanel: ReactNode;
 }) {
   const [tab, setTab] = useState<TaxonomyTabId>("category");
 
@@ -27,6 +33,8 @@ export function TaxonomyTabsClient({
     category: categoryPanel,
     movement: movementPanel,
     body: bodyPanel,
+    bodyPart: bodyPartPanel,
+    level: levelPanel,
   };
 
   return (

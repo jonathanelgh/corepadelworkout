@@ -143,3 +143,67 @@ export async function deleteBodyRegion(formData: FormData) {
   revalidateExercisePaths();
   redirect(`${PATH}?saved=1`);
 }
+
+/* ——— body_parts ——— */
+
+export async function createBodyPart(formData: FormData) {
+  const { name, slug } = parseNameSlug(formData);
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("body_parts").insert({ name, slug });
+  if (error) flashError(error.message);
+  revalidateExercisePaths();
+  redirect(`${PATH}?saved=1`);
+}
+
+export async function updateBodyPart(formData: FormData) {
+  const id = (formData.get("id") as string)?.trim();
+  if (!id) flashError("Missing id.");
+  const { name, slug } = parseNameSlug(formData);
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("body_parts").update({ name, slug }).eq("id", id);
+  if (error) flashError(error.message);
+  revalidateExercisePaths();
+  redirect(`${PATH}?saved=1`);
+}
+
+export async function deleteBodyPart(formData: FormData) {
+  const id = (formData.get("id") as string)?.trim();
+  if (!id) flashError("Missing id.");
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("body_parts").delete().eq("id", id);
+  if (error) flashError(error.message);
+  revalidateExercisePaths();
+  redirect(`${PATH}?saved=1`);
+}
+
+/* ——— exercise_levels ——— */
+
+export async function createExerciseLevel(formData: FormData) {
+  const { name, slug } = parseNameSlug(formData);
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("exercise_levels").insert({ name, slug });
+  if (error) flashError(error.message);
+  revalidateExercisePaths();
+  redirect(`${PATH}?saved=1`);
+}
+
+export async function updateExerciseLevel(formData: FormData) {
+  const id = (formData.get("id") as string)?.trim();
+  if (!id) flashError("Missing id.");
+  const { name, slug } = parseNameSlug(formData);
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("exercise_levels").update({ name, slug }).eq("id", id);
+  if (error) flashError(error.message);
+  revalidateExercisePaths();
+  redirect(`${PATH}?saved=1`);
+}
+
+export async function deleteExerciseLevel(formData: FormData) {
+  const id = (formData.get("id") as string)?.trim();
+  if (!id) flashError("Missing id.");
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("exercise_levels").delete().eq("id", id);
+  if (error) flashError(error.message);
+  revalidateExercisePaths();
+  redirect(`${PATH}?saved=1`);
+}

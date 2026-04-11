@@ -1,7 +1,7 @@
-import { Plus, Search, Edit, Eye, Filter } from "lucide-react";
+import { Plus, Search, Filter } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
-import { DeleteProgramButton } from "./delete-program-button";
+import { ProgramRowActions } from "./program-row-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -144,6 +144,16 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
               Could not load programs: {error.message}
             </div>
           )}
+          {sp.error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {sp.error}
+            </div>
+          )}
+          {sp.deleted && (
+            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              Program deleted.
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
             <div className="relative w-full sm:w-96">
@@ -250,26 +260,12 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
                               {statusLabel}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-1 sm:gap-2">
-                              <Link
-                                href={`/programs/${program.slug}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-colors inline-flex"
-                                title="View live"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Link>
-                              <Link
-                                href={`/admin/programs/${program.id}/edit`}
-                                className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-colors inline-flex"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Link>
-                              <DeleteProgramButton programId={program.id} programTitle={program.title} />
-                            </div>
+                          <td className="relative px-6 py-4 text-right">
+                            <ProgramRowActions
+                              programId={program.id}
+                              programTitle={program.title}
+                              programSlug={program.slug}
+                            />
                           </td>
                         </tr>
                       );

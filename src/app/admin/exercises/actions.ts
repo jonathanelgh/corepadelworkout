@@ -15,6 +15,11 @@ function parseUuidList(formData: FormData, key: string): string[] {
   return [...new Set(out)];
 }
 
+function parseOptionalExerciseLevelId(formData: FormData): string | null {
+  const v = (formData.get("exercise_level_id") as string)?.trim() ?? "";
+  return v.length > 0 ? v : null;
+}
+
 async function replaceExerciseEquipment(
   supabase: SupabaseClient,
   exerciseId: string,
@@ -29,23 +34,6 @@ async function replaceExerciseEquipment(
     sort_order,
   }));
   const { error: insErr } = await supabase.from("exercise_equipment").insert(rows);
-  if (insErr) throw new Error(insErr.message);
-}
-
-async function replaceExerciseTabLinks(
-  supabase: SupabaseClient,
-  exerciseId: string,
-  tabIds: string[]
-): Promise<void> {
-  const { error: delErr } = await supabase.from("exercise_tab_links").delete().eq("exercise_id", exerciseId);
-  if (delErr) throw new Error(delErr.message);
-  if (tabIds.length === 0) return;
-  const rows = tabIds.map((exercise_tab_id, sort_order) => ({
-    exercise_id: exerciseId,
-    exercise_tab_id,
-    sort_order,
-  }));
-  const { error: insErr } = await supabase.from("exercise_tab_links").insert(rows);
   if (insErr) throw new Error(insErr.message);
 }
 
@@ -103,6 +91,23 @@ async function replaceExerciseBodyRegionLinks(
   if (insErr) throw new Error(insErr.message);
 }
 
+async function replaceExerciseBodyPartLinks(
+  supabase: SupabaseClient,
+  exerciseId: string,
+  bodyPartIds: string[]
+): Promise<void> {
+  const { error: delErr } = await supabase.from("exercise_body_part_links").delete().eq("exercise_id", exerciseId);
+  if (delErr) throw new Error(delErr.message);
+  if (bodyPartIds.length === 0) return;
+  const rows = bodyPartIds.map((body_part_id, sort_order) => ({
+    exercise_id: exerciseId,
+    body_part_id,
+    sort_order,
+  }));
+  const { error: insErr } = await supabase.from("exercise_body_part_links").insert(rows);
+  if (insErr) throw new Error(insErr.message);
+}
+
 export async function createExercise(formData: FormData): Promise<CreateExerciseResult> {
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() || null;
@@ -111,10 +116,11 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
   const image_url = (formData.get("image_url") as string)?.trim() || null;
   const location_id = formData.get("location_id") as string;
   const equipmentIds = parseUuidList(formData, "equipment_ids");
-  const tabIds = parseUuidList(formData, "exercise_tab_ids");
   const categoryTypeIds = parseUuidList(formData, "exercise_category_type_ids");
   const movementPatternIds = parseUuidList(formData, "movement_pattern_ids");
   const bodyRegionIds = parseUuidList(formData, "body_region_ids");
+  const bodyPartIds = parseUuidList(formData, "body_part_ids");
+  const exercise_level_id = parseOptionalExerciseLevelId(formData);
 
   if (!title) {
     return { error: "Title is required." };
@@ -148,6 +154,7 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
       video_url,
       image_url,
       location_id,
+      exercise_level_id,
     })
     .select("id")
     .single();
@@ -158,14 +165,14 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
 
   try {
     await replaceExerciseEquipment(supabase, row.id, equipmentIds);
-    await replaceExerciseTabLinks(supabase, row.id, tabIds);
     await replaceExerciseCategoryTypeLinks(supabase, row.id, categoryTypeIds);
     await replaceExerciseMovementPatternLinks(supabase, row.id, movementPatternIds);
     await replaceExerciseBodyRegionLinks(supabase, row.id, bodyRegionIds);
+    await replaceExerciseBodyPartLinks(supabase, row.id, bodyPartIds);
   } catch (e) {
     await supabase.from("exercises").delete().eq("id", row.id);
     return {
-      error: e instanceof Error ? e.message : "Could not save exercise relations (equipment, tags, taxonomy).",
+      error: e instanceof Error ? e.message : "Could not save exercise relations (equipment, taxonomy).",
     };
   }
 
@@ -209,10 +216,11 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   }
 
   const equipmentIds = parseUuidList(formData, "equipment_ids");
-  const tabIds = parseUuidList(formData, "exercise_tab_ids");
   const categoryTypeIds = parseUuidList(formData, "exercise_category_type_ids");
   const movementPatternIds = parseUuidList(formData, "movement_pattern_ids");
   const bodyRegionIds = parseUuidList(formData, "body_region_ids");
+  const bodyPartIds = parseUuidList(formData, "body_part_ids");
+  const exercise_level_id = parseOptionalExerciseLevelId(formData);
 
   const { error } = await supabase
     .from("exercises")
@@ -223,6 +231,7 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
       video_url,
       image_url,
       location_id,
+      exercise_level_id,
     })
     .eq("id", id);
 
@@ -232,13 +241,13 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
 
   try {
     await replaceExerciseEquipment(supabase, id, equipmentIds);
-    await replaceExerciseTabLinks(supabase, id, tabIds);
     await replaceExerciseCategoryTypeLinks(supabase, id, categoryTypeIds);
     await replaceExerciseMovementPatternLinks(supabase, id, movementPatternIds);
     await replaceExerciseBodyRegionLinks(supabase, id, bodyRegionIds);
+    await replaceExerciseBodyPartLinks(supabase, id, bodyPartIds);
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Could not save exercise relations (equipment, tags, taxonomy).",
+      error: e instanceof Error ? e.message : "Could not save exercise relations (equipment, taxonomy).",
     };
   }
 
