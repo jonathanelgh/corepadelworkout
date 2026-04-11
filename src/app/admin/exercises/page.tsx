@@ -1,4 +1,4 @@
-import { Plus, Package, Tag } from "lucide-react";
+import { Plus, Package, Tag, Layers } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import type { ExerciseListItem } from "./edit-exercise-modal";
@@ -21,13 +21,29 @@ function sortedJunctionIds<T extends { sort_order: number }>(
   return [...rows].sort((a, b) => a.sort_order - b.sort_order).map(getId);
 }
 
+function bucketJunctionByExerciseId<T extends { exercise_id: string; sort_order: number }>(
+  data: T[] | null | undefined
+): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const r of data ?? []) {
+    const list = m.get(r.exercise_id) ?? [];
+    list.push(r);
+    m.set(r.exercise_id, list);
+  }
+  for (const list of m.values()) {
+    list.sort((a, b) => a.sort_order - b.sort_order);
+  }
+  return m;
+}
+
 export default async function AdminExercisesPage() {
   const supabase = await createClient();
-  const [exercisesRes, locationsRes, equipmentRes, tabsRes] = await Promise.all([
-    supabase
-      .from("exercises")
-      .select(
-        `
+  const [exercisesRes, locationsRes, equipmentRes, tabsRes, categoryTypesRes, movementPatternsRes, bodyRegionsRes] =
+    await Promise.all([
+      supabase
+        .from("exercises")
+        .select(
+          `
       id,
       title,
       description,
@@ -40,14 +56,48 @@ export default async function AdminExercisesPage() {
       exercise_equipment ( equipment_id, sort_order ),
       exercise_tab_links ( exercise_tab_id, sort_order )
     `
-      )
-      .order("created_at", { ascending: false }),
-    supabase.from("locations").select("id, name, slug").order("sort_order", { ascending: true }),
-    supabase.from("equipment").select("id, title").order("title", { ascending: true }),
-    supabase.from("exercise_tabs").select("id, title").order("title", { ascending: true }),
-  ]);
+        )
+        .order("created_at", { ascending: false }),
+      supabase.from("locations").select("id, name, slug").order("sort_order", { ascending: true }),
+      supabase.from("equipment").select("id, title").order("title", { ascending: true }),
+      supabase.from("exercise_tabs").select("id, title").order("title", { ascending: true }),
+      supabase.from("exercise_category_types").select("id, name").order("name", { ascending: true }),
+      supabase.from("movement_patterns").select("id, name").order("name", { ascending: true }),
+      supabase.from("body_regions").select("id, name").order("name", { ascending: true }),
+    ]);
 
   const { data: exercises, error } = exercisesRes;
+
+  const exerciseIds = (exercises ?? []).map((e) => e.id as string);
+  let ctByExercise = new Map<string, { exercise_category_type_id: string; sort_order: number }[]>();
+  let mpByExercise = new Map<string, { movement_pattern_id: string; sort_order: number }[]>();
+  let brByExercise = new Map<string, { body_region_id: string; sort_order: number }[]>();
+
+  if (exerciseIds.length > 0) {
+    const [catRes, mpRes, brRes] = await Promise.all([
+      supabase
+        .from("exercise_category_type_links")
+        .select("exercise_id, exercise_category_type_id, sort_order")
+        .in("exercise_id", exerciseIds),
+      supabase
+        .from("exercise_movement_pattern_links")
+        .select("exercise_id, movement_pattern_id, sort_order")
+        .in("exercise_id", exerciseIds),
+      supabase
+        .from("exercise_body_region_links")
+        .select("exercise_id, body_region_id, sort_order")
+        .in("exercise_id", exerciseIds),
+    ]);
+    if (!catRes.error && catRes.data) {
+      ctByExercise = bucketJunctionByExerciseId(catRes.data);
+    }
+    if (!mpRes.error && mpRes.data) {
+      mpByExercise = bucketJunctionByExerciseId(mpRes.data);
+    }
+    if (!brRes.error && brRes.data) {
+      brByExercise = bucketJunctionByExerciseId(brRes.data);
+    }
+  }
   const locations = locationsRes.data ?? [];
   const equipmentOptions = (equipmentRes.data ?? []).map((r) => ({
     id: r.id as string,
@@ -57,13 +107,29 @@ export default async function AdminExercisesPage() {
     id: r.id as string,
     label: r.title as string,
   }));
+  const categoryTypeOptions = (categoryTypesRes.data ?? []).map((r) => ({
+    id: r.id as string,
+    label: r.name as string,
+  }));
+  const movementPatternOptions = (movementPatternsRes.data ?? []).map((r) => ({
+    id: r.id as string,
+    label: r.name as string,
+  }));
+  const bodyRegionOptions = (bodyRegionsRes.data ?? []).map((r) => ({
+    id: r.id as string,
+    label: r.name as string,
+  }));
 
   const rows: ExerciseListItem[] = (exercises ?? []).map((row) => {
+    const id = row.id as string;
     const loc = pickLocation(row.locations as { name: string; slug: string } | { name: string; slug: string }[] | null);
     const ee = row.exercise_equipment as { equipment_id: string; sort_order: number }[] | null | undefined;
     const tl = row.exercise_tab_links as { exercise_tab_id: string; sort_order: number }[] | null | undefined;
+    const ct = ctByExercise.get(id);
+    const mp = mpByExercise.get(id);
+    const br = brByExercise.get(id);
     return {
-      id: row.id as string,
+      id,
       title: row.title as string,
       description: (row.description as string | null) ?? null,
       how_to: (row.how_to as string | null) ?? null,
@@ -74,6 +140,9 @@ export default async function AdminExercisesPage() {
       locationName: loc?.name ?? null,
       equipmentIds: sortedJunctionIds(ee, (r) => r.equipment_id),
       tabIds: sortedJunctionIds(tl, (r) => r.exercise_tab_id),
+      categoryTypeIds: sortedJunctionIds(ct, (r) => r.exercise_category_type_id),
+      movementPatternIds: sortedJunctionIds(mp, (r) => r.movement_pattern_id),
+      bodyRegionIds: sortedJunctionIds(br, (r) => r.body_region_id),
     };
   });
 
@@ -95,6 +164,13 @@ export default async function AdminExercisesPage() {
           >
             <Tag className="h-4 w-4" />
             Tags
+          </Link>
+          <Link
+            href="/admin/exercises/taxonomy"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Layers className="h-4 w-4" />
+            Taxonomy
           </Link>
           <Link
             href="/admin/exercises/new"
@@ -119,6 +195,9 @@ export default async function AdminExercisesPage() {
             locations={locations}
             equipmentOptions={equipmentOptions}
             tagOptions={tagOptions}
+            categoryTypeOptions={categoryTypeOptions}
+            movementPatternOptions={movementPatternOptions}
+            bodyRegionOptions={bodyRegionOptions}
           />
         </div>
       </div>

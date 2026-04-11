@@ -10,6 +10,8 @@ import {
   Activity,
   Package,
   Tag,
+  Layers,
+  Images,
   Settings, 
   LogOut, 
   ChevronLeft, 
@@ -42,6 +44,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Exercises", href: "/admin/exercises", icon: Activity },
     { name: "Equipment", href: "/admin/exercises/equipment", icon: Package },
     { name: "Exercise tags", href: "/admin/exercises/tags", icon: Tag },
+    { name: "Exercise taxonomy", href: "/admin/exercises/taxonomy", icon: Layers },
+    { name: "Media", href: "/admin/media", icon: Images },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 

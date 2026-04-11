@@ -39,6 +39,15 @@ yarn-error.log*
 # supabase
 supabase/.temp/
 
+# Local script artifacts (taxonomy generator / MCP experiments)
+scripts/_*
+scripts/mcp_batches/
+scripts/.mcp*
+scripts/invoke*.json
+scripts/gen_exercise_taxonomy_output.sql
+scripts/generate_exercise_taxonomy.sql
+scripts/mcp_merged*.sql
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

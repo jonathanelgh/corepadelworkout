@@ -46,15 +46,27 @@ export function CreateExerciseForm({
   locationsError,
   equipmentOptions,
   tagOptions,
+  categoryTypeOptions,
+  movementPatternOptions,
+  bodyRegionOptions,
   equipmentError,
   tagsError,
+  categoryTypesError,
+  movementPatternsError,
+  bodyRegionsError,
 }: {
   locations: LocationOption[];
   locationsError?: string | null;
   equipmentOptions: MultiSelectOption[];
   tagOptions: MultiSelectOption[];
+  categoryTypeOptions: MultiSelectOption[];
+  movementPatternOptions: MultiSelectOption[];
+  bodyRegionOptions: MultiSelectOption[];
   equipmentError?: string | null;
   tagsError?: string | null;
+  categoryTypesError?: string | null;
+  movementPatternsError?: string | null;
+  bodyRegionsError?: string | null;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("basic");
@@ -62,6 +74,9 @@ export function CreateExerciseForm({
   const [pending, setPending] = useState(false);
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [selectedCategoryTypeIds, setSelectedCategoryTypeIds] = useState<string[]>([]);
+  const [selectedMovementPatternIds, setSelectedMovementPatternIds] = useState<string[]>([]);
+  const [selectedBodyRegionIds, setSelectedBodyRegionIds] = useState<string[]>([]);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -116,6 +131,15 @@ export function CreateExerciseForm({
       }
       for (const id of selectedTagIds) {
         fd.append("exercise_tab_ids", id);
+      }
+      for (const id of selectedCategoryTypeIds) {
+        fd.append("exercise_category_type_ids", id);
+      }
+      for (const id of selectedMovementPatternIds) {
+        fd.append("movement_pattern_ids", id);
+      }
+      for (const id of selectedBodyRegionIds) {
+        fd.append("body_region_ids", id);
       }
 
       const result = await createExercise(fd);
@@ -267,10 +291,17 @@ export function CreateExerciseForm({
                   <p className="mt-1.5 text-xs text-gray-500">Shown in lists and previews.</p>
                 </div>
 
-                {(equipmentError || tagsError) && (
+                {(equipmentError ||
+                  tagsError ||
+                  categoryTypesError ||
+                  movementPatternsError ||
+                  bodyRegionsError) && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     {equipmentError && <p>Equipment list: {equipmentError}</p>}
                     {tagsError && <p>Tags list: {tagsError}</p>}
+                    {categoryTypesError && <p>Category types: {categoryTypesError}</p>}
+                    {movementPatternsError && <p>Movement patterns: {movementPatternsError}</p>}
+                    {bodyRegionsError && <p>Body regions: {bodyRegionsError}</p>}
                   </div>
                 )}
 
@@ -291,6 +322,34 @@ export function CreateExerciseForm({
                   onChange={setSelectedTagIds}
                   searchPlaceholder="Search tags…"
                   emptyListHint="Add tags in Exercise tags first."
+                  disabled={pending}
+                />
+
+                <MultiSelectSearchChips
+                  label="Category types"
+                  options={categoryTypeOptions}
+                  value={selectedCategoryTypeIds}
+                  onChange={setSelectedCategoryTypeIds}
+                  searchPlaceholder="Search category types…"
+                  emptyListHint="No category types in the database yet."
+                  disabled={pending}
+                />
+                <MultiSelectSearchChips
+                  label="Movement patterns"
+                  options={movementPatternOptions}
+                  value={selectedMovementPatternIds}
+                  onChange={setSelectedMovementPatternIds}
+                  searchPlaceholder="Search movement patterns…"
+                  emptyListHint="No movement patterns in the database yet."
+                  disabled={pending}
+                />
+                <MultiSelectSearchChips
+                  label="Body regions"
+                  options={bodyRegionOptions}
+                  value={selectedBodyRegionIds}
+                  onChange={setSelectedBodyRegionIds}
+                  searchPlaceholder="Search body regions…"
+                  emptyListHint="No body regions in the database yet."
                   disabled={pending}
                 />
               </div>
