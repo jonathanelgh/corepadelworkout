@@ -252,5 +252,6 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   }
 
   revalidatePath("/admin/exercises");
+  revalidatePath(`/admin/exercises/${id}/edit`);
   return { ok: true };
 }

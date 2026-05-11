@@ -3,23 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  Image as ImageIcon,
-  Info,
-  Save,
-  UploadCloud,
-  Video,
-} from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Info, Save, Video } from "lucide-react";
 import { createExercise } from "../actions";
-import { createClient } from "@/utils/supabase/client";
-import { STORAGE_BUCKETS } from "@/utils/supabase/storage";
 import {
   MultiSelectSearchChips,
   type MultiSelectOption,
 } from "@/components/admin/multi-select-search-chips";
+import { ExerciseMediaPickerModal } from "@/components/admin/exercise-media-picker-modal";
 
 type LocationOption = { id: string; name: string; slug: string };
 
@@ -27,19 +17,6 @@ const TABS = [
   { id: "basic", label: "Basic Info", icon: Info },
   { id: "media", label: "Media", icon: ImageIcon },
 ];
-
-function extFromFile(file: File, fallback: string) {
-  const n = file.name.split(".").pop();
-  if (n && n.length <= 5) return n.toLowerCase();
-  if (file.type === "image/jpeg") return "jpg";
-  if (file.type === "image/png") return "png";
-  if (file.type === "image/webp") return "webp";
-  if (file.type === "image/gif") return "gif";
-  if (file.type === "video/mp4") return "mp4";
-  if (file.type === "video/webm") return "webm";
-  if (file.type === "video/quicktime") return "mov";
-  return fallback;
-}
 
 export function CreateExerciseForm({
   locations,
@@ -82,33 +59,9 @@ export function CreateExerciseForm({
   const [selectedBodyRegionIds, setSelectedBodyRegionIds] = useState<string[]>([]);
   const [selectedBodyPartIds, setSelectedBodyPartIds] = useState<string[]>([]);
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [imageDragging, setImageDragging] = useState(false);
-  const [videoDragging, setVideoDragging] = useState(false);
-
-  const applyImageFile = (file: File | undefined) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    setImageFile(file);
-  };
-
-  const applyVideoFile = (file: File | undefined) => {
-    if (!file || !file.type.startsWith("video/")) return;
-    setVideoFile(file);
-  };
-
-  async function uploadExerciseFile(file: File, kind: "image" | "video"): Promise<string> {
-    const supabase = createClient();
-    const folder = crypto.randomUUID();
-    const ext = extFromFile(file, kind === "image" ? "jpg" : "mp4");
-    const path = `${folder}/${kind}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(STORAGE_BUCKETS.exercises).upload(path, file, {
-      upsert: false,
-    });
-    if (upErr) throw new Error(upErr.message);
-    const { data } = supabase.storage.from(STORAGE_BUCKETS.exercises).getPublicUrl(path);
-    return data.publicUrl;
-  }
+  const [imageUrl, setImageUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [mediaPicker, setMediaPicker] = useState<null | "image" | "video">(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -117,19 +70,9 @@ export function CreateExerciseForm({
     const form = e.currentTarget;
 
     try {
-      let videoUrl = ((form.elements.namedItem("video_url") as HTMLInputElement)?.value ?? "").trim();
-      let imageUrl = ((form.elements.namedItem("image_url") as HTMLInputElement)?.value ?? "").trim();
-
-      if (videoFile) {
-        videoUrl = await uploadExerciseFile(videoFile, "video");
-      }
-      if (imageFile) {
-        imageUrl = await uploadExerciseFile(imageFile, "image");
-      }
-
       const fd = new FormData(form);
-      fd.set("video_url", videoUrl);
-      fd.set("image_url", imageUrl);
+      fd.set("video_url", videoUrl.trim());
+      fd.set("image_url", imageUrl.trim());
       for (const id of selectedEquipmentIds) {
         fd.append("equipment_ids", id);
       }
@@ -161,6 +104,18 @@ export function CreateExerciseForm({
   }
 
   return (
+    <>
+      {mediaPicker && (
+        <ExerciseMediaPickerModal
+          open
+          kind={mediaPicker}
+          onClose={() => setMediaPicker(null)}
+          onChooseUrl={(url) => {
+            if (mediaPicker === "image") setImageUrl(url);
+            else setVideoUrl(url);
+          }}
+        />
+      )}
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 min-h-0">
       <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 lg:px-8 shrink-0 z-10">
         <div className="flex items-center gap-4 min-w-0">
@@ -422,62 +377,36 @@ export function CreateExerciseForm({
             <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Cover image</h2>
               <p className="text-sm text-gray-500 mb-6">
-                Upload a key frame or demo still, or paste an image URL. Used in cards and detail views.
+                Choose from the media library, upload a new file, or paste an image URL. Used in cards and detail
+                views.
               </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload image</label>
-                <input
-                  id="exercise-image-upload"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="sr-only"
-                  onChange={(e) => applyImageFile(e.target.files?.[0])}
-                />
-                <label
-                  htmlFor="exercise-image-upload"
-                  onDragEnter={(e) => {
-                    e.preventDefault();
-                    setImageDragging(true);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "copy";
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setImageDragging(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setImageDragging(false);
-                    applyImageFile(e.dataTransfer.files?.[0]);
-                  }}
-                  className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center transition-colors cursor-pointer group ${
-                    imageDragging ? "border-black bg-gray-100" : "border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                    <UploadCloud className="w-6 h-6 text-gray-500" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">Click to upload or drag and drop</p>
-                  <p className="text-xs text-gray-500">PNG, JPG, WebP, or GIF</p>
-                </label>
-                {imageFile && (
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                    <span className="truncate text-sm font-medium text-gray-900">{imageFile.name}</span>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 sm:h-40 sm:w-56">
+                  {imageUrl.trim() ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- admin: arbitrary image URLs
+                    <img src={imageUrl.trim()} alt="" className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <ImageIcon className="h-12 w-12 text-gray-300" aria-hidden />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setMediaPicker("image")}
+                    className="inline-flex items-center justify-center rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+                  >
+                    Choose image
+                  </button>
+                  {imageUrl.trim() && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        const el = document.getElementById("exercise-image-upload") as HTMLInputElement | null;
-                        if (el) el.value = "";
-                      }}
-                      className="shrink-0 text-sm font-medium text-red-600 hover:text-red-700"
+                      onClick={() => setImageUrl("")}
+                      className="ml-0 block text-sm font-medium text-red-600 hover:text-red-700 sm:ml-2 sm:inline"
                     >
-                      Remove
+                      Remove image
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="relative flex items-center gap-4 my-8">
@@ -494,79 +423,53 @@ export function CreateExerciseForm({
                   id="image_url"
                   name="image_url"
                   type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
                   placeholder="https://…"
                   className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                 />
-                <p className="mt-1.5 text-xs text-gray-500">If the image is already hosted elsewhere.</p>
+                <p className="mt-1.5 text-xs text-gray-500">Paste a link if the image is hosted elsewhere.</p>
               </div>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Demo video</h2>
               <p className="text-sm text-gray-500 mb-6">
-                Upload a file to your library, or paste a link (Vimeo, YouTube, or direct MP4).
+                Choose from the media library, upload a new file, or paste a link (Vimeo, YouTube, or direct MP4).
               </p>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Upload video file</label>
-                <input
-                  id="exercise-video-upload"
-                  type="file"
-                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-                  className="sr-only"
-                  onChange={(e) => applyVideoFile(e.target.files?.[0])}
-                />
-                <label
-                  htmlFor="exercise-video-upload"
-                  onDragEnter={(e) => {
-                    e.preventDefault();
-                    setVideoDragging(true);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "copy";
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setVideoDragging(false);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setVideoDragging(false);
-                    applyVideoFile(e.dataTransfer.files?.[0]);
-                  }}
-                  className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors cursor-pointer group ${
-                    videoDragging ? "border-black bg-gray-100" : "border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                    <Video className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">Click to upload or drag and drop</p>
-                  <p className="text-xs text-gray-500">MP4, WebM, or MOV — up to bucket limit</p>
-                </label>
-                {videoFile && (
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <Video className="h-4 w-4 shrink-0 text-gray-500" />
-                      <span className="truncate text-sm font-medium text-gray-900">{videoFile.name}</span>
-                      <span className="shrink-0 text-xs text-gray-500">
-                        ({(videoFile.size / (1024 * 1024)).toFixed(1)} MB)
-                      </span>
-                    </div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 sm:h-40 sm:w-56">
+                  {videoUrl.trim() ? (
+                    <video
+                      src={videoUrl.trim()}
+                      className="max-h-full max-w-full object-contain"
+                      controls
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <Video className="h-12 w-12 text-gray-300" aria-hidden />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setMediaPicker("video")}
+                    className="inline-flex items-center justify-center rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+                  >
+                    Choose video
+                  </button>
+                  {videoUrl.trim() && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setVideoFile(null);
-                        const el = document.getElementById("exercise-video-upload") as HTMLInputElement | null;
-                        if (el) el.value = "";
-                      }}
-                      className="shrink-0 text-sm font-medium text-red-600 hover:text-red-700"
+                      onClick={() => setVideoUrl("")}
+                      className="ml-0 block text-sm font-medium text-red-600 hover:text-red-700 sm:ml-2 sm:inline"
                     >
-                      Remove
+                      Remove video
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="relative flex items-center gap-4 my-8">
@@ -583,6 +486,8 @@ export function CreateExerciseForm({
                   id="video_url"
                   name="video_url"
                   type="url"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
                   placeholder="https://…"
                   className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                 />
@@ -590,7 +495,7 @@ export function CreateExerciseForm({
             </div>
 
             <p className="text-xs text-gray-500">
-              Uploads require a signed-in admin account. URLs can be used without uploading.
+              Library and uploads require a signed-in admin account. External URLs work without uploading.
             </p>
 
             <div className="flex justify-between gap-4">
@@ -613,5 +518,6 @@ export function CreateExerciseForm({
         </form>
       </div>
     </div>
+    </>
   );
 }

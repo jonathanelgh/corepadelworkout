@@ -3,11 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Pencil, Plus, Search } from "lucide-react";
-import { EditExerciseModal, type ExerciseListItem } from "./edit-exercise-modal";
-import type { MultiSelectOption } from "@/components/admin/multi-select-search-chips";
-
-type LocationOption = { id: string; name: string; slug: string };
-
+import type { ExerciseListItem } from "./types";
 function matchesExerciseQuery(ex: ExerciseListItem, q: string): boolean {
   if (!q) return true;
   const n = q.toLowerCase();
@@ -18,27 +14,8 @@ function matchesExerciseQuery(ex: ExerciseListItem, q: string): boolean {
   return false;
 }
 
-export function ExercisesListClient({
-  rows,
-  locations,
-  equipmentOptions,
-  categoryTypeOptions,
-  movementPatternOptions,
-  bodyRegionOptions,
-  bodyPartOptions,
-  exerciseLevelOptions,
-}: {
-  rows: ExerciseListItem[];
-  locations: LocationOption[];
-  equipmentOptions: MultiSelectOption[];
-  categoryTypeOptions: MultiSelectOption[];
-  movementPatternOptions: MultiSelectOption[];
-  bodyRegionOptions: MultiSelectOption[];
-  bodyPartOptions: MultiSelectOption[];
-  exerciseLevelOptions: MultiSelectOption[];
-}) {
+export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<ExerciseListItem | null>(null);
 
   const filtered = useMemo(
     () => rows.filter((ex) => matchesExerciseQuery(ex, query.trim())),
@@ -138,14 +115,13 @@ export function ExercisesListClient({
                       </td>
                       <td className="px-6 py-4 text-gray-500">{created}</td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setEditing(ex)}
+                        <Link
+                          href={`/admin/exercises/${ex.id}/edit`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-800 hover:bg-gray-50"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                           Edit
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   );
@@ -160,18 +136,6 @@ export function ExercisesListClient({
           </div>
         )}
       </div>
-
-      <EditExerciseModal
-        item={editing}
-        locations={locations}
-        equipmentOptions={equipmentOptions}
-        categoryTypeOptions={categoryTypeOptions}
-        movementPatternOptions={movementPatternOptions}
-        bodyRegionOptions={bodyRegionOptions}
-        bodyPartOptions={bodyPartOptions}
-        exerciseLevelOptions={exerciseLevelOptions}
-        onClose={() => setEditing(null)}
-      />
     </>
   );
 }

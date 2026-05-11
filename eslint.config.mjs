@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Frozen copy of pre-launch homepage (see RESTORE-HOME.txt)
+    "src/landing-archive/**",
   ]),
 ]);
 

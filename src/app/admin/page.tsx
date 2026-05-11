@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Users, TrendingUp, Activity, CreditCard, ArrowUpRight, ArrowDownRight, MoreHorizontal, Dumbbell, ArrowRight } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -55,7 +56,12 @@ export default function AdminDashboard() {
             <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white">
                 <h2 className="text-lg font-semibold text-gray-900">Recent Signups</h2>
-                <button className="text-sm font-medium text-gray-500 hover:text-black transition-colors">View All</button>
+                <Link
+                  href="/admin/users"
+                  className="text-sm font-medium text-gray-500 hover:text-black transition-colors"
+                >
+                  View all
+                </Link>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">

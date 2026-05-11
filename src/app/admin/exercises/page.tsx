@@ -1,57 +1,18 @@
 import { Plus, Package, Layers } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
-import type { ExerciseListItem } from "./edit-exercise-modal";
+import { bucketJunctionByExerciseId, exerciseRowToListItem } from "./exercise-row-utils";
 import { ExercisesListClient } from "./exercises-list-client";
+import type { ExerciseListItem } from "./types";
 
 export const dynamic = "force-dynamic";
 
-function pickLocation(
-  loc: { name: string; slug: string } | { name: string; slug: string }[] | null
-): { name: string; slug: string } | null {
-  if (!loc) return null;
-  return Array.isArray(loc) ? loc[0] ?? null : loc;
-}
-
-function sortedJunctionIds<T extends { sort_order: number }>(
-  rows: T[] | null | undefined,
-  getId: (r: T) => string
-): string[] {
-  if (!rows?.length) return [];
-  return [...rows].sort((a, b) => a.sort_order - b.sort_order).map(getId);
-}
-
-function bucketJunctionByExerciseId<T extends { exercise_id: string; sort_order: number }>(
-  data: T[] | null | undefined
-): Map<string, T[]> {
-  const m = new Map<string, T[]>();
-  for (const r of data ?? []) {
-    const list = m.get(r.exercise_id) ?? [];
-    list.push(r);
-    m.set(r.exercise_id, list);
-  }
-  for (const list of m.values()) {
-    list.sort((a, b) => a.sort_order - b.sort_order);
-  }
-  return m;
-}
-
 export default async function AdminExercisesPage() {
   const supabase = await createClient();
-  const [
-    exercisesRes,
-    locationsRes,
-    equipmentRes,
-    categoryTypesRes,
-    movementPatternsRes,
-    bodyRegionsRes,
-    bodyPartsRes,
-    exerciseLevelsRes,
-  ] = await Promise.all([
-      supabase
-        .from("exercises")
-        .select(
-          `
+  const exercisesRes = await supabase
+    .from("exercises")
+    .select(
+      `
       id,
       title,
       description,
@@ -64,16 +25,8 @@ export default async function AdminExercisesPage() {
       locations ( name, slug ),
       exercise_equipment ( equipment_id, sort_order )
     `
-        )
-        .order("created_at", { ascending: false }),
-      supabase.from("locations").select("id, name, slug").order("sort_order", { ascending: true }),
-      supabase.from("equipment").select("id, title").order("title", { ascending: true }),
-      supabase.from("exercise_category_types").select("id, name").order("name", { ascending: true }),
-      supabase.from("movement_patterns").select("id, name").order("name", { ascending: true }),
-      supabase.from("body_regions").select("id, name").order("name", { ascending: true }),
-      supabase.from("body_parts").select("id, name").order("name", { ascending: true }),
-      supabase.from("exercise_levels").select("id, name").order("sort_order", { ascending: true }),
-    ]);
+    )
+    .order("created_at", { ascending: false });
 
   const { data: exercises, error } = exercisesRes;
 
@@ -115,58 +68,33 @@ export default async function AdminExercisesPage() {
       bpByExercise = bucketJunctionByExerciseId(bpRes.data);
     }
   }
-  const locations = locationsRes.data ?? [];
-  const equipmentOptions = (equipmentRes.data ?? []).map((r) => ({
-    id: r.id as string,
-    label: r.title as string,
-  }));
-  const categoryTypeOptions = (categoryTypesRes.data ?? []).map((r) => ({
-    id: r.id as string,
-    label: r.name as string,
-  }));
-  const movementPatternOptions = (movementPatternsRes.data ?? []).map((r) => ({
-    id: r.id as string,
-    label: r.name as string,
-  }));
-  const bodyRegionOptions = (bodyRegionsRes.data ?? []).map((r) => ({
-    id: r.id as string,
-    label: r.name as string,
-  }));
-  const bodyPartOptions = (bodyPartsRes.data ?? []).map((r) => ({
-    id: r.id as string,
-    label: r.name as string,
-  }));
-  const exerciseLevelOptions = (exerciseLevelsRes.data ?? []).map((r) => ({
-    id: r.id as string,
-    label: r.name as string,
-  }));
-
-  const rows: ExerciseListItem[] = (exercises ?? []).map((row) => {
-    const id = row.id as string;
-    const loc = pickLocation(row.locations as { name: string; slug: string } | { name: string; slug: string }[] | null);
-    const ee = row.exercise_equipment as { equipment_id: string; sort_order: number }[] | null | undefined;
-    const ct = ctByExercise.get(id);
-    const mp = mpByExercise.get(id);
-    const br = brByExercise.get(id);
-    const bp = bpByExercise.get(id);
-    return {
-      id,
-      title: row.title as string,
-      description: (row.description as string | null) ?? null,
-      how_to: (row.how_to as string | null) ?? null,
-      video_url: (row.video_url as string | null) ?? null,
-      image_url: (row.image_url as string | null) ?? null,
-      location_id: row.location_id as string,
-      created_at: row.created_at as string,
-      locationName: loc?.name ?? null,
-      equipmentIds: sortedJunctionIds(ee, (r) => r.equipment_id),
-      categoryTypeIds: sortedJunctionIds(ct, (r) => r.exercise_category_type_id),
-      movementPatternIds: sortedJunctionIds(mp, (r) => r.movement_pattern_id),
-      bodyRegionIds: sortedJunctionIds(br, (r) => r.body_region_id),
-      bodyPartIds: sortedJunctionIds(bp, (r) => r.body_part_id),
-      exerciseLevelId: (row.exercise_level_id as string | null) ?? null,
-    };
-  });
+  const rows: ExerciseListItem[] = (exercises ?? []).map((row) =>
+    exerciseRowToListItem(
+      {
+        id: row.id as string,
+        title: row.title as string,
+        description: (row.description as string | null) ?? null,
+        how_to: (row.how_to as string | null) ?? null,
+        video_url: (row.video_url as string | null) ?? null,
+        image_url: (row.image_url as string | null) ?? null,
+        created_at: row.created_at as string,
+        location_id: row.location_id as string,
+        exercise_level_id: (row.exercise_level_id as string | null) ?? null,
+        locations: row.locations as
+          | { name: string; slug: string }
+          | { name: string; slug: string }[]
+          | null,
+        exercise_equipment: row.exercise_equipment as
+          | { equipment_id: string; sort_order: number }[]
+          | null
+          | undefined,
+      },
+      ctByExercise,
+      mpByExercise,
+      brByExercise,
+      bpByExercise
+    )
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -205,16 +133,7 @@ export default async function AdminExercisesPage() {
             </div>
           )}
 
-          <ExercisesListClient
-            rows={rows}
-            locations={locations}
-            equipmentOptions={equipmentOptions}
-            categoryTypeOptions={categoryTypeOptions}
-            movementPatternOptions={movementPatternOptions}
-            bodyRegionOptions={bodyRegionOptions}
-            bodyPartOptions={bodyPartOptions}
-            exerciseLevelOptions={exerciseLevelOptions}
-          />
+          <ExercisesListClient rows={rows} />
         </div>
       </div>
     </div>

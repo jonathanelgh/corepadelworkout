@@ -1,0 +1,10 @@
+Restore the full marketing homepage at `/`
+
+1. Copy the file `src/landing-archive/original-home-page.tsx` over `src/app/page.tsx` (overwrite), then rename the destination to `page.tsx` if your editor saved it with another name.
+
+   From repo root:
+   cp src/landing-archive/original-home-page.tsx src/app/page.tsx
+
+2. Optional: in `src/app/layout.tsx`, set `metadata.title.default` / `metadata.description` back to your launch wording if you changed them for "coming soon".
+
+3. Remove or adjust this folder only after you no longer need the backup.
