@@ -295,15 +295,27 @@ export function EditExerciseForm({
                     </div>
                   )}
 
-                  <MultiSelectSearchChips
-                    label="Equipment"
-                    options={equipmentOptions}
-                    value={selectedEquipmentIds}
-                    onChange={setSelectedEquipmentIds}
-                    searchPlaceholder="Search equipment…"
-                    emptyListHint="Add equipment in Exercise equipment first."
-                    disabled={pending}
-                  />
+                  <div className="space-y-1.5">
+                    <MultiSelectSearchChips
+                      label="Gear / equipment"
+                      options={equipmentOptions}
+                      value={selectedEquipmentIds}
+                      onChange={setSelectedEquipmentIds}
+                      searchPlaceholder="Search gear…"
+                      emptyListHint="Add items under Exercise equipment first."
+                      disabled={pending}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Pick any combination from your equipment library. Manage items in{" "}
+                      <Link
+                        href="/admin/exercises/equipment"
+                        className="font-medium text-gray-800 underline decoration-gray-300 underline-offset-2 hover:decoration-gray-600"
+                      >
+                        Exercise equipment
+                      </Link>
+                      .
+                    </p>
+                  </div>
 
                   <MultiSelectSearchChips
                     label="Category types"

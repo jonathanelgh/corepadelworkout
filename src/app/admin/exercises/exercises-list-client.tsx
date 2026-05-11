@@ -11,6 +11,7 @@ function matchesExerciseQuery(ex: ExerciseListItem, q: string): boolean {
   if (ex.description?.toLowerCase().includes(n)) return true;
   if (ex.how_to?.toLowerCase().includes(n)) return true;
   if (ex.locationName?.toLowerCase().includes(n)) return true;
+  if (ex.equipmentLabels.some((label) => label.toLowerCase().includes(n))) return true;
   return false;
 }
 
@@ -31,7 +32,7 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title, description, location…"
+            placeholder="Search by title, gear, description, location…"
             className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pr-4 pl-10 text-sm transition-all focus:border-transparent focus:ring-2 focus:ring-black focus:outline-none"
             aria-label="Search exercises"
           />
@@ -45,6 +46,7 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
               <tr className="border-b border-gray-200 bg-gray-50/50 text-gray-500">
                 <th className="px-6 py-4 font-medium">Exercise</th>
                 <th className="px-6 py-4 font-medium">Location</th>
+                <th className="px-6 py-4 font-medium">Gear</th>
                 <th className="px-6 py-4 font-medium">Media</th>
                 <th className="px-6 py-4 font-medium">Created</th>
                 <th className="px-6 py-4 text-right font-medium">Actions</th>
@@ -53,7 +55,7 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-16 text-center text-gray-500">
                     {rows.length === 0 ? (
                       <>
                         <p className="mb-1 font-medium text-gray-900">No exercises yet</p>
@@ -96,6 +98,23 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
                           </span>
                         ) : (
                           "—"
+                        )}
+                      </td>
+                      <td className="max-w-[220px] px-6 py-4 text-gray-600">
+                        {ex.equipmentLabels.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {ex.equipmentLabels.map((g) => (
+                              <span
+                                key={g}
+                                className="inline-flex max-w-full truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-800"
+                                title={g}
+                              >
+                                {g}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-600">

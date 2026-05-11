@@ -12,6 +12,8 @@ export type TakeExercise = {
   how_to: string | null;
   video_url: string | null;
   image_url: string | null;
+  /** Gear names from linked equipment rows */
+  equipmentLabels: string[];
 };
 
 export type TakeSession = {
@@ -143,6 +145,21 @@ export function TakeSessionsList({ programSlug, tracks }: Props) {
                                   Exercise {ei + 1}
                                 </div>
                                 <h3 className="mt-1 text-xl font-medium text-gray-900">{ex.title}</h3>
+                                {ex.equipmentLabels.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+                                      Gear
+                                    </span>
+                                    {ex.equipmentLabels.map((g) => (
+                                      <span
+                                        key={g}
+                                        className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-800"
+                                      >
+                                        {g}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                                 {ex.description?.trim() && (
                                   <p className="mt-2 text-sm leading-relaxed text-gray-600">
                                     {ex.description.trim()}

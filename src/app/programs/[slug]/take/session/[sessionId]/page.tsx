@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { SessionWorkoutClient, type WorkoutExercise } from "@/app/programs/session-workout-client";
+import { equipmentTitlesFromJoin } from "@/lib/exercises/equipment-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +93,11 @@ export default async function SessionWorkoutPage({ params }: PageProps) {
         title,
         description,
         how_to,
-        video_url
+        video_url,
+        exercise_equipment (
+          sort_order,
+          equipment ( title )
+        )
       )
     `
     )
@@ -103,13 +108,22 @@ export default async function SessionWorkoutPage({ params }: PageProps) {
     console.error("session workout exercises:", peErr.message);
   }
 
+  type RawNestedExercise = {
+    id: string;
+    title: string;
+    description: string | null;
+    how_to: string | null;
+    video_url: string | null;
+    exercise_equipment?: { sort_order?: number | null; equipment?: { title: string } | { title: string }[] | null }[];
+  };
+
   type PeIn = {
     sort_order: number;
     duration_minutes: number | null;
     sets: number | null;
     reps: number | null;
     rest_after_seconds: number | null;
-    exercises: WorkoutExercise | WorkoutExercise[] | null;
+    exercises: RawNestedExercise | RawNestedExercise[] | null;
   };
 
   const exercises: WorkoutExercise[] = [];
@@ -123,6 +137,7 @@ export default async function SessionWorkoutPage({ params }: PageProps) {
         description: ex.description ?? null,
         how_to: ex.how_to ?? null,
         video_url: ex.video_url ?? null,
+        equipmentLabels: equipmentTitlesFromJoin(ex.exercise_equipment ?? undefined),
         duration_minutes: row.duration_minutes,
         sets: row.sets,
         reps: row.reps,

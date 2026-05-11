@@ -73,7 +73,9 @@ export default async function EditExercisePage({ params }: { params: Promise<{ i
   const brByExercise = bucketJunctionByExerciseId(brRes.data);
   const bpByExercise = bucketJunctionByExerciseId(bpRes.data);
 
-  const initial: ExerciseListItem = exerciseRowToListItem(
+  const equipmentTitleById = new Map((equipmentRes.data ?? []).map((e) => [e.id as string, e.title as string]));
+
+  const baseItem = exerciseRowToListItem(
     {
       id: row.id as string,
       title: row.title as string,
@@ -95,6 +97,12 @@ export default async function EditExercisePage({ params }: { params: Promise<{ i
     brByExercise,
     bpByExercise
   );
+
+  const equipmentLabels = baseItem.equipmentIds
+    .map((eqId) => equipmentTitleById.get(eqId))
+    .filter((t): t is string => Boolean(t));
+
+  const initial: ExerciseListItem = { ...baseItem, equipmentLabels };
 
   const equipmentOptions = (equipmentRes.data ?? []).map((r) => ({
     id: r.id as string,

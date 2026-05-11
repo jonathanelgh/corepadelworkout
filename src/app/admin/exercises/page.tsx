@@ -68,8 +68,11 @@ export default async function AdminExercisesPage() {
       bpByExercise = bucketJunctionByExerciseId(bpRes.data);
     }
   }
-  const rows: ExerciseListItem[] = (exercises ?? []).map((row) =>
-    exerciseRowToListItem(
+  const { data: equipLib } = await supabase.from("equipment").select("id, title").order("title", { ascending: true });
+  const equipmentTitleById = new Map((equipLib ?? []).map((e) => [e.id as string, e.title as string]));
+
+  const rows: ExerciseListItem[] = (exercises ?? []).map((row) => {
+    const item = exerciseRowToListItem(
       {
         id: row.id as string,
         title: row.title as string,
@@ -93,8 +96,12 @@ export default async function AdminExercisesPage() {
       mpByExercise,
       brByExercise,
       bpByExercise
-    )
-  );
+    );
+    const equipmentLabels = item.equipmentIds
+      .map((id) => equipmentTitleById.get(id))
+      .filter((t): t is string => Boolean(t));
+    return { ...item, equipmentLabels };
+  });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

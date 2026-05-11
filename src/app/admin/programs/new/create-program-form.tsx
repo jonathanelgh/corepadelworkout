@@ -13,6 +13,7 @@ import {
   ListOrdered,
   Music,
   Plus,
+  Copy,
   Save,
   Settings,
   Trash2,
@@ -309,6 +310,36 @@ export function CreateProgramForm({
         if (j < 0 || j >= t.sessions.length) return t;
         const sessions = [...t.sessions];
         [sessions[i], sessions[j]] = [sessions[j], sessions[i]];
+        return { ...t, sessions };
+      })
+    );
+  }
+
+  function duplicateSessionInTrack(trackKey: string, sessionKey: string) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        const i = t.sessions.findIndex((s) => s.key === sessionKey);
+        if (i < 0) return t;
+        const src = t.sessions[i];
+        const copyName = src.name.trim()
+          ? `${src.name.trim()} (copy)`
+          : `Session ${t.sessions.length + 1}`;
+        const duplicated: SessionBlock = {
+          key: crypto.randomUUID(),
+          name: copyName,
+          description: src.description,
+          durationMinutes: src.durationMinutes,
+          exercises: src.exercises.map((e) => ({
+            key: crypto.randomUUID(),
+            exerciseId: e.exerciseId,
+            durationMinutes: e.durationMinutes,
+            sets: e.sets,
+            reps: e.reps,
+            restAfterSeconds: e.restAfterSeconds,
+          })),
+        };
+        const sessions = [...t.sessions.slice(0, i + 1), duplicated, ...t.sessions.slice(i + 1)];
         return { ...t, sessions };
       })
     );
@@ -1289,7 +1320,16 @@ export function CreateProgramForm({
                             className="flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                           />
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => duplicateSessionInTrack(activeTrack.key, session.key)}
+                            className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded border border-gray-200 bg-white"
+                            title="Duplicate this session (same exercises and settings)"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            Duplicate
+                          </button>
                           <button
                             type="button"
                             onClick={() => moveSessionInTrack(activeTrack.key, session.key, -1)}

@@ -6,6 +6,7 @@ import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { ProgramExperienceLayout } from "../../program-experience-layout";
 import { ProgramTakeFooter } from "../../program-take-footer";
 import { TakeSessionsList } from "../../take-sessions-list";
+import { equipmentTitlesFromJoin, type ExerciseEquipmentJoinRow } from "@/lib/exercises/equipment-labels";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ type ExerciseRow = {
   how_to: string | null;
   video_url: string | null;
   image_url: string | null;
+  exercise_equipment?: ExerciseEquipmentJoinRow[] | null;
 };
 
 type SessionRow = {
@@ -190,7 +192,11 @@ export default async function ProgramTakePage({ params }: PageProps) {
             description,
             how_to,
             video_url,
-            image_url
+            image_url,
+            exercise_equipment (
+              sort_order,
+              equipment ( title )
+            )
           )
         )
       )
@@ -233,6 +239,7 @@ export default async function ProgramTakePage({ params }: PageProps) {
           how_to: ex.how_to,
           video_url: ex.video_url?.trim() || null,
           image_url: ex.image_url?.trim() || null,
+          equipmentLabels: equipmentTitlesFromJoin(ex.exercise_equipment ?? undefined),
         })),
       };
     }),

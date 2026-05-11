@@ -69,6 +69,7 @@ export function exerciseRowToListItem(
     created_at: row.created_at,
     locationName: loc?.name ?? null,
     equipmentIds: sortedJunctionIds(ee, (r) => r.equipment_id),
+    equipmentLabels: [],
     categoryTypeIds: sortedJunctionIds(ct, (r) => r.exercise_category_type_id),
     movementPatternIds: sortedJunctionIds(mp, (r) => r.movement_pattern_id),
     bodyRegionIds: sortedJunctionIds(br, (r) => r.body_region_id),

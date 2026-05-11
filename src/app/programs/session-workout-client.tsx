@@ -11,6 +11,8 @@ export type WorkoutExercise = {
   description: string | null;
   how_to: string | null;
   video_url: string | null;
+  /** Names from exercise_equipment → equipment */
+  equipmentLabels: string[];
   /** Prescription for this exercise in this program session */
   duration_minutes?: number | null;
   sets?: number | null;
@@ -213,6 +215,19 @@ export function SessionWorkoutClient({
               <h2 className="mt-1 text-2xl font-medium tracking-tight text-gray-900">{current.title}</h2>
               {prescription && (
                 <p className="mt-2 text-sm font-medium tabular-nums text-gray-600">{prescription}</p>
+              )}
+              {current.equipmentLabels.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-semibold tracking-wide text-gray-400 uppercase">Gear</span>
+                  {current.equipmentLabels.map((g) => (
+                    <span
+                      key={g}
+                      className="rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-800"
+                    >
+                      {g}
+                    </span>
+                  ))}
+                </div>
               )}
               {restAfterLabel(current) && (
                 <p className="mt-1 text-xs tabular-nums text-gray-500">{restAfterLabel(current)}</p>

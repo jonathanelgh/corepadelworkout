@@ -9,6 +9,8 @@ export type ExerciseListItem = {
   created_at: string;
   locationName: string | null;
   equipmentIds: string[];
+  /** Resolved titles from `equipment` for display (order matches selection). */
+  equipmentLabels: string[];
   categoryTypeIds: string[];
   movementPatternIds: string[];
   bodyRegionIds: string[];
