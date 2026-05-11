@@ -10,6 +10,7 @@ import {
   type MultiSelectOption,
 } from "@/components/admin/multi-select-search-chips";
 import { ExerciseMediaPickerModal } from "@/components/admin/exercise-media-picker-modal";
+import { VideoUrlPreview } from "@/components/media/video-url-preview";
 import type { ExerciseListItem } from "../../types";
 
 type LocationOption = { id: string; name: string; slug: string };
@@ -442,21 +443,18 @@ export function EditExerciseForm({
               <div className="rounded-xl border border-gray-200 bg-white p-6 lg:p-8">
                 <h2 className="mb-2 text-lg font-semibold text-gray-900">Demo video</h2>
                 <p className="mb-6 text-sm text-gray-500">
-                  Choose from the media library, upload a new file, or paste a link (Vimeo, YouTube, or direct MP4).
+                  Choose from the media library, upload a new file, or paste a link. Third-party embeds supported: YouTube,
+                  Vimeo, Google Drive (file shared for viewing), Loom, Dailymotion, or a direct MP4/WebM URL.
                 </p>
 
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <div className="flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 sm:h-40 sm:w-56">
+                  <div className="flex min-h-[11rem] w-full shrink-0 items-stretch justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 sm:min-h-[12rem] sm:w-72">
                     {videoUrl.trim() ? (
-                      <video
-                        src={videoUrl.trim()}
-                        className="max-h-full max-w-full object-contain"
-                        controls
-                        playsInline
-                        preload="metadata"
-                      />
+                      <VideoUrlPreview url={videoUrl} label="Demo video preview" />
                     ) : (
-                      <Video className="h-12 w-12 text-gray-300" aria-hidden />
+                      <div className="flex h-full min-h-[10rem] w-full items-center justify-center">
+                        <Video className="h-12 w-12 text-gray-300" aria-hidden />
+                      </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1 space-y-3">
@@ -493,11 +491,15 @@ export function EditExerciseForm({
                     id="video_url"
                     name="video_url"
                     type="url"
+                    inputMode="url"
                     value={videoUrl}
                     onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://…"
+                    placeholder="https://youtube.com/…, vimeo.com/…, or direct .mp4"
                     className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-black"
                   />
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    Use a public link. For Google Drive, use &quot;Anyone with the link&quot; can view the file.
+                  </p>
                 </div>
               </div>
 
