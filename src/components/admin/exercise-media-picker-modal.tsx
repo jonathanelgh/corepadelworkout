@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { FolderOpen, Loader2, RefreshCw, Search, UploadCloud, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { STORAGE_BUCKETS, type StorageBucketId } from "@/utils/supabase/storage";
@@ -61,6 +62,7 @@ export function ExerciseMediaPickerModal({
 }) {
   const titleId = useId();
   const uploadInputId = useId();
+  const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<TabId>("upload");
   const [bucketFilter, setBucketFilter] = useState<StorageBucketId | "all">("all");
   const [rows, setRows] = useState<AdminMediaRow[]>([]);
@@ -90,6 +92,10 @@ export function ExerciseMediaPickerModal({
     if (!open || tab !== "library") return;
     void load();
   }, [open, tab, load]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -173,9 +179,10 @@ export function ExerciseMediaPickerModal({
   const kindLabel = kind === "image" ? "image" : "video";
 
   if (!open) return null;
+  if (!mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" role="presentation">
+  return createPortal(
+    <div className="fixed inset-0 z-100 flex items-end justify-center p-4 sm:items-center" role="presentation">
       <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close dialog" onClick={onClose} />
       <div
         role="dialog"
@@ -463,6 +470,7 @@ export function ExerciseMediaPickerModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
