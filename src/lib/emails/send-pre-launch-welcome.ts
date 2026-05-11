@@ -3,12 +3,16 @@ import { buildPreLaunchWelcomeEmail } from "./pre-launch-welcome-html";
 
 const DEFAULT_SITE = "https://corepadel.app";
 
-/** Public URL for the e-book PDF (used in the welcome email). */
+/** Hosted PDF in Supabase Storage (`public_media` bucket); override with NEXT_PUBLIC_PRELAUNCH_EBOOK_URL if needed. */
+const DEFAULT_PRELAUNCH_EBOOK_URL =
+  "https://ppxjmpsircgmhdylqhlq.supabase.co/storage/v1/object/public/public_media/Master-Your-Padel-Game-The-Ultimate-Physical-Performance-Guide.pdf";
+
+/** Public URL for the e-book PDF (welcome email and /join/welcome). */
 export function resolvePreLaunchEbookPublicUrl(): string {
   const site = (process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE).replace(/\/$/, "");
   const raw = process.env.NEXT_PUBLIC_PRELAUNCH_EBOOK_URL?.trim();
   if (!raw) {
-    return `${site}/prelaunch-ebook.pdf`;
+    return DEFAULT_PRELAUNCH_EBOOK_URL;
   }
   if (raw.startsWith("http://") || raw.startsWith("https://")) {
     return raw;
