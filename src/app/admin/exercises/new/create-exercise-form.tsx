@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Info, Save, Video } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Info, Save, Sparkles, Video } from "lucide-react";
+import { BulkExerciseVideoImportModal } from "@/components/admin/bulk-exercise-video-import-modal";
 import { createExercise } from "../actions";
 import {
   MultiSelectSearchChips,
@@ -63,6 +64,7 @@ export function CreateExerciseForm({
   const [imageUrl, setImageUrl] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [mediaPicker, setMediaPicker] = useState<null | "image" | "video">(null);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,6 +108,11 @@ export function CreateExerciseForm({
 
   return (
     <>
+      <BulkExerciseVideoImportModal
+        open={bulkImportOpen}
+        onClose={() => setBulkImportOpen(false)}
+        locations={locations.map((l) => ({ id: l.id, name: l.name }))}
+      />
       {mediaPicker && (
         <ExerciseMediaPickerModal
           open
@@ -130,6 +137,15 @@ export function CreateExerciseForm({
           <h1 className="text-lg font-semibold text-gray-900 truncate">Create exercise</h1>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => setBulkImportOpen(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-800 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors sm:px-4"
+          >
+            <Sparkles className="w-4 h-4 text-[#ccff00]" />
+            <span className="hidden sm:inline">Bulk upload videos</span>
+            <span className="sm:hidden">Bulk</span>
+          </button>
           <button
             type="button"
             disabled
