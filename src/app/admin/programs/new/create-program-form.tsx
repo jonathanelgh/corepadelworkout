@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
+import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +17,7 @@ import {
   Plus,
   Copy,
   Save,
+  Sparkles,
   Settings,
   Trash2,
   UploadCloud,
@@ -134,6 +137,8 @@ export function CreateProgramForm({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("basic");
   const [error, setError] = useState<string | null>(null);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -165,6 +170,63 @@ export function CreateProgramForm({
 
   function toggleCategory(id: string) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function setFieldValue(id: string, value: string) {
+    const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+    if (el) el.value = value;
+  }
+
+  function applyAiDraft(draft: AiProgramFormDraft, warnings: string[]) {
+    setFieldValue("title", draft.title);
+    setFieldValue("description", draft.description);
+    setFieldValue("body", draft.body);
+    setFieldValue("difficulty_level_id", draft.difficultyLevelId);
+    setFieldValue("duration_weeks", draft.durationWeeks);
+    setFieldValue("sessions_per_week", draft.sessionsPerWeek);
+    setFieldValue("minutes_per_session", draft.minutesPerSession);
+    setSelectedCategoryIds(draft.categoryIds);
+    setOutcomeLines(
+      draft.outcomes.length > 0
+        ? draft.outcomes.map((text) => ({ key: crypto.randomUUID(), text }))
+        : [{ key: crypto.randomUUID(), text: "" }]
+    );
+
+    const newTracks: TrackBlock[] = draft.tracks.map((tr) => ({
+      key: crypto.randomUUID(),
+      locationId: tr.locationId,
+      sessions: tr.sessions.map((s, i) => ({
+        key: crypto.randomUUID(),
+        name: s.name.trim() || `Day ${i + 1}`,
+        description: s.description,
+        durationMinutes: s.durationMinutes,
+        exercises: s.exercises.map((ex) => ({
+          key: crypto.randomUUID(),
+          exerciseId: ex.exerciseId,
+          durationMinutes: ex.durationMinutes,
+          sets: ex.sets,
+          reps: ex.reps,
+          restAfterSeconds: ex.restAfterSeconds,
+        })),
+      })),
+    }));
+
+    setTracks(newTracks);
+    setSessionPicks({});
+    setActiveLocationTabKey(newTracks[0]?.key ?? null);
+    setActiveTab("curriculum");
+
+    const sessionCount = newTracks.reduce((n, t) => n + t.sessions.length, 0);
+    const exerciseCount = newTracks.reduce(
+      (n, t) => n + t.sessions.reduce((m, s) => m + s.exercises.length, 0),
+      0
+    );
+    let notice = `AI draft applied: ${sessionCount} session${sessionCount === 1 ? "" : "s"}, ${exerciseCount} exercise slots. Review and edit before saving.`;
+    if (warnings.length > 0) {
+      notice += ` ${warnings.length} adjustment${warnings.length === 1 ? "" : "s"}: ${warnings.slice(0, 3).join(" ")}${warnings.length > 3 ? "…" : ""}`;
+    }
+    setAiNotice(notice);
+    setError(null);
   }
 
   const effectiveLocationTabKey =
@@ -618,6 +680,20 @@ export function CreateProgramForm({
         <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
+            onClick={() => setAiModalOpen(true)}
+            disabled={exercises.length === 0 || locations.length === 0}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              exercises.length === 0
+                ? "Add exercises to the library first"
+                : "Generate program with AI from your exercise library"
+            }
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="hidden sm:inline">AI builder</span>
+          </button>
+          <button
+            type="button"
             disabled
             className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-400 bg-white border border-gray-200 rounded-lg cursor-not-allowed"
             title="Coming soon"
@@ -674,6 +750,18 @@ export function CreateProgramForm({
           {loadError && (
             <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               {loadError}
+            </div>
+          )}
+          {aiNotice && (
+            <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-start justify-between gap-3">
+              <span>{aiNotice}</span>
+              <button
+                type="button"
+                onClick={() => setAiNotice(null)}
+                className="shrink-0 text-emerald-700 hover:text-emerald-900 text-xs font-medium"
+              >
+                Dismiss
+              </button>
             </div>
           )}
           {error && (
@@ -1181,13 +1269,24 @@ export function CreateProgramForm({
           </div>
 
           <div className={activeTab === "curriculum" ? "space-y-6" : "hidden"}>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Workout by location</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Add a block per place members can train (e.g. Gym vs Home). Each location has its own sessions
-                and exercises—members pick where they work out and follow that track. Switch tabs to edit each
-                place.
-              </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Workout by location</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Add a block per place members can train (e.g. Gym vs Home). Each location has its own sessions
+                  and exercises—members pick where they work out and follow that track. Switch tabs to edit each
+                  place.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiModalOpen(true)}
+                disabled={exercises.length === 0 || locations.length === 0}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Sparkles className="h-4 w-4" />
+                Generate with AI
+              </button>
             </div>
 
             {locations.length === 0 && (
@@ -1748,6 +1847,13 @@ export function CreateProgramForm({
           </div>
         </form>
       </div>
+
+      <AiProgramGeneratorModal
+        open={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        locations={locations}
+        onApply={applyAiDraft}
+      />
     </div>
   );
 }
