@@ -4,6 +4,7 @@ import {
   formatTaxonomyForPrompt,
   type ExerciseTaxonomyContext,
 } from "@/lib/exercises/taxonomy-context";
+import { resolveGeminiModel } from "@/lib/gemini-config";
 
 export type GeminiExerciseDraft = {
   title: string;
@@ -136,7 +137,7 @@ export async function analyzeExerciseVideoWithGemini(
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash",
+    model: resolveGeminiModel(),
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.3,

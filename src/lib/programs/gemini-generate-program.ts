@@ -5,6 +5,7 @@ import {
   type ExerciseCatalogEntry,
   type ProgramAiContext,
 } from "@/lib/programs/exercise-catalog";
+import { resolveGeminiModel } from "@/lib/gemini-config";
 
 export type GeminiProgramExercise = {
   exercise_id: string;
@@ -220,7 +221,7 @@ export async function generateProgramWithGemini(
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash",
+    model: resolveGeminiModel(),
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.45,
