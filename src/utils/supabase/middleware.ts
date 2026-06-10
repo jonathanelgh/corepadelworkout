@@ -61,6 +61,20 @@ export async function updateSession(request: NextRequest) {
     return withSessionCookies(NextResponse.redirect(url))
   }
 
+  if (isAdminRoute && user) {
+    const { data: adminRow } = await supabase
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (!adminRow) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/member"
+      return withSessionCookies(NextResponse.redirect(url))
+    }
+  }
+
   if (user && isLoginRoute) {
     const next = request.nextUrl.searchParams.get("next")
     const safeNext =
