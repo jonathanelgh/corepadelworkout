@@ -44,7 +44,7 @@ function LoginForm() {
     setError(null);
     setPending(true);
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/login/reset-password")}`;
+    const redirectTo = `${window.location.origin}/auth/recovery`;
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo,
     });

@@ -15,13 +15,47 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     const supabase = createClient();
-    void supabase.auth.getSession().then(({ data }) => {
+
+    async function verifyResetSession() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          router.replace(
+            "/login?error=" + encodeURIComponent("Reset link expired or invalid. Request a new one.")
+          );
+          return;
+        }
+        window.history.replaceState({}, "", "/login/reset-password");
+      } else if (tokenHash && type === "recovery") {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+        if (error) {
+          router.replace(
+            "/login?error=" + encodeURIComponent("Reset link expired or invalid. Request a new one.")
+          );
+          return;
+        }
+        window.history.replaceState({}, "", "/login/reset-password");
+      } else if (window.location.hash.includes("type=recovery")) {
+        await supabase.auth.getSession();
+        window.history.replaceState({}, "", "/login/reset-password");
+      }
+
+      const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        router.replace("/login?error=" + encodeURIComponent("Reset link expired or invalid. Request a new one."));
+        router.replace(
+          "/login?error=" + encodeURIComponent("Reset link expired or invalid. Request a new one.")
+        );
         return;
       }
       setCheckingSession(false);
-    });
+    }
+
+    void verifyResetSession();
   }, [router]);
 
   async function onSubmit(e: React.FormEvent) {

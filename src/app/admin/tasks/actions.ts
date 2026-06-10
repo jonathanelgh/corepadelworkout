@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
+import { notifyNewTaskAssignees } from "@/lib/emails/notify-task-assignees";
 import type { AssigneeOption, TaskBoardDetail, TaskBoardListItem } from "./types";
 
 const TASKS_PATH = "/admin/tasks";
@@ -321,6 +322,14 @@ export async function updateTaskCard(input: {
   const due_date =
     input.dueDate && input.dueDate.trim() !== "" ? input.dueDate.trim() : null;
 
+  const { data: previousAssignees } = await auth.supabase
+    .from("task_card_assignees")
+    .select("user_id")
+    .eq("card_id", input.cardId);
+  const previousAssigneeIds = new Set(
+    (previousAssignees ?? []).map((r) => r.user_id as string)
+  );
+
   const { error } = await auth.supabase
     .from("task_cards")
     .update({
@@ -348,6 +357,22 @@ export async function updateTaskCard(input: {
       }))
     );
     if (insErr) return { error: insErr.message };
+  }
+
+  try {
+    await notifyNewTaskAssignees({
+      supabase: auth.supabase,
+      cardId: input.cardId,
+      boardId: input.boardId,
+      taskTitle: title,
+      taskDescription: input.description.trim() || null,
+      dueDate: due_date,
+      previousAssigneeIds,
+      nextAssigneeIds: uniqueAssignees,
+      assignedByUserId: auth.user!.id,
+    });
+  } catch (e) {
+    console.warn("[task-assigned] Notification error:", e);
   }
 
   revalidateBoard(input.boardId);

@@ -35,15 +35,23 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const path = request.nextUrl.pathname
-  const isAdminRoute = path.startsWith("/admin")
-  const isLoginRoute = path === "/login"
-
   function withSessionCookies(res: NextResponse) {
     supabaseResponse.cookies.getAll().forEach(({ name, value }) => {
       res.cookies.set(name, value)
     })
     return res
+  }
+
+  const path = request.nextUrl.pathname
+  const isAdminRoute = path.startsWith("/admin")
+  const isLoginRoute = path === "/login"
+  const code = request.nextUrl.searchParams.get("code")
+
+  // Supabase may fall back to Site URL (/) when redirect URLs are not allowlisted.
+  if (code && path === "/") {
+    const url = request.nextUrl.clone()
+    url.pathname = "/auth/recovery"
+    return withSessionCookies(NextResponse.redirect(url))
   }
 
   if (isAdminRoute && !user) {
