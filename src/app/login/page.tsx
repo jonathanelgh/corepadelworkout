@@ -5,15 +5,21 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
+type View = "login" | "forgot" | "forgot-sent";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [view, setView] = useState<View>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
+  const resetSuccess = searchParams.get("reset") === "1";
+  const authError = searchParams.get("error");
+
+  async function onSubmitLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setPending(true);
@@ -33,9 +39,25 @@ function LoginForm() {
     router.refresh();
   }
 
+  async function onSubmitForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/login/reset-password")}`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    });
+    setPending(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setView("forgot-sent");
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-black text-white">
-      {/* Background */}
       <div className="absolute inset-0">
         <img src="/elbopain-landing.webp" alt="" className="h-full w-full object-cover opacity-25" />
         <div className="absolute inset-0 bg-linear-to-b from-black/70 via-black/55 to-black/85" />
@@ -57,76 +79,165 @@ function LoginForm() {
         <main className="flex flex-1 items-center justify-center py-10">
           <div className="w-full max-w-md">
             <div className="mb-8 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ccff00]">Sign in</p>
-              <h1 className="mt-3 text-3xl font-medium tracking-tight md:text-4xl">Welcome back</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ccff00]">
+                {view === "login" ? "Sign in" : "Reset password"}
+              </p>
+              <h1 className="mt-3 text-3xl font-medium tracking-tight md:text-4xl">
+                {view === "login" ? "Welcome back" : view === "forgot-sent" ? "Check your email" : "Forgot password?"}
+              </h1>
               <p className="mt-3 text-sm text-white/70">
-                Use your account to access your programs and dashboard.
+                {view === "login" && "Use your account to access your programs and dashboard."}
+                {view === "forgot" && "We will email you a link to reset your password."}
+                {view === "forgot-sent" &&
+                  `If an account exists for ${email}, you will receive a reset link shortly.`}
               </p>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur-md md:p-8">
-          {error && (
-            <div className="mb-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-              {error}
-            </div>
-          )}
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-white/85 mb-1.5">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none ring-0 transition focus:border-[#ccff00]/60 focus:bg-black/40 focus:ring-2 focus:ring-[#ccff00]/25"
-                placeholder="you@club.com"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white/85 mb-1.5">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none ring-0 transition focus:border-[#ccff00]/60 focus:bg-black/40 focus:ring-2 focus:ring-[#ccff00]/25"
-                placeholder="••••••••"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={pending}
-              className="w-full rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-60"
-            >
-              {pending ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
+              {resetSuccess && view === "login" && (
+                <div className="mb-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                  Your password was updated. Sign in with your new password.
+                </div>
+              )}
+              {authError && view === "login" && (
+                <div className="mb-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {authError}
+                </div>
+              )}
+              {error && (
+                <div className="mb-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {error}
+                </div>
+              )}
 
-              <div className="mt-6 flex flex-col items-center gap-2 text-center text-xs text-white/60">
-                <p>
-                  Want to explore first?{" "}
-                  <Link href="/free-warmup" className="text-white underline underline-offset-4 hover:text-white/80">
-                    Free 15-min warmup
-                  </Link>
-                </p>
-                <p>
-                  Member access?{" "}
-                  <Link
-                    href="/login?next=/member"
-                    className="text-white underline underline-offset-4 hover:text-white/80"
+              {view === "login" && (
+                <form onSubmit={onSubmitLogin} className="space-y-4">
+                  <div>
+                    <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-white/85">
+                      Email
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-[#ccff00]/60 focus:bg-black/40 focus:ring-2 focus:ring-[#ccff00]/25"
+                      placeholder="you@club.com"
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <label htmlFor="password" className="block text-sm font-medium text-white/85">
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setView("forgot");
+                        }}
+                        className="text-xs font-medium text-[#ccff00] hover:text-[#b3e600]"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <input
+                      id="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-[#ccff00]/60 focus:bg-black/40 focus:ring-2 focus:ring-[#ccff00]/25"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="w-full rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-60"
                   >
-                    Go to member dashboard
-                  </Link>
-                </p>
-              </div>
+                    {pending ? "Signing in…" : "Sign in"}
+                  </button>
+                </form>
+              )}
+
+              {view === "forgot" && (
+                <form onSubmit={onSubmitForgot} className="space-y-4">
+                  <div>
+                    <label htmlFor="forgot-email" className="mb-1.5 block text-sm font-medium text-white/85">
+                      Email
+                    </label>
+                    <input
+                      id="forgot-email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-[#ccff00]/60 focus:bg-black/40 focus:ring-2 focus:ring-[#ccff00]/25"
+                      placeholder="you@club.com"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="w-full rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-60"
+                  >
+                    {pending ? "Sending…" : "Send reset link"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null);
+                      setView("login");
+                    }}
+                    className="w-full text-center text-sm text-white/70 hover:text-white"
+                  >
+                    Back to sign in
+                  </button>
+                </form>
+              )}
+
+              {view === "forgot-sent" && (
+                <div className="space-y-4">
+                  <p className="text-sm text-white/75">
+                    The link expires after a short time. Check spam if you do not see it in your inbox.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null);
+                      setView("login");
+                    }}
+                    className="w-full rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600]"
+                  >
+                    Back to sign in
+                  </button>
+                </div>
+              )}
+
+              {view === "login" && (
+                <div className="mt-6 flex flex-col items-center gap-2 text-center text-xs text-white/60">
+                  <p>
+                    Want to explore first?{" "}
+                    <Link href="/free-warmup" className="text-white underline underline-offset-4 hover:text-white/80">
+                      Free 15-min warmup
+                    </Link>
+                  </p>
+                  <p>
+                    Member access?{" "}
+                    <Link
+                      href="/login?next=/member"
+                      className="text-white underline underline-offset-4 hover:text-white/80"
+                    >
+                      Go to member dashboard
+                    </Link>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </main>
