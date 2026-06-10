@@ -12,6 +12,7 @@ import {
   Layers,
   Images,
   KanbanSquare,
+  Bot,
   Settings, 
   LogOut, 
   ChevronLeft, 
@@ -41,6 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Programs", href: "/admin/programs", icon: Dumbbell },
+    { name: "AI Coach", href: "/admin/programs/ai", icon: Bot },
     { name: "Exercises", href: "/admin/exercises", icon: Activity },
     { name: "Equipment", href: "/admin/exercises/equipment", icon: Package },
     { name: "Exercise taxonomy", href: "/admin/exercises/taxonomy", icon: Layers },
@@ -132,7 +134,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const isActive =
                 item.href === "/admin"
                   ? pathname === "/admin"
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  : item.href === "/admin/programs"
+                    ? pathname === "/admin/programs" ||
+                      (pathname.startsWith("/admin/programs/") &&
+                        !pathname.startsWith("/admin/programs/ai"))
+                    : item.href === "/admin/programs/ai"
+                      ? pathname === "/admin/programs/ai" ||
+                        pathname.startsWith("/admin/programs/ai/")
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link 
                   key={item.name}

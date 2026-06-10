@@ -4,7 +4,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { parseExerciseStatus } from "@/lib/exercises/status";
+
+const ADMIN_EXERCISES_PATH = "/admin/exercises";
+
+function redirectExercisesError(msg: string): never {
+  redirect(`${ADMIN_EXERCISES_PATH}?error=${encodeURIComponent(msg)}`);
+}
 
 export type CreateExerciseResult = { ok: true } | { error: string };
 
@@ -258,4 +265,33 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   revalidatePath("/admin/exercises");
   revalidatePath(`/admin/exercises/${id}/edit`);
   return { ok: true };
+}
+
+export async function deleteExercise(formData: FormData) {
+  const exerciseId = (formData.get("exercise_id") as string)?.trim();
+  if (!exerciseId) redirectExercisesError("Missing exercise id.");
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirectExercisesError("You must be signed in.");
+  if (!(await getIsAdmin(supabase))) {
+    redirectExercisesError("Not authorized.");
+  }
+
+  const { data: row, error: fetchErr } = await supabase
+    .from("exercises")
+    .select("id")
+    .eq("id", exerciseId)
+    .maybeSingle();
+
+  if (fetchErr) redirectExercisesError(fetchErr.message);
+  if (!row) redirectExercisesError("Exercise not found.");
+
+  const { error: delErr } = await supabase.from("exercises").delete().eq("id", exerciseId);
+  if (delErr) redirectExercisesError(delErr.message);
+
+  revalidatePath(ADMIN_EXERCISES_PATH);
+  redirect(`${ADMIN_EXERCISES_PATH}?deleted=1`);
 }

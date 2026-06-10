@@ -7,7 +7,14 @@ import type { ExerciseListItem } from "./types";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminExercisesPage() {
+type PageSearch = Promise<{ error?: string; deleted?: string }>;
+
+export default async function AdminExercisesPage({
+  searchParams,
+}: {
+  searchParams: PageSearch;
+}) {
+  const sp = await searchParams;
   const supabase = await createClient();
   const exercisesRes = await supabase
     .from("exercises")
@@ -139,6 +146,16 @@ export default async function AdminExercisesPage() {
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               Could not load exercises: {error.message}
+            </div>
+          )}
+          {sp.error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {sp.error}
+            </div>
+          )}
+          {sp.deleted && (
+            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              Exercise deleted.
             </div>
           )}
 

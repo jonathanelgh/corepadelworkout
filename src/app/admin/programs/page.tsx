@@ -1,4 +1,4 @@
-import { Plus, Search, Filter } from "lucide-react";
+import { Bot, Plus, Search, Filter } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { ProgramRowActions } from "./program-row-actions";
@@ -128,13 +128,22 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-8">
         <h1 className="text-lg font-semibold text-gray-900">Programs</h1>
-        <Link
-          href="/admin/programs/new"
-          className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add program
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/programs/ai"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            <Bot className="w-4 h-4" />
+            AI Coach
+          </Link>
+          <Link
+            href="/admin/programs/new"
+            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add program
+          </Link>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-8">

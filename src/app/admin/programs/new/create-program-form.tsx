@@ -27,6 +27,7 @@ import { createProgram, updateProgram } from "../actions";
 import { createClient } from "@/utils/supabase/client";
 import { STORAGE_BUCKETS } from "@/utils/supabase/storage";
 import { ExerciseSearchCombobox, type ExerciseOption } from "./exercise-search-combobox";
+import type { MemberPickerOption } from "@/lib/programs/profile-ai-context";
 
 const TABS = [
   { id: "basic", label: "Basic Info", icon: Info },
@@ -123,6 +124,7 @@ export function CreateProgramForm({
   loadError,
   programId,
   initial,
+  members = [],
 }: {
   categories: CategoryOption[];
   difficulties: DifficultyOption[];
@@ -130,6 +132,7 @@ export function CreateProgramForm({
   locations: LocationOption[];
   defaultLocationId: string;
   loadError?: string | null;
+  members?: MemberPickerOption[];
   /** When set, form submits as update and fields are pre-filled */
   programId?: string;
   initial?: ProgramFormInitialValues | null;
@@ -1852,6 +1855,7 @@ export function CreateProgramForm({
         open={aiModalOpen}
         onClose={() => setAiModalOpen(false)}
         locations={locations}
+        members={members}
         onApply={applyAiDraft}
       />
     </div>

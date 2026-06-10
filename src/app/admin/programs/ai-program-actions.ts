@@ -2,7 +2,9 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
+import { loadAiPrompt } from "@/lib/programs/ai-prompts";
 import { loadProgramAiContext } from "@/lib/programs/exercise-catalog";
+import { loadProfileAiContext, userContextBlock } from "@/lib/programs/profile-ai-context";
 import { generateProgramWithGemini, type AiProgramGenerateRequest } from "@/lib/programs/gemini-generate-program";
 import { mapGeminiDraftToForm, type AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 
@@ -36,7 +38,14 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
       return { error: "Your exercise library is empty. Create exercises before generating a program." };
     }
 
-    const geminiDraft = await generateProgramWithGemini(ctx, input);
+    const promptTemplate = await loadAiPrompt(auth.supabase, "ai_program_builder");
+    const profileContext = input.targetUserId
+      ? await loadProfileAiContext(auth.supabase, input.targetUserId)
+      : null;
+    const geminiDraft = await generateProgramWithGemini(ctx, input, {
+      promptTemplate,
+      userContextBlock: userContextBlock(profileContext),
+    });
     const catalogIds = new Set(ctx.exercises.map((e) => e.id));
     const { draft, warnings } = mapGeminiDraftToForm(geminiDraft, ctx, catalogIds);
 

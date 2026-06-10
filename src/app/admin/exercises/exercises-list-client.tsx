@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
+import { ExerciseRowActions } from "./exercise-row-actions";
 import type { ExerciseListItem } from "./types";
 function matchesExerciseQuery(ex: ExerciseListItem, q: string): boolean {
   if (!q) return true;
@@ -146,13 +147,7 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
                       </td>
                       <td className="px-6 py-4 text-gray-500">{created}</td>
                       <td className="px-6 py-4 text-right">
-                        <Link
-                          href={`/admin/exercises/${ex.id}/edit`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-800 hover:bg-gray-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit
-                        </Link>
+                        <ExerciseRowActions exerciseId={ex.id} exerciseTitle={ex.title} />
                       </td>
                     </tr>
                   );

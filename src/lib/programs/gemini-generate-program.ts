@@ -6,6 +6,7 @@ import {
   type ProgramAiContext,
 } from "@/lib/programs/exercise-catalog";
 import { resolveGeminiModel } from "@/lib/gemini-config";
+import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
 
 export type GeminiProgramExercise = {
   exercise_id: string;
@@ -48,9 +49,11 @@ export type AiProgramGenerateRequest = {
   sessionsPerWeek?: number | null;
   minutesPerSession?: number | null;
   difficultyLevelId?: string | null;
+  /** When set, member profile is injected into the prompt for personalization. */
+  targetUserId?: string | null;
 };
 
-const RESPONSE_SCHEMA = `{
+export const AI_PROGRAM_RESPONSE_SCHEMA = `{
   "title": "string (compelling program name)",
   "description": "string (1-3 sentences for program cards)",
   "body": "string (2-4 paragraphs markdown-friendly plain text for sales/detail page)",
@@ -185,7 +188,8 @@ function catalogForLocations(
 
 export async function generateProgramWithGemini(
   ctx: ProgramAiContext,
-  input: AiProgramGenerateRequest
+  input: AiProgramGenerateRequest,
+  options: { promptTemplate: string; userContextBlock?: string }
 ): Promise<GeminiProgramDraft> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
@@ -211,15 +215,6 @@ export async function generateProgramWithGemini(
     throw new Error("No exercises in the library for the selected locations. Add exercises first.");
   }
 
-  const difficultyHint = input.difficultyLevelId
-    ? ctx.difficulties.find((d) => d.id === input.difficultyLevelId)?.name
-    : null;
-
-  const scheduleParts: string[] = [];
-  if (input.durationWeeks != null) scheduleParts.push(`Duration: ${input.durationWeeks} weeks`);
-  if (input.sessionsPerWeek != null) scheduleParts.push(`Frequency: ${input.sessionsPerWeek} sessions per week`);
-  if (input.minutesPerSession != null) scheduleParts.push(`Target session length: ~${input.minutesPerSession} minutes`);
-
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
     model: resolveGeminiModel(),
@@ -229,43 +224,35 @@ export async function generateProgramWithGemini(
     },
   });
 
+  const scheduleParts: string[] = [];
+  if (input.durationWeeks != null) scheduleParts.push(`Duration: ${input.durationWeeks} weeks`);
+  if (input.sessionsPerWeek != null) scheduleParts.push(`Frequency: ${input.sessionsPerWeek} sessions per week`);
+  if (input.minutesPerSession != null) scheduleParts.push(`Target session length: ~${input.minutesPerSession} minutes`);
+
+  const schedule_targets =
+    scheduleParts.length > 0 ? `\n## Schedule targets\n${scheduleParts.join("\n")}\n` : "";
+
+  const difficultyName = input.difficultyLevelId
+    ? ctx.difficulties.find((d) => d.id === input.difficultyLevelId)?.name
+    : null;
+
+  const difficulty_hint = difficultyName ? `\n## Target difficulty\n${difficultyName}\n` : "";
+
   const metaBlock = formatProgramMetaForPrompt(ctx);
   const catalogBlock = formatExerciseCatalogForPrompt(relevantExercises);
   const locationList = selectedLocations.map((l) => `${l.name} (${l.slug})`).join(", ");
 
-  const prompt = `You are an expert padel strength & conditioning coach building programs for Core Padel Workout.
-
-Design a complete, periodized training program for competitive and recreational padel players.
-
-## Coach brief
-${brief}
-
-## Constraints
-- Use ONLY exercises from the catalog below. Every exercise_id MUST be copied exactly from a catalog line (the UUID in square brackets).
-- Do NOT invent exercises, IDs, or names not in the catalog.
-- Build one track per location: ${locationList}
-- For each track, only use exercises whose location matches that track (see @location in catalog).
-- Sessions should progress logically (warm-up → main work → accessory/mobility where appropriate).
-- Typical session: 6–12 exercises. Vary movement patterns; include padel-relevant rotation, legs, shoulders, and core.
-- Prescribe realistic sets/reps/duration/rest for padel S&C (e.g. strength 3–4×6–10, mobility timed, rest 30–90s).
-- Avoid repeating the same exercise in one session unless intentional (e.g. ladder drills).
-${scheduleParts.length ? `\n## Schedule targets\n${scheduleParts.join("\n")}` : ""}
-${difficultyHint ? `\n## Target difficulty\n${difficultyHint}` : ""}
-
-## Allowed program metadata
-${metaBlock}
-
-## Exercise catalog (${relevantExercises.length} exercises)
-${catalogBlock}
-
-Return JSON only (no markdown), matching:
-${RESPONSE_SCHEMA}
-
-Rules:
-- category_slugs and difficulty_level_slug must match slugs from metadata lists, or use empty/null when unsure.
-- tracks array must include exactly one entry per requested location slug.
-- Session count should match the brief and schedule (e.g. 3 sessions/week × 4 weeks → ~12 sessions per track unless brief says otherwise).
-- body: engaging copy explaining who the program is for and how it improves padel performance.`;
+  const prompt = fillPromptTemplate(options.promptTemplate, {
+    user_context_block: options.userContextBlock ?? "",
+    coach_brief: brief,
+    location_list: locationList,
+    schedule_targets,
+    difficulty_hint,
+    program_metadata: metaBlock,
+    exercise_catalog: catalogBlock,
+    exercise_count: String(relevantExercises.length),
+    response_schema: AI_PROGRAM_RESPONSE_SCHEMA,
+  });
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();

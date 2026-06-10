@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { listMembersForAiPicker } from "@/lib/programs/profile-ai-context";
 import {
   CreateProgramForm,
   type ProgramFormInitialValues,
@@ -123,6 +124,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     difficultiesRes,
     exercisesRes,
     locationsRes,
+    members,
   ] = await Promise.all([
     supabase
       .from("programs")
@@ -177,6 +179,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     supabase.from("difficulty_levels").select("id, name, slug").order("sort_order", { ascending: true }),
     supabase.from("exercises").select("id, title, location_id, status").order("title", { ascending: true }),
     supabase.from("locations").select("id, name, slug").order("sort_order", { ascending: true }),
+    listMembersForAiPicker(supabase),
   ]);
 
   if (!programRes.data) {
@@ -255,6 +258,7 @@ export default async function EditProgramPage({ params }: PageProps) {
       locations={locations}
       defaultLocationId={defaultLocationId}
       loadError={loadError || null}
+      members={members}
     />
   );
 }

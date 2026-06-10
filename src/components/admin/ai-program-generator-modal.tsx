@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Sparkles, X } from "lucide-react";
+import Link from "next/link";
+import { Loader2, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { generateAiProgram } from "@/app/admin/programs/ai-program-actions";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
+import type { MemberPickerOption } from "@/lib/programs/profile-ai-context";
 
 type LocationOption = { id: string; name: string; slug: string };
 
@@ -18,11 +20,13 @@ export function AiProgramGeneratorModal({
   open,
   onClose,
   locations,
+  members = [],
   onApply,
 }: {
   open: boolean;
   onClose: () => void;
   locations: LocationOption[];
+  members?: MemberPickerOption[];
   onApply: (draft: AiProgramFormDraft, warnings: string[]) => void;
 }) {
   const titleId = useId();
@@ -32,6 +36,7 @@ export function AiProgramGeneratorModal({
   const [durationWeeks, setDurationWeeks] = useState("");
   const [sessionsPerWeek, setSessionsPerWeek] = useState("");
   const [minutesPerSession, setMinutesPerSession] = useState("");
+  const [targetUserId, setTargetUserId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +51,7 @@ export function AiProgramGeneratorModal({
     setSessionsPerWeek("");
     setMinutesPerSession("");
     setLocationIds(locations.length > 0 ? [locations[0]!.id] : []);
+    setTargetUserId("");
   }, [open, locations]);
 
   useEffect(() => {
@@ -79,6 +85,7 @@ export function AiProgramGeneratorModal({
       durationWeeks: durationWeeks.trim() ? Number.parseInt(durationWeeks, 10) : null,
       sessionsPerWeek: sessionsPerWeek.trim() ? Number.parseInt(sessionsPerWeek, 10) : null,
       minutesPerSession: minutesPerSession.trim() ? Number.parseInt(minutesPerSession, 10) : null,
+      targetUserId: targetUserId || null,
     });
     setPending(false);
 
@@ -114,7 +121,15 @@ export function AiProgramGeneratorModal({
               AI program builder
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Builds a full program using only exercises from your library.
+              Builds a full program using only exercises from your library.{" "}
+              <Link
+                href="/admin/programs/ai/prompts"
+                className="inline-flex items-center gap-1 font-medium text-gray-700 underline underline-offset-2 hover:text-black"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Edit AI prompts
+              </Link>
             </p>
           </div>
           <button
@@ -129,6 +144,32 @@ export function AiProgramGeneratorModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {members.length > 0 && (
+            <div>
+              <label htmlFor="ai-target-member" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Personalize for member
+              </label>
+              <select
+                id="ai-target-member"
+                value={targetUserId}
+                onChange={(e) => setTargetUserId(e.target.value)}
+                disabled={pending}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black disabled:opacity-60"
+              >
+                <option value="">Generic (no member profile)</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                    {m.email ? ` — ${m.email}` : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-gray-500">
+                Injects age, gender, padel level, pains, goals, and training environment from their profile.
+              </p>
+            </div>
+          )}
+
           <div>
             <label htmlFor="ai-program-brief" className="block text-sm font-medium text-gray-700 mb-1.5">
               What should this program achieve?
