@@ -4,6 +4,7 @@ import { bucketJunctionByExerciseId, exerciseRowToListItem } from "@/app/admin/e
 export type ExerciseCatalogEntry = {
   id: string;
   title: string;
+  status: "draft" | "published";
   description: string | null;
   locationId: string;
   locationSlug: string | null;
@@ -49,6 +50,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         created_at,
         location_id,
         exercise_level_id,
+        status,
         locations ( name, slug ),
         exercise_equipment ( equipment_id, sort_order )
       `
@@ -139,6 +141,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
     return {
       id: item.id,
       title: item.title,
+      status: row.status === "draft" ? "draft" : "published",
       description: item.description,
       locationId: item.location_id,
       locationSlug: loc?.slug ?? null,

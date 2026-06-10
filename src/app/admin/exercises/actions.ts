@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
+import { parseExerciseStatus } from "@/lib/exercises/status";
 
 export type CreateExerciseResult = { ok: true } | { error: string };
 
@@ -155,6 +156,7 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
       image_url,
       location_id,
       exercise_level_id,
+      status: "published",
     })
     .select("id")
     .single();
@@ -221,6 +223,7 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   const bodyRegionIds = parseUuidList(formData, "body_region_ids");
   const bodyPartIds = parseUuidList(formData, "body_part_ids");
   const exercise_level_id = parseOptionalExerciseLevelId(formData);
+  const status = parseExerciseStatus(formData.get("status"));
 
   const { error } = await supabase
     .from("exercises")
@@ -232,6 +235,7 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
       image_url,
       location_id,
       exercise_level_id,
+      status,
     })
     .eq("id", id);
 

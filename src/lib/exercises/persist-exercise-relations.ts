@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ExerciseStatus } from "@/lib/exercises/status";
 
 export type ExerciseRelationsInput = {
   equipmentIds: string[];
@@ -118,6 +119,7 @@ export async function insertExerciseWithRelations(
     image_url: string | null;
     location_id: string;
     exercise_level_id: string | null;
+    status?: ExerciseStatus;
   },
   relations: ExerciseRelationsInput
 ): Promise<string> {

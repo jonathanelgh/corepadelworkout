@@ -12,7 +12,12 @@ import {
 import { createPortal } from "react-dom";
 import { ChevronDown, Search } from "lucide-react";
 
-export type ExerciseOption = { id: string; title: string; location_id: string };
+export type ExerciseOption = {
+  id: string;
+  title: string;
+  location_id: string;
+  status?: "draft" | "published";
+};
 
 type Props = {
   exercises: ExerciseOption[];
@@ -109,7 +114,11 @@ export function ExerciseSearchCombobox({
   );
 
   /** When open, input shows what you type; when closed, show selected label */
-  const inputValue = open ? query : selected?.title ?? "";
+  const selectedLabel =
+    selected != null
+      ? `${selected.title}${selected.status === "draft" ? " (draft)" : ""}`
+      : "";
+  const inputValue = open ? query : selectedLabel;
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
@@ -175,7 +184,12 @@ export function ExerciseSearchCombobox({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(ex.id)}
             >
-              <span className="truncate">{ex.title}</span>
+              <span className="truncate">
+                {ex.title}
+                {ex.status === "draft" ? (
+                  <span className="ml-1.5 font-normal text-amber-700">(draft)</span>
+                ) : null}
+              </span>
             </button>
           </li>
         ))

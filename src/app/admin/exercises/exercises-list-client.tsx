@@ -45,6 +45,7 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50 text-gray-500">
                 <th className="px-6 py-4 font-medium">Exercise</th>
+                <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Location</th>
                 <th className="px-6 py-4 font-medium">Gear</th>
                 <th className="px-6 py-4 font-medium">Media</th>
@@ -55,7 +56,7 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-16 text-center text-gray-500">
                     {rows.length === 0 ? (
                       <>
                         <p className="mb-1 font-medium text-gray-900">No exercises yet</p>
@@ -90,6 +91,17 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
                         {ex.description && (
                           <div className="mt-0.5 line-clamp-2 max-w-md text-gray-500">{ex.description}</div>
                         )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${
+                            ex.status === "published"
+                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              : "bg-amber-50 text-amber-900 border border-amber-200"
+                          }`}
+                        >
+                          {ex.status === "published" ? "Published" : "Draft"}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-gray-600">
                         {loc ? (

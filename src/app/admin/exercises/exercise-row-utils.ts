@@ -33,6 +33,7 @@ export function bucketJunctionByExerciseId<T extends { exercise_id: string; sort
 type ExerciseRow = {
   id: string;
   title: string;
+  status?: string | null;
   description: string | null;
   how_to: string | null;
   video_url: string | null;
@@ -58,9 +59,12 @@ export function exerciseRowToListItem(
   const mp = mpByExercise.get(id);
   const br = brByExercise.get(id);
   const bp = bpByExercise.get(id);
+  const status = row.status === "draft" ? "draft" : "published";
+
   return {
     id,
     title: row.title,
+    status,
     description: row.description ?? null,
     how_to: row.how_to ?? null,
     video_url: row.video_url ?? null,

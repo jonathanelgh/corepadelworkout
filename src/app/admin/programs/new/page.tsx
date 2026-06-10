@@ -9,7 +9,7 @@ export default async function NewProgramPage() {
   const [categoriesRes, difficultiesRes, exercisesRes, locationsRes] = await Promise.all([
     supabase.from("categories").select("id, name, slug").order("sort_order", { ascending: true }),
     supabase.from("difficulty_levels").select("id, name, slug").order("sort_order", { ascending: true }),
-    supabase.from("exercises").select("id, title, location_id").order("title", { ascending: true }),
+    supabase.from("exercises").select("id, title, location_id, status").order("title", { ascending: true }),
     supabase.from("locations").select("id, name, slug").order("sort_order", { ascending: true }),
   ]);
 

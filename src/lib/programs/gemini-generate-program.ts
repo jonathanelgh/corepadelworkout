@@ -205,7 +205,8 @@ export async function generateProgramWithGemini(
   const locationIdBySlug = new Map(ctx.locations.map((l) => [normalizeSlug(l.slug), l.id]));
   const slugSet = new Set(selectedLocations.map((l) => normalizeSlug(l.slug)));
 
-  const relevantExercises = catalogForLocations(ctx.exercises, slugSet, locationIdBySlug);
+  const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
+  const relevantExercises = catalogForLocations(publishedExercises, slugSet, locationIdBySlug);
   if (relevantExercises.length === 0) {
     throw new Error("No exercises in the library for the selected locations. Add exercises first.");
   }

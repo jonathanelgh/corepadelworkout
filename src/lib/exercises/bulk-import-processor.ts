@@ -100,6 +100,7 @@ export async function processBulkImportBatch(batchId: string): Promise<void> {
           image_url: null,
           location_id: locationId,
           exercise_level_id: exerciseLevelId,
+          status: "draft",
         },
         {
           equipmentIds: matchTaxonomyIds(draft.equipment_titles, taxonomy.equipment),

@@ -1,6 +1,9 @@
+import type { ExerciseStatus } from "@/lib/exercises/status";
+
 export type ExerciseListItem = {
   id: string;
   title: string;
+  status: ExerciseStatus;
   description: string | null;
   how_to: string | null;
   video_url: string | null;

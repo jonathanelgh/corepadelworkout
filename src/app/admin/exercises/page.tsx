@@ -22,6 +22,7 @@ export default async function AdminExercisesPage() {
       created_at,
       location_id,
       exercise_level_id,
+      status,
       locations ( name, slug ),
       exercise_equipment ( equipment_id, sort_order )
     `
@@ -83,6 +84,7 @@ export default async function AdminExercisesPage() {
         created_at: row.created_at as string,
         location_id: row.location_id as string,
         exercise_level_id: (row.exercise_level_id as string | null) ?? null,
+        status: (row.status as string | null) ?? "published",
         locations: row.locations as
           | { name: string; slug: string }
           | { name: string; slug: string }[]
