@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { inferExercisePrescriptionType } from "@/lib/programs/program-exercises";
+import { loadProgramExerciseOptions } from "@/lib/exercises/program-exercise-options";
 import { listMembersForAiPicker } from "@/lib/programs/profile-ai-context";
 import {
   CreateProgramForm,
@@ -16,8 +18,10 @@ type ExerciseRow = {
   exercise_id: string;
   sort_order: number;
   duration_minutes: number | null;
+  duration_seconds: number | null;
   sets: number | null;
   reps: number | null;
+  rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
 };
 type SessionRow = {
@@ -70,20 +74,39 @@ function mapTracks(rows: TrackRow[] | null, fallbackLocationId: string): TrackBl
       const pe = s.program_exercises;
       const exList = Array.isArray(pe) ? pe : pe != null ? [pe] : [];
       const ex = exList.slice().sort((a, b) => a.sort_order - b.sort_order);
-      const exercises: SessionExerciseEntry[] = ex.map((e) => ({
-        key: randomUUID(),
-        exerciseId: e.exercise_id,
-        durationMinutes:
-          e.duration_minutes != null && Number.isFinite(e.duration_minutes)
-            ? String(e.duration_minutes)
-            : "",
-        sets: e.sets != null && Number.isFinite(e.sets) ? String(e.sets) : "",
-        reps: e.reps != null && Number.isFinite(e.reps) ? String(e.reps) : "",
-        restAfterSeconds:
-          e.rest_after_seconds != null && Number.isFinite(e.rest_after_seconds)
-            ? String(e.rest_after_seconds)
-            : "",
-      }));
+      const exercises: SessionExerciseEntry[] = ex.map((e) => {
+        let durationValue = "";
+        let durationUnit: SessionExerciseEntry["durationUnit"] = "sec";
+        if (e.duration_seconds != null && Number.isFinite(e.duration_seconds)) {
+          durationValue = String(e.duration_seconds);
+          durationUnit = "sec";
+        } else if (e.duration_minutes != null && Number.isFinite(e.duration_minutes)) {
+          durationValue = String(e.duration_minutes);
+          durationUnit = "min";
+        }
+        return {
+          key: randomUUID(),
+          exerciseId: e.exercise_id,
+          prescriptionType: inferExercisePrescriptionType({
+            durationSeconds: e.duration_seconds,
+            durationMinutes: e.duration_minutes,
+            sets: e.sets,
+            restBetweenSetsSeconds: e.rest_between_sets_seconds,
+          }),
+          durationValue,
+          durationUnit,
+          sets: e.sets != null && Number.isFinite(e.sets) ? String(e.sets) : "",
+          reps: e.reps != null && Number.isFinite(e.reps) ? String(e.reps) : "",
+          restBetweenSetsSeconds:
+            e.rest_between_sets_seconds != null && Number.isFinite(e.rest_between_sets_seconds)
+              ? String(e.rest_between_sets_seconds)
+              : "",
+          restAfterSeconds:
+            e.rest_after_seconds != null && Number.isFinite(e.rest_after_seconds)
+              ? String(e.rest_after_seconds)
+              : "",
+        };
+      });
       return {
         key: randomUUID(),
         name: s.name?.trim() || `Day ${idx + 1}`,
@@ -122,7 +145,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     tracksRes,
     categoriesRes,
     difficultiesRes,
-    exercisesRes,
+    exerciseOptionsRes,
     locationsRes,
     members,
   ] = await Promise.all([
@@ -166,8 +189,10 @@ export default async function EditProgramPage({ params }: PageProps) {
             exercise_id,
             sort_order,
             duration_minutes,
+            duration_seconds,
             sets,
             reps,
+            rest_between_sets_seconds,
             rest_after_seconds
           )
         )
@@ -177,7 +202,7 @@ export default async function EditProgramPage({ params }: PageProps) {
       .order("sort_order", { ascending: true }),
     supabase.from("categories").select("id, name, slug").order("sort_order", { ascending: true }),
     supabase.from("difficulty_levels").select("id, name, slug").order("sort_order", { ascending: true }),
-    supabase.from("exercises").select("id, title, location_id, status").order("title", { ascending: true }),
+    loadProgramExerciseOptions(supabase),
     supabase.from("locations").select("id, name, slug").order("sort_order", { ascending: true }),
     listMembersForAiPicker(supabase),
   ]);
@@ -241,11 +266,11 @@ export default async function EditProgramPage({ params }: PageProps) {
     tracksRes.error,
     categoriesRes.error,
     difficultiesRes.error,
-    exercisesRes.error,
+    exerciseOptionsRes.error,
     locationsRes.error,
   ]
     .filter(Boolean)
-    .map((e) => e!.message)
+    .map((e) => (typeof e === "string" ? e : (e as { message: string }).message))
     .join(" · ");
 
   return (
@@ -254,7 +279,7 @@ export default async function EditProgramPage({ params }: PageProps) {
       initial={initial}
       categories={categoriesRes.data ?? []}
       difficulties={difficultiesRes.data ?? []}
-      exercises={exercisesRes.data ?? []}
+      exercises={exerciseOptionsRes.exercises}
       locations={locations}
       defaultLocationId={defaultLocationId}
       loadError={loadError || null}

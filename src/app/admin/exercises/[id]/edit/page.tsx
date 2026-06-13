@@ -25,6 +25,11 @@ export default async function EditExercisePage({ params }: { params: Promise<{ i
       exercise_level_id,
       status,
       locations ( name, slug ),
+      exercise_locations (
+        location_id,
+        sort_order,
+        locations ( name, slug )
+      ),
       exercise_equipment ( equipment_id, sort_order )
     `
     )
@@ -89,6 +94,14 @@ export default async function EditExercisePage({ params }: { params: Promise<{ i
       exercise_level_id: (row.exercise_level_id as string | null) ?? null,
       status: (row.status as string | null) ?? "published",
       locations: row.locations as { name: string; slug: string } | { name: string; slug: string }[] | null,
+      exercise_locations: row.exercise_locations as
+        | {
+            location_id: string;
+            sort_order: number;
+            locations: { name: string; slug: string } | { name: string; slug: string }[] | null;
+          }[]
+        | null
+        | undefined,
       exercise_equipment: row.exercise_equipment as
         | { equipment_id: string; sort_order: number }[]
         | null

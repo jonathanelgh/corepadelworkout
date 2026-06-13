@@ -31,6 +31,11 @@ export default async function AdminExercisesPage({
       exercise_level_id,
       status,
       locations ( name, slug ),
+      exercise_locations (
+        location_id,
+        sort_order,
+        locations ( name, slug )
+      ),
       exercise_equipment ( equipment_id, sort_order )
     `
     )
@@ -96,6 +101,14 @@ export default async function AdminExercisesPage({
           | { name: string; slug: string }
           | { name: string; slug: string }[]
           | null,
+        exercise_locations: row.exercise_locations as
+          | {
+              location_id: string;
+              sort_order: number;
+              locations: { name: string; slug: string } | { name: string; slug: string }[] | null;
+            }[]
+          | null
+          | undefined,
         exercise_equipment: row.exercise_equipment as
           | { equipment_id: string; sort_order: number }[]
           | null

@@ -2,13 +2,14 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
-type View = "login" | "forgot" | "forgot-sent";
+import { sendLoginMagicLink } from "./actions";
+
+type View = "login" | "forgot" | "forgot-sent" | "magic-sent";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<View>("login");
   const [email, setEmail] = useState("");
@@ -18,25 +19,22 @@ function LoginForm() {
 
   const resetSuccess = searchParams.get("reset") === "1";
   const authError = searchParams.get("error");
+  const nextPath = searchParams.get("next") ?? "";
 
-  async function onSubmitLogin(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmitMagicLink() {
     setError(null);
     setPending(true);
-    const supabase = createClient();
-    const { error: signError } = await supabase.auth.signInWithPassword({ email, password });
+    const result = await sendLoginMagicLink({
+      email: email.trim(),
+      next: searchParams.get("next"),
+      origin: window.location.origin,
+    });
     setPending(false);
-    if (signError) {
-      setError(signError.message);
+    if ("error" in result) {
+      setError(result.error);
       return;
     }
-    const next = searchParams.get("next");
-    const target =
-      next && next.startsWith("/") && !next.startsWith("//")
-        ? next
-        : "/admin";
-    router.push(target);
-    router.refresh();
+    setView("magic-sent");
   }
 
   async function onSubmitForgot(e: React.FormEvent) {
@@ -83,13 +81,17 @@ function LoginForm() {
                 {view === "login" ? "Sign in" : "Reset password"}
               </p>
               <h1 className="mt-3 text-3xl font-medium tracking-tight md:text-4xl">
-                {view === "login" ? "Welcome back" : view === "forgot-sent" ? "Check your email" : "Forgot password?"}
+                {view === "login"
+                  ? "Welcome back"
+                  : view === "forgot-sent" || view === "magic-sent"
+                    ? "Check your email"
+                    : "Forgot password?"}
               </h1>
               <p className="mt-3 text-sm text-white/70">
                 {view === "login" && "Use your account to access your programs and dashboard."}
                 {view === "forgot" && "We will email you a link to reset your password."}
-                {view === "forgot-sent" &&
-                  `If an account exists for ${email}, you will receive a reset link shortly.`}
+                {(view === "forgot-sent" || view === "magic-sent") &&
+                  `If an account exists for ${email}, you will receive a link shortly.`}
               </p>
             </div>
 
@@ -111,13 +113,15 @@ function LoginForm() {
               )}
 
               {view === "login" && (
-                <form onSubmit={onSubmitLogin} className="space-y-4">
+                <form action="/auth/login" method="post" className="space-y-4">
+                  <input type="hidden" name="next" value={nextPath} />
                   <div>
                     <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-white/85">
                       Email
                     </label>
                     <input
                       id="email"
+                      name="email"
                       type="email"
                       autoComplete="email"
                       required
@@ -145,6 +149,7 @@ function LoginForm() {
                     </div>
                     <input
                       id="password"
+                      name="password"
                       type="password"
                       autoComplete="current-password"
                       required
@@ -156,11 +161,27 @@ function LoginForm() {
                   </div>
                   <button
                     type="submit"
-                    disabled={pending}
                     className="w-full rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-60"
                   >
-                    {pending ? "Signing in…" : "Sign in"}
+                    Sign in
                   </button>
+                  <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center" aria-hidden>
+                      <div className="w-full border-t border-white/15" />
+                    </div>
+                    <p className="relative text-center text-xs text-white/50">or</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={pending || !email.trim()}
+                    onClick={() => void onSubmitMagicLink()}
+                    className="w-full rounded-xl border border-white/20 bg-white/5 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-60"
+                  >
+                    {pending ? "Sending…" : "Email me a sign-in link"}
+                  </button>
+                  <p className="text-center text-xs text-white/50">
+                    Signed up via onboarding? Use the magic link — no password needed.
+                  </p>
                 </form>
               )}
 
@@ -204,7 +225,25 @@ function LoginForm() {
               {view === "forgot-sent" && (
                 <div className="space-y-4">
                   <p className="text-sm text-white/75">
-                    The link expires after a short time. Check spam if you do not see it in your inbox.
+                    The reset link expires after a short time. Check spam if you do not see it in your inbox.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null);
+                      setView("login");
+                    }}
+                    className="w-full rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600]"
+                  >
+                    Back to sign in
+                  </button>
+                </div>
+              )}
+
+              {view === "magic-sent" && (
+                <div className="space-y-4">
+                  <p className="text-sm text-white/75">
+                    Open the link in the same browser you use for Core Padel. Check spam if it does not arrive.
                   </p>
                   <button
                     type="button"

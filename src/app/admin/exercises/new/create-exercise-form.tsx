@@ -55,6 +55,7 @@ export function CreateExerciseForm({
   const [activeTab, setActiveTab] = useState("basic");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
   const [selectedCategoryTypeIds, setSelectedCategoryTypeIds] = useState<string[]>([]);
   const [selectedMovementPatternIds, setSelectedMovementPatternIds] = useState<string[]>([]);
@@ -66,6 +67,8 @@ export function CreateExerciseForm({
   const [mediaPicker, setMediaPicker] = useState<null | "image" | "video">(null);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
+  const locationOptions = locations.map((loc) => ({ id: loc.id, label: loc.name }));
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -76,6 +79,9 @@ export function CreateExerciseForm({
       const fd = new FormData(form);
       fd.set("video_url", videoUrl.trim());
       fd.set("image_url", imageUrl.trim());
+      for (const id of selectedLocationIds) {
+        fd.append("location_ids", id);
+      }
       for (const id of selectedEquipmentIds) {
         fd.append("equipment_ids", id);
       }
@@ -228,29 +234,19 @@ export function CreateExerciseForm({
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="location_id" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Location <span className="text-red-600">*</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="location_id"
-                      name="location_id"
-                      required
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all appearance-none"
-                      defaultValue=""
-                    >
-                      <option value="" disabled>
-                        Select location…
-                      </option>
-                      {locations.map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  </div>
+                <div className="space-y-1.5">
+                  <MultiSelectSearchChips
+                    label="Locations"
+                    options={locationOptions}
+                    value={selectedLocationIds}
+                    onChange={setSelectedLocationIds}
+                    searchPlaceholder="Search locations…"
+                    emptyListHint="No locations in the database yet."
+                    disabled={pending}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Select every place this exercise can be performed (e.g. Gym and Home).
+                  </p>
                 </div>
 
                 <div>

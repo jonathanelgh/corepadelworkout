@@ -6,6 +6,7 @@ import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseExerciseStatus } from "@/lib/exercises/status";
+import { replaceExerciseLocations } from "@/lib/exercises/persist-exercise-relations";
 
 const ADMIN_EXERCISES_PATH = "/admin/exercises";
 
@@ -122,7 +123,7 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
   const how_to = (formData.get("how_to") as string)?.trim() || null;
   const video_url = (formData.get("video_url") as string)?.trim() || null;
   const image_url = (formData.get("image_url") as string)?.trim() || null;
-  const location_id = formData.get("location_id") as string;
+  const locationIds = parseUuidList(formData, "location_ids");
   const equipmentIds = parseUuidList(formData, "equipment_ids");
   const categoryTypeIds = parseUuidList(formData, "exercise_category_type_ids");
   const movementPatternIds = parseUuidList(formData, "movement_pattern_ids");
@@ -133,8 +134,8 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
   if (!title) {
     return { error: "Title is required." };
   }
-  if (!location_id) {
-    return { error: "Location is required." };
+  if (locationIds.length === 0) {
+    return { error: "Select at least one location." };
   }
 
   const supabase = await createClient();
@@ -161,7 +162,7 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
       how_to,
       video_url,
       image_url,
-      location_id,
+      location_id: locationIds[0]!,
       exercise_level_id,
       status: "published",
     })
@@ -173,6 +174,7 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
   }
 
   try {
+    await replaceExerciseLocations(supabase, row.id, locationIds);
     await replaceExerciseEquipment(supabase, row.id, equipmentIds);
     await replaceExerciseCategoryTypeLinks(supabase, row.id, categoryTypeIds);
     await replaceExerciseMovementPatternLinks(supabase, row.id, movementPatternIds);
@@ -196,7 +198,7 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   const how_to = (formData.get("how_to") as string)?.trim() || null;
   const video_url = (formData.get("video_url") as string)?.trim() || null;
   const image_url = (formData.get("image_url") as string)?.trim() || null;
-  const location_id = formData.get("location_id") as string;
+  const locationIds = parseUuidList(formData, "location_ids");
 
   if (!id) {
     return { error: "Missing exercise id." };
@@ -204,8 +206,8 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   if (!title) {
     return { error: "Title is required." };
   }
-  if (!location_id) {
-    return { error: "Location is required." };
+  if (locationIds.length === 0) {
+    return { error: "Select at least one location." };
   }
 
   const supabase = await createClient();
@@ -240,7 +242,7 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
       how_to,
       video_url,
       image_url,
-      location_id,
+      location_id: locationIds[0]!,
       exercise_level_id,
       status,
     })
@@ -251,6 +253,7 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   }
 
   try {
+    await replaceExerciseLocations(supabase, id, locationIds);
     await replaceExerciseEquipment(supabase, id, equipmentIds);
     await replaceExerciseCategoryTypeLinks(supabase, id, categoryTypeIds);
     await replaceExerciseMovementPatternLinks(supabase, id, movementPatternIds);

@@ -13,6 +13,7 @@ export type GeminiProgramExercise = {
   duration_minutes: number | null;
   sets: number | null;
   reps: number | null;
+  rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
 };
 
@@ -77,6 +78,7 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
               "duration_minutes": "number | null",
               "sets": "number | null",
               "reps": "number | null",
+              "rest_between_sets_seconds": "number | null",
               "rest_after_seconds": "number | null"
             }
           ]
@@ -105,6 +107,7 @@ function parseExerciseRow(row: unknown): GeminiProgramExercise | null {
     duration_minutes: parseOptionalInt(r.duration_minutes),
     sets: parseOptionalInt(r.sets),
     reps: parseOptionalInt(r.reps),
+    rest_between_sets_seconds: parseOptionalInt(r.rest_between_sets_seconds),
     rest_after_seconds: parseOptionalInt(r.rest_after_seconds),
   };
 }
@@ -183,7 +186,7 @@ function catalogForLocations(
     if (id) locationIds.add(id);
   }
   if (locationIds.size === 0) return all;
-  return all.filter((e) => locationIds.has(e.locationId));
+  return all.filter((e) => e.locationIds.some((id) => locationIds.has(id)));
 }
 
 export async function generateProgramWithGemini(

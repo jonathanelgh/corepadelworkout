@@ -9,8 +9,10 @@ export type ExerciseListItem = {
   video_url: string | null;
   image_url: string | null;
   location_id: string;
+  locationIds: string[];
   created_at: string;
   locationName: string | null;
+  locationNames: string[];
   equipmentIds: string[];
   /** Resolved titles from `equipment` for display (order matches selection). */
   equipmentLabels: string[];

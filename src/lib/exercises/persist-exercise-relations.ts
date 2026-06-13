@@ -2,12 +2,30 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExerciseStatus } from "@/lib/exercises/status";
 
 export type ExerciseRelationsInput = {
+  locationIds: string[];
   equipmentIds: string[];
   categoryTypeIds: string[];
   movementPatternIds: string[];
   bodyRegionIds: string[];
   bodyPartIds: string[];
 };
+
+export async function replaceExerciseLocations(
+  supabase: SupabaseClient,
+  exerciseId: string,
+  locationIds: string[]
+): Promise<void> {
+  const { error: delErr } = await supabase.from("exercise_locations").delete().eq("exercise_id", exerciseId);
+  if (delErr) throw new Error(delErr.message);
+  if (locationIds.length === 0) return;
+  const rows = locationIds.map((location_id, sort_order) => ({
+    exercise_id: exerciseId,
+    location_id,
+    sort_order,
+  }));
+  const { error: insErr } = await supabase.from("exercise_locations").insert(rows);
+  if (insErr) throw new Error(insErr.message);
+}
 
 export async function replaceExerciseEquipment(
   supabase: SupabaseClient,
@@ -102,6 +120,7 @@ export async function applyExerciseRelations(
   exerciseId: string,
   relations: ExerciseRelationsInput
 ): Promise<void> {
+  await replaceExerciseLocations(supabase, exerciseId, relations.locationIds);
   await replaceExerciseEquipment(supabase, exerciseId, relations.equipmentIds);
   await replaceExerciseCategoryTypeLinks(supabase, exerciseId, relations.categoryTypeIds);
   await replaceExerciseMovementPatternLinks(supabase, exerciseId, relations.movementPatternIds);

@@ -12,6 +12,7 @@ function matchesExerciseQuery(ex: ExerciseListItem, q: string): boolean {
   if (ex.description?.toLowerCase().includes(n)) return true;
   if (ex.how_to?.toLowerCase().includes(n)) return true;
   if (ex.locationName?.toLowerCase().includes(n)) return true;
+  if (ex.locationNames.some((label) => label.toLowerCase().includes(n))) return true;
   if (ex.equipmentLabels.some((label) => label.toLowerCase().includes(n))) return true;
   return false;
 }
@@ -77,7 +78,6 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
                 </tr>
               ) : (
                 filtered.map((ex) => {
-                  const loc = ex.locationName;
                   const hasVideo = Boolean(ex.video_url?.trim());
                   const hasImage = Boolean(ex.image_url?.trim());
                   const created = new Date(ex.created_at).toLocaleDateString(undefined, {
@@ -105,10 +105,17 @@ export function ExercisesListClient({ rows }: { rows: ExerciseListItem[] }) {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {loc ? (
-                          <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                            {loc}
-                          </span>
+                        {ex.locationNames.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {ex.locationNames.map((name) => (
+                              <span
+                                key={name}
+                                className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700"
+                              >
+                                {name}
+                              </span>
+                            ))}
+                          </div>
                         ) : (
                           "—"
                         )}

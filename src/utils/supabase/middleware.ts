@@ -78,7 +78,7 @@ export async function updateSession(request: NextRequest) {
   if (user && isLoginRoute) {
     const next = request.nextUrl.searchParams.get("next")
     const safeNext =
-      next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin"
+      next && next.startsWith("/") && !next.startsWith("//") ? next : "/member"
     return withSessionCookies(NextResponse.redirect(new URL(safeNext, request.url)))
   }
 

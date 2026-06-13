@@ -7,8 +7,11 @@ export type ExerciseCatalogEntry = {
   status: "draft" | "published";
   description: string | null;
   locationId: string;
+  locationIds: string[];
   locationSlug: string | null;
+  locationSlugs: string[];
   locationName: string | null;
+  locationNames: string[];
   levelName: string | null;
   categoryTypes: string[];
   movementPatterns: string[];
@@ -52,6 +55,11 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         exercise_level_id,
         status,
         locations ( name, slug ),
+        exercise_locations (
+          location_id,
+          sort_order,
+          locations ( name, slug )
+        ),
         exercise_equipment ( equipment_id, sort_order )
       `
       )
@@ -125,6 +133,14 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
           | { name: string; slug: string }
           | { name: string; slug: string }[]
           | null,
+        exercise_locations: row.exercise_locations as
+          | {
+              location_id: string;
+              sort_order: number;
+              locations: { name: string; slug: string } | { name: string; slug: string }[] | null;
+            }[]
+          | null
+          | undefined,
         exercise_equipment: row.exercise_equipment as
           | { equipment_id: string; sort_order: number }[]
           | null
@@ -136,7 +152,22 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
       bpByExercise
     );
 
-    const loc = Array.isArray(row.locations) ? row.locations[0] : row.locations;
+    const locSlugs: string[] = [];
+    if (item.locationIds.length && row.exercise_locations?.length) {
+      const sorted = [...row.exercise_locations].sort((a, b) => a.sort_order - b.sort_order);
+      for (const link of sorted) {
+        const locRow = Array.isArray(link.locations) ? link.locations[0] : link.locations;
+        if (locRow?.slug) locSlugs.push(locRow.slug);
+      }
+    }
+    const legacyLoc = row.locations as
+      | { name: string; slug: string }
+      | { name: string; slug: string }[]
+      | null;
+    const primarySlug =
+      locSlugs[0] ??
+      (Array.isArray(legacyLoc) ? legacyLoc[0]?.slug : legacyLoc?.slug) ??
+      null;
 
     return {
       id: item.id,
@@ -144,8 +175,11 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
       status: row.status === "draft" ? "draft" : "published",
       description: item.description,
       locationId: item.location_id,
-      locationSlug: loc?.slug ?? null,
-      locationName: loc?.name ?? null,
+      locationIds: item.locationIds,
+      locationSlug: primarySlug,
+      locationSlugs: locSlugs,
+      locationName: item.locationName,
+      locationNames: item.locationNames,
       levelName: item.exerciseLevelId ? levelName.get(item.exerciseLevelId) ?? null : null,
       categoryTypes: item.categoryTypeIds.map((id) => categoryTypeName.get(id)).filter(Boolean) as string[],
       movementPatterns: item.movementPatternIds.map((id) => movementName.get(id)).filter(Boolean) as string[],
@@ -196,7 +230,7 @@ export function formatExerciseCatalogForPrompt(entries: ExerciseCatalogEntry[]):
         .filter(Boolean)
         .join("; ");
       const desc = e.description ? ` — ${truncate(e.description, 100)}` : "";
-      return `[${e.id}] ${e.title} @${e.locationSlug ?? e.locationName ?? "unknown"}${tags ? ` (${tags})` : ""}${desc}`;
+      return `[${e.id}] ${e.title} @${(e.locationSlugs.length ? e.locationSlugs.join(",") : e.locationSlug) ?? e.locationName ?? "unknown"}${tags ? ` (${tags})` : ""}${desc}`;
     })
     .join("\n");
 }

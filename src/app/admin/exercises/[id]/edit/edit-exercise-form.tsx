@@ -57,6 +57,7 @@ export function EditExerciseForm({
   const [activeTab, setActiveTab] = useState("basic");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>(initial.locationIds);
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>(initial.equipmentIds);
   const [selectedCategoryTypeIds, setSelectedCategoryTypeIds] = useState<string[]>(initial.categoryTypeIds);
   const [selectedMovementPatternIds, setSelectedMovementPatternIds] = useState<string[]>(
@@ -69,6 +70,8 @@ export function EditExerciseForm({
   const [videoUrl, setVideoUrl] = useState(initial.video_url ?? "");
   const [mediaPicker, setMediaPicker] = useState<null | "image" | "video">(null);
 
+  const locationOptions = locations.map((loc) => ({ id: loc.id, label: loc.name }));
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -79,6 +82,9 @@ export function EditExerciseForm({
       const fd = new FormData(form);
       fd.set("video_url", videoUrl.trim());
       fd.set("image_url", imageUrl.trim());
+      for (const id of selectedLocationIds) {
+        fd.append("location_ids", id);
+      }
       for (const id of selectedEquipmentIds) {
         fd.append("equipment_ids", id);
       }
@@ -241,26 +247,19 @@ export function EditExerciseForm({
                     </p>
                   </div>
 
-                  <div>
-                    <label htmlFor="location_id" className="mb-1.5 block text-sm font-medium text-gray-700">
-                      Location <span className="text-red-600">*</span>
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="location_id"
-                        name="location_id"
-                        required
-                        defaultValue={initial.location_id}
-                        className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-black"
-                      >
-                        {locations.map((loc) => (
-                          <option key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <MultiSelectSearchChips
+                      label="Locations"
+                      options={locationOptions}
+                      value={selectedLocationIds}
+                      onChange={setSelectedLocationIds}
+                      searchPlaceholder="Search locations…"
+                      emptyListHint="No locations in the database yet."
+                    disabled={pending}
+                  />
+                    <p className="text-xs text-gray-500">
+                      Select every place this exercise can be performed.
+                    </p>
                   </div>
 
                   <div>

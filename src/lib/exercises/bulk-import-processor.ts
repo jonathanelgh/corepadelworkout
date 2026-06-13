@@ -104,6 +104,7 @@ export async function processBulkImportBatch(batchId: string): Promise<void> {
         },
         {
           equipmentIds: matchTaxonomyIds(draft.equipment_titles, taxonomy.equipment),
+          locationIds: [locationId],
           categoryTypeIds: matchTaxonomyIds(draft.category_type_names, taxonomy.categoryTypes),
           movementPatternIds: matchTaxonomyIds(draft.movement_pattern_names, taxonomy.movementPatterns),
           bodyRegionIds: matchTaxonomyIds(draft.body_region_names, taxonomy.bodyRegions),

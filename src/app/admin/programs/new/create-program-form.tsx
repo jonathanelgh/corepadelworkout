@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { ExercisePrescriptionType } from "@/lib/programs/program-exercises";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
@@ -40,13 +41,37 @@ type CategoryOption = { id: string; name: string; slug: string };
 type DifficultyOption = { id: string; name: string; slug: string };
 type LocationOption = { id: string; name: string; slug: string };
 
+export type ExerciseDurationUnit = "sec" | "min";
+
+const PRESCRIPTION_OPTIONS: { id: ExercisePrescriptionType; label: string; hint: string }[] = [
+  {
+    id: "sets_reps",
+    label: "Sets & reps",
+    hint: "Go at your own pace — no timer.",
+  },
+  {
+    id: "time",
+    label: "Time",
+    hint: "Single timed work period.",
+  },
+  {
+    id: "timed_intervals",
+    label: "Timed sets + rest",
+    hint: "Repeat work and rest (e.g. 20s on, 20s off × 5).",
+  },
+];
+
 export type SessionExerciseEntry = {
   key: string;
   exerciseId: string;
-  /** Minutes for this exercise in this program; empty = not set */
-  durationMinutes: string;
+  prescriptionType: ExercisePrescriptionType;
+  /** Work time value; unit chosen separately */
+  durationValue: string;
+  durationUnit: ExerciseDurationUnit;
   sets: string;
   reps: string;
+  /** Seconds of rest between timed rounds */
+  restBetweenSetsSeconds: string;
   /** Seconds of pause after this exercise before the next; empty = none */
   restAfterSeconds: string;
 };
@@ -206,9 +231,12 @@ export function CreateProgramForm({
         exercises: s.exercises.map((ex) => ({
           key: crypto.randomUUID(),
           exerciseId: ex.exerciseId,
-          durationMinutes: ex.durationMinutes,
+          prescriptionType: ex.prescriptionType,
+          durationValue: ex.durationValue,
+          durationUnit: ex.durationUnit,
           sets: ex.sets,
           reps: ex.reps,
+          restBetweenSetsSeconds: ex.restBetweenSetsSeconds,
           restAfterSeconds: ex.restAfterSeconds,
         })),
       })),
@@ -238,6 +266,11 @@ export function CreateProgramForm({
       : (tracks[0]?.key ?? "");
 
   const activeTrack = tracks.find((t) => t.key === effectiveLocationTabKey) ?? tracks[0];
+  const trackExerciseOptions = useMemo(() => {
+    const locId = activeTrack?.locationId;
+    if (!locId) return [];
+    return exercises.filter((ex) => ex.location_ids.includes(locId));
+  }, [exercises, activeTrack?.locationId]);
   const activeTrackIndex =
     activeTrack != null ? tracks.findIndex((t) => t.key === activeTrack.key) : 0;
   const locationIdsUsedElsewhere = activeTrack
@@ -398,9 +431,12 @@ export function CreateProgramForm({
           exercises: src.exercises.map((e) => ({
             key: crypto.randomUUID(),
             exerciseId: e.exerciseId,
-            durationMinutes: e.durationMinutes,
+            prescriptionType: e.prescriptionType,
+            durationValue: e.durationValue,
+            durationUnit: e.durationUnit,
             sets: e.sets,
             reps: e.reps,
+            restBetweenSetsSeconds: e.restBetweenSetsSeconds,
             restAfterSeconds: e.restAfterSeconds,
           })),
         };
@@ -468,9 +504,12 @@ export function CreateProgramForm({
                 {
                   key: crypto.randomUUID(),
                   exerciseId: pick,
-                  durationMinutes: "",
+                  prescriptionType: "sets_reps",
+                  durationValue: "",
+                  durationUnit: "sec",
                   sets: "",
                   reps: "",
+                  restBetweenSetsSeconds: "",
                   restAfterSeconds: "",
                 },
               ],
@@ -516,11 +555,36 @@ export function CreateProgramForm({
     );
   }
 
+  function setSessionExercisePrescriptionType(
+    trackKey: string,
+    sessionKey: string,
+    entryKey: string,
+    prescriptionType: ExercisePrescriptionType
+  ) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.key !== sessionKey) return s;
+            return {
+              ...s,
+              exercises: s.exercises.map((e) =>
+                e.key === entryKey ? { ...e, prescriptionType } : e
+              ),
+            };
+          }),
+        };
+      })
+    );
+  }
+
   function setSessionExerciseNumericField(
     trackKey: string,
     sessionKey: string,
     entryKey: string,
-    field: "durationMinutes" | "sets" | "reps" | "restAfterSeconds",
+    field: "durationValue" | "sets" | "reps" | "restBetweenSetsSeconds" | "restAfterSeconds",
     value: string
   ) {
     if (value !== "" && !/^\d*$/.test(value)) return;
@@ -536,6 +600,47 @@ export function CreateProgramForm({
               exercises: s.exercises.map((e) =>
                 e.key === entryKey ? { ...e, [field]: value } : e
               ),
+            };
+          }),
+        };
+      })
+    );
+  }
+
+  function convertDurationValue(value: string, from: ExerciseDurationUnit, to: ExerciseDurationUnit): string {
+    if (value.trim() === "" || from === to) return value;
+    const n = Number.parseInt(value.trim(), 10);
+    if (!Number.isFinite(n) || n < 0) return value;
+    if (from === "sec" && to === "min") {
+      return String(Math.max(1, Math.round(n / 60)));
+    }
+    return String(n * 60);
+  }
+
+  function setSessionExerciseDurationUnit(
+    trackKey: string,
+    sessionKey: string,
+    entryKey: string,
+    unit: ExerciseDurationUnit
+  ) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.key !== sessionKey) return s;
+            return {
+              ...s,
+              exercises: s.exercises.map((e) => {
+                if (e.key !== entryKey) return e;
+                if (e.durationUnit === unit) return e;
+                return {
+                  ...e,
+                  durationUnit: unit,
+                  durationValue: convertDurationValue(e.durationValue, e.durationUnit, unit),
+                };
+              }),
             };
           }),
         };
@@ -604,21 +709,44 @@ export function CreateProgramForm({
             if (Number.isFinite(n) && n >= 0) duration_minutes = n;
           }
           const exerciseRows = exercises.map((e) => {
-            let exDur: number | null = null;
-            if (e.durationMinutes.trim() !== "") {
-              const n = Number.parseInt(e.durationMinutes, 10);
-              if (Number.isFinite(n) && n >= 0) exDur = n;
-            }
+            let duration_seconds: number | null = null;
+            let duration_minutes: number | null = null;
             let sets: number | null = null;
-            if (e.sets.trim() !== "") {
-              const n = Number.parseInt(e.sets, 10);
-              if (Number.isFinite(n) && n >= 0) sets = n;
-            }
             let reps: number | null = null;
-            if (e.reps.trim() !== "") {
-              const n = Number.parseInt(e.reps, 10);
-              if (Number.isFinite(n) && n >= 0) reps = n;
+            let rest_between_sets_seconds: number | null = null;
+
+            if (e.prescriptionType === "time" || e.prescriptionType === "timed_intervals") {
+              if (e.durationValue.trim() !== "") {
+                const n = Number.parseInt(e.durationValue, 10);
+                if (Number.isFinite(n) && n >= 0) {
+                  if (e.durationUnit === "sec") duration_seconds = n;
+                  else duration_minutes = n;
+                }
+              }
             }
+
+            if (e.prescriptionType === "sets_reps") {
+              if (e.sets.trim() !== "") {
+                const n = Number.parseInt(e.sets, 10);
+                if (Number.isFinite(n) && n >= 0) sets = n;
+              }
+              if (e.reps.trim() !== "") {
+                const n = Number.parseInt(e.reps, 10);
+                if (Number.isFinite(n) && n >= 0) reps = n;
+              }
+            }
+
+            if (e.prescriptionType === "timed_intervals") {
+              if (e.sets.trim() !== "") {
+                const n = Number.parseInt(e.sets, 10);
+                if (Number.isFinite(n) && n > 0) sets = n;
+              }
+              if (e.restBetweenSetsSeconds.trim() !== "") {
+                const n = Number.parseInt(e.restBetweenSetsSeconds, 10);
+                if (Number.isFinite(n) && n > 0) rest_between_sets_seconds = n;
+              }
+            }
+
             let rest_after_seconds: number | null = null;
             if (e.restAfterSeconds.trim() !== "") {
               const n = Number.parseInt(e.restAfterSeconds, 10);
@@ -626,9 +754,11 @@ export function CreateProgramForm({
             }
             return {
               exercise_id: e.exerciseId,
-              duration_minutes: exDur,
+              duration_seconds,
+              duration_minutes,
               sets,
               reps,
+              rest_between_sets_seconds,
               rest_after_seconds,
             };
           });
@@ -1511,7 +1641,7 @@ export function CreateProgramForm({
                           <>
                             <div className="flex flex-col sm:flex-row gap-3 sm:items-start">
                               <ExerciseSearchCombobox
-                                exercises={exercises}
+                                exercises={trackExerciseOptions}
                                 value={sessionPicks[pickCompoundKey(activeTrack.key, session.key)] ?? ""}
                                 onChange={(id) =>
                                   setSessionPicks((p) => ({
@@ -1551,114 +1681,271 @@ export function CreateProgramForm({
                                           {exerciseTitle(entry.exerciseId)}
                                         </p>
                                         <p className="mt-2 text-xs text-gray-500">
-                                          Optional prescription for this program only. Rest applies after this exercise
-                                          before the next.
+                                          Choose how this exercise runs in the workout player. Rest after applies
+                                          before the next exercise.
                                         </p>
-                                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:max-w-2xl">
-                                          <div>
+                                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                                          {PRESCRIPTION_OPTIONS.map((opt) => (
+                                            <label
+                                              key={opt.id}
+                                              className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-lg border px-3 py-2.5 transition ${
+                                                entry.prescriptionType === opt.id
+                                                  ? "border-black bg-gray-50 ring-1 ring-black"
+                                                  : "border-gray-200 bg-white hover:border-gray-300"
+                                              }`}
+                                            >
+                                              <span className="flex items-center gap-2">
+                                                <input
+                                                  type="radio"
+                                                  name={`prescription-${entry.key}`}
+                                                  checked={entry.prescriptionType === opt.id}
+                                                  onChange={() =>
+                                                    setSessionExercisePrescriptionType(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      opt.id
+                                                    )
+                                                  }
+                                                  className="h-4 w-4 border-gray-300 text-black focus:ring-black"
+                                                />
+                                                <span className="text-sm font-medium text-gray-900">{opt.label}</span>
+                                              </span>
+                                              <span className="mt-1 pl-6 text-xs text-gray-500">{opt.hint}</span>
+                                            </label>
+                                          ))}
+                                        </div>
+
+                                        {entry.prescriptionType === "sets_reps" && (
+                                          <div className="mt-3 grid grid-cols-2 gap-2 sm:max-w-md">
+                                            <div>
+                                              <label
+                                                className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                htmlFor={`ex-sets-${entry.key}`}
+                                              >
+                                                Sets
+                                              </label>
+                                              <input
+                                                id={`ex-sets-${entry.key}`}
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={entry.sets}
+                                                onChange={(e) =>
+                                                  setSessionExerciseNumericField(
+                                                    activeTrack.key,
+                                                    session.key,
+                                                    entry.key,
+                                                    "sets",
+                                                    e.target.value
+                                                  )
+                                                }
+                                                placeholder="—"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label
+                                                className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                htmlFor={`ex-reps-${entry.key}`}
+                                              >
+                                                Reps
+                                              </label>
+                                              <input
+                                                id={`ex-reps-${entry.key}`}
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={entry.reps}
+                                                onChange={(e) =>
+                                                  setSessionExerciseNumericField(
+                                                    activeTrack.key,
+                                                    session.key,
+                                                    entry.key,
+                                                    "reps",
+                                                    e.target.value
+                                                  )
+                                                }
+                                                placeholder="—"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {entry.prescriptionType === "time" && (
+                                          <div className="mt-3 max-w-xs">
                                             <label
                                               className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
-                                              htmlFor={`ex-min-${entry.key}`}
+                                              htmlFor={`ex-dur-${entry.key}`}
                                             >
-                                              Min
+                                              Duration
                                             </label>
-                                            <input
-                                              id={`ex-min-${entry.key}`}
-                                              type="text"
-                                              inputMode="numeric"
-                                              pattern="[0-9]*"
-                                              value={entry.durationMinutes}
-                                              onChange={(e) =>
-                                                setSessionExerciseNumericField(
-                                                  activeTrack.key,
-                                                  session.key,
-                                                  entry.key,
-                                                  "durationMinutes",
-                                                  e.target.value
-                                                )
-                                              }
-                                              placeholder="—"
-                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                                            />
+                                            <div className="flex gap-1">
+                                              <input
+                                                id={`ex-dur-${entry.key}`}
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={entry.durationValue}
+                                                onChange={(e) =>
+                                                  setSessionExerciseNumericField(
+                                                    activeTrack.key,
+                                                    session.key,
+                                                    entry.key,
+                                                    "durationValue",
+                                                    e.target.value
+                                                  )
+                                                }
+                                                placeholder="—"
+                                                className="min-w-0 flex-1 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                              />
+                                              <select
+                                                value={entry.durationUnit}
+                                                onChange={(e) =>
+                                                  setSessionExerciseDurationUnit(
+                                                    activeTrack.key,
+                                                    session.key,
+                                                    entry.key,
+                                                    e.target.value as ExerciseDurationUnit
+                                                  )
+                                                }
+                                                className="shrink-0 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                aria-label="Duration unit"
+                                              >
+                                                <option value="sec">Sec</option>
+                                                <option value="min">Min</option>
+                                              </select>
+                                            </div>
                                           </div>
-                                          <div>
-                                            <label
-                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
-                                              htmlFor={`ex-sets-${entry.key}`}
-                                            >
-                                              Sets
-                                            </label>
-                                            <input
-                                              id={`ex-sets-${entry.key}`}
-                                              type="text"
-                                              inputMode="numeric"
-                                              pattern="[0-9]*"
-                                              value={entry.sets}
-                                              onChange={(e) =>
-                                                setSessionExerciseNumericField(
-                                                  activeTrack.key,
-                                                  session.key,
-                                                  entry.key,
-                                                  "sets",
-                                                  e.target.value
-                                                )
-                                              }
-                                              placeholder="—"
-                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                                            />
+                                        )}
+
+                                        {entry.prescriptionType === "timed_intervals" && (
+                                          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:max-w-xl">
+                                            <div>
+                                              <label
+                                                className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                htmlFor={`ex-dur-${entry.key}`}
+                                              >
+                                                Work
+                                              </label>
+                                              <div className="flex gap-1">
+                                                <input
+                                                  id={`ex-dur-${entry.key}`}
+                                                  type="text"
+                                                  inputMode="numeric"
+                                                  pattern="[0-9]*"
+                                                  value={entry.durationValue}
+                                                  onChange={(e) =>
+                                                    setSessionExerciseNumericField(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      "durationValue",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  placeholder="20"
+                                                  className="min-w-0 flex-1 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                />
+                                                <select
+                                                  value={entry.durationUnit}
+                                                  onChange={(e) =>
+                                                    setSessionExerciseDurationUnit(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      e.target.value as ExerciseDurationUnit
+                                                    )
+                                                  }
+                                                  className="shrink-0 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                  aria-label="Work duration unit"
+                                                >
+                                                  <option value="sec">Sec</option>
+                                                  <option value="min">Min</option>
+                                                </select>
+                                              </div>
+                                            </div>
+                                            <div>
+                                              <label
+                                                className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                htmlFor={`ex-rest-between-${entry.key}`}
+                                              >
+                                                Rest (sec)
+                                              </label>
+                                              <input
+                                                id={`ex-rest-between-${entry.key}`}
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={entry.restBetweenSetsSeconds}
+                                                onChange={(e) =>
+                                                  setSessionExerciseNumericField(
+                                                    activeTrack.key,
+                                                    session.key,
+                                                    entry.key,
+                                                    "restBetweenSetsSeconds",
+                                                    e.target.value
+                                                  )
+                                                }
+                                                placeholder="20"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label
+                                                className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                htmlFor={`ex-sets-${entry.key}`}
+                                              >
+                                                Rounds
+                                              </label>
+                                              <input
+                                                id={`ex-sets-${entry.key}`}
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                value={entry.sets}
+                                                onChange={(e) =>
+                                                  setSessionExerciseNumericField(
+                                                    activeTrack.key,
+                                                    session.key,
+                                                    entry.key,
+                                                    "sets",
+                                                    e.target.value
+                                                  )
+                                                }
+                                                placeholder="5"
+                                                className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                              />
+                                            </div>
                                           </div>
-                                          <div>
-                                            <label
-                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
-                                              htmlFor={`ex-reps-${entry.key}`}
-                                            >
-                                              Reps
-                                            </label>
-                                            <input
-                                              id={`ex-reps-${entry.key}`}
-                                              type="text"
-                                              inputMode="numeric"
-                                              pattern="[0-9]*"
-                                              value={entry.reps}
-                                              onChange={(e) =>
-                                                setSessionExerciseNumericField(
-                                                  activeTrack.key,
-                                                  session.key,
-                                                  entry.key,
-                                                  "reps",
-                                                  e.target.value
-                                                )
-                                              }
-                                              placeholder="—"
-                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label
-                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
-                                              htmlFor={`ex-rest-${entry.key}`}
-                                            >
-                                              Rest (sec)
-                                            </label>
-                                            <input
-                                              id={`ex-rest-${entry.key}`}
-                                              type="text"
-                                              inputMode="numeric"
-                                              pattern="[0-9]*"
-                                              value={entry.restAfterSeconds}
-                                              onChange={(e) =>
-                                                setSessionExerciseNumericField(
-                                                  activeTrack.key,
-                                                  session.key,
-                                                  entry.key,
-                                                  "restAfterSeconds",
-                                                  e.target.value
-                                                )
-                                              }
-                                              placeholder="—"
-                                              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                                            />
-                                          </div>
+                                        )}
+
+                                        <div className="mt-3 max-w-xs">
+                                          <label
+                                            className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                            htmlFor={`ex-rest-${entry.key}`}
+                                          >
+                                            Rest after (sec)
+                                          </label>
+                                          <input
+                                            id={`ex-rest-${entry.key}`}
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            value={entry.restAfterSeconds}
+                                            onChange={(e) =>
+                                              setSessionExerciseNumericField(
+                                                activeTrack.key,
+                                                session.key,
+                                                entry.key,
+                                                "restAfterSeconds",
+                                                e.target.value
+                                              )
+                                            }
+                                            placeholder="—"
+                                            className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                          />
                                         </div>
                                       </div>
                                     </div>

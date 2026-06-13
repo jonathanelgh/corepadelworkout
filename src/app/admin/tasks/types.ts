@@ -36,3 +36,11 @@ export type TaskBoardDetail = {
   description: string | null;
   columns: TaskColumnData[];
 };
+
+export type TaskCardComment = {
+  id: string;
+  body: string;
+  createdAt: string;
+  authorId: string;
+  authorLabel: string;
+};

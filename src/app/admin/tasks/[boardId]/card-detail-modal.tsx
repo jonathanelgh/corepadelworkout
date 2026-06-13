@@ -2,10 +2,21 @@
 
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Trash2, X } from "lucide-react";
+import { Loader2, MessageSquare, Trash2, X } from "lucide-react";
 import { Check } from "lucide-react";
-import { deleteTaskCard, setTaskCardCompleted, updateTaskCard } from "../actions";
-import type { AssigneeOption, TaskCardData } from "../types";
+import { addTaskCardComment, deleteTaskCard, listTaskCardComments, setTaskCardCompleted, updateTaskCard } from "../actions";
+import type { AssigneeOption, TaskCardComment, TaskCardData } from "../types";
+
+function formatCommentTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export function CardDetailModal({
   card,
@@ -29,8 +40,29 @@ export function CardDetailModal({
   const [completed, setCompleted] = useState(card.completed);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [comments, setComments] = useState<TaskCardComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentPending, setCommentPending] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCommentsLoading(true);
+    void listTaskCardComments(card.id).then((res) => {
+      if (cancelled) return;
+      if ("error" in res) {
+        setComments([]);
+      } else {
+        setComments(res);
+      }
+      setCommentsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [card.id]);
 
   useEffect(() => {
     setTitle(card.title);
@@ -84,6 +116,21 @@ export function CardDetailModal({
     }
     onUpdated();
     onClose();
+  }
+
+  async function handleAddComment() {
+    const text = commentBody.trim();
+    if (!text) return;
+    setCommentPending(true);
+    setError(null);
+    const res = await addTaskCardComment(card.id, boardId, text);
+    setCommentPending(false);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    setComments((prev) => [...prev, res.comment]);
+    setCommentBody("");
   }
 
   async function handleDelete() {
@@ -211,6 +258,52 @@ export function CardDetailModal({
                 })
               )}
             </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-gray-500" />
+              <p className="text-sm font-medium text-gray-700">Comments</p>
+            </div>
+
+            {commentsLoading ? (
+              <p className="text-sm text-gray-500">Loading comments…</p>
+            ) : comments.length === 0 ? (
+              <p className="text-sm text-gray-500">No comments yet.</p>
+            ) : (
+              <ul className="mb-3 max-h-48 space-y-3 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 p-3">
+                {comments.map((c) => (
+                  <li key={c.id} className="text-sm">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-medium text-gray-900">{c.authorLabel}</span>
+                      <time className="shrink-0 text-xs text-gray-400">{formatCommentTime(c.createdAt)}</time>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-gray-700">{c.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <textarea
+              value={commentBody}
+              onChange={(e) => setCommentBody(e.target.value)}
+              rows={2}
+              disabled={commentPending || pending}
+              placeholder="Add a comment…"
+              className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={() => void handleAddComment()}
+              disabled={commentPending || pending || !commentBody.trim()}
+              className="mt-2 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {commentPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Post comment
+            </button>
+            <p className="mt-1.5 text-xs text-gray-500">
+              The task creator gets an email when someone else comments.
+            </p>
           </div>
 
           {error && (

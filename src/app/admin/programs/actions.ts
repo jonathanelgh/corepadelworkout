@@ -23,8 +23,10 @@ export type ProgramMediaUrls = {
 type ProgramExercisePayload = {
   exercise_id: string;
   duration_minutes: number | null;
+  duration_seconds: number | null;
   sets: number | null;
   reps: number | null;
+  rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
 };
 
@@ -95,12 +97,26 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
   const duration_minutes = parseOptionalNonNegIntField(
     row.duration_minutes ?? row.durationMinutes
   );
+  const duration_seconds = parseOptionalNonNegIntField(
+    row.duration_seconds ?? row.durationSeconds
+  );
   const sets = parseOptionalNonNegIntField(row.sets);
   const reps = parseOptionalNonNegIntField(row.reps);
+  const rest_between_sets_seconds = parseOptionalNonNegIntField(
+    row.rest_between_sets_seconds ?? row.restBetweenSetsSeconds
+  );
   const rest_after_seconds = parseOptionalNonNegIntField(
     row.rest_after_seconds ?? row.restAfterSeconds ?? row.pause_seconds
   );
-  return { exercise_id, duration_minutes, sets, reps, rest_after_seconds };
+  return {
+    exercise_id,
+    duration_minutes,
+    duration_seconds,
+    sets,
+    reps,
+    rest_between_sets_seconds,
+    rest_after_seconds,
+  };
 }
 
 function parseOneSession(o: Record<string, unknown>): SessionPayload {
@@ -134,8 +150,10 @@ function parseOneSession(o: Record<string, unknown>): SessionPayload {
           exercises.push({
             exercise_id: x,
             duration_minutes: null,
+            duration_seconds: null,
             sets: null,
             reps: null,
+            rest_between_sets_seconds: null,
             rest_after_seconds: null,
           });
         }
@@ -342,9 +360,11 @@ async function insertCurriculumForProgram(
           session_id: sessionRow.id,
           exercise_id: ex.exercise_id,
           sort_order: j,
-          duration_minutes: ex.duration_minutes,
+          duration_minutes: ex.duration_seconds != null ? null : ex.duration_minutes,
+          duration_seconds: ex.duration_seconds,
           sets: ex.sets,
           reps: ex.reps,
+          rest_between_sets_seconds: ex.rest_between_sets_seconds,
           rest_after_seconds: ex.rest_after_seconds,
         }));
         const { error: peError } = await supabase.from("program_exercises").insert(rows);
@@ -521,8 +541,10 @@ type DuplicateDbExerciseRow = {
   exercise_id: string;
   sort_order: number;
   duration_minutes: number | null;
+  duration_seconds: number | null;
   sets: number | null;
   reps: number | null;
+  rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
 };
 
@@ -566,8 +588,10 @@ function dbTracksToDuplicatePayloads(rows: DuplicateDbTrackRow[] | null): TrackP
       const exercises: ProgramExercisePayload[] = exSorted.map((e) => ({
         exercise_id: e.exercise_id,
         duration_minutes: e.duration_minutes,
+        duration_seconds: e.duration_seconds,
         sets: e.sets,
         reps: e.reps,
+        rest_between_sets_seconds: e.rest_between_sets_seconds,
         rest_after_seconds: e.rest_after_seconds,
       }));
       return {
@@ -636,8 +660,10 @@ export async function duplicateProgram(formData: FormData) {
           exercise_id,
           sort_order,
           duration_minutes,
+          duration_seconds,
           sets,
           reps,
+          rest_between_sets_seconds,
           rest_after_seconds
         )
       )

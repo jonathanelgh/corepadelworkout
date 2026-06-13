@@ -4,7 +4,9 @@ import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
 import { notifyNewTaskAssignees } from "@/lib/emails/notify-task-assignees";
-import type { AssigneeOption, TaskBoardDetail, TaskBoardListItem } from "./types";
+import { notifyTaskCreatorOnComment } from "@/lib/emails/notify-task-creator-on-comment";
+import { notifyAdminsOnTaskMove } from "@/lib/emails/notify-admins-on-task-move";
+import type { AssigneeOption, TaskBoardDetail, TaskBoardListItem, TaskCardComment } from "./types";
 
 const TASKS_PATH = "/admin/tasks";
 const DEFAULT_COLUMNS = ["Backlog", "To do", "In progress", "Completed"];
@@ -397,7 +399,19 @@ export async function moveTaskCard(
   sortOrder: number
 ): Promise<ActionResult> {
   const auth = await requireAdmin();
-  if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
+  if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
+
+  const { data: card, error: cardErr } = await auth.supabase
+    .from("task_cards")
+    .select("column_id, title")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (cardErr) return { error: cardErr.message };
+  if (!card) return { error: "Task not found." };
+
+  const previousColumnId = card.column_id as string;
+  const columnChanged = previousColumnId !== columnId;
 
   const { error } = await auth.supabase
     .from("task_cards")
@@ -405,6 +419,130 @@ export async function moveTaskCard(
     .eq("id", cardId);
 
   if (error) return { error: error.message };
+
+  if (columnChanged) {
+    try {
+      await notifyAdminsOnTaskMove({
+        supabase: auth.supabase,
+        cardId,
+        boardId,
+        taskTitle: (card.title as string).trim() || "Untitled task",
+        fromColumnId: previousColumnId,
+        toColumnId: columnId,
+        movedByUserId: auth.user.id,
+      });
+    } catch (e) {
+      console.warn("[task-moved] Notification failed:", e);
+    }
+  }
+
   revalidateBoard(boardId);
   return { ok: true };
+}
+
+export async function listTaskCardComments(
+  cardId: string
+): Promise<TaskCardComment[] | { error: string }> {
+  const auth = await requireAdmin();
+  if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
+
+  const { data: rows, error } = await auth.supabase
+    .from("task_card_comments")
+    .select("id, body, created_at, user_id")
+    .eq("card_id", cardId)
+    .order("created_at", { ascending: true });
+
+  if (error) return { error: error.message };
+  if (!rows?.length) return [];
+
+  const authorIds = [...new Set(rows.map((r) => r.user_id as string))];
+  const { data: profiles } = await auth.supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .in("id", authorIds);
+
+  const labelById = new Map<string, string>();
+  for (const p of profiles ?? []) {
+    const label =
+      (p.full_name as string | null)?.trim() ||
+      (p.email as string | null)?.trim() ||
+      "Admin";
+    labelById.set(p.id as string, label);
+  }
+
+  return rows.map((r) => ({
+    id: r.id as string,
+    body: r.body as string,
+    createdAt: r.created_at as string,
+    authorId: r.user_id as string,
+    authorLabel: labelById.get(r.user_id as string) ?? "Admin",
+  }));
+}
+
+export async function addTaskCardComment(
+  cardId: string,
+  boardId: string,
+  body: string
+): Promise<{ ok: true; comment: TaskCardComment } | { error: string }> {
+  const auth = await requireAdmin();
+  if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
+
+  const text = body.trim();
+  if (!text) return { error: "Comment cannot be empty." };
+
+  const { data: card, error: cardErr } = await auth.supabase
+    .from("task_cards")
+    .select("title")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (cardErr) return { error: cardErr.message };
+  if (!card) return { error: "Task not found." };
+
+  const { data: inserted, error } = await auth.supabase
+    .from("task_card_comments")
+    .insert({
+      card_id: cardId,
+      user_id: auth.user.id,
+      body: text,
+    })
+    .select("id, body, created_at, user_id")
+    .single();
+
+  if (error || !inserted) return { error: error?.message ?? "Could not add comment." };
+
+  const { data: profile } = await auth.supabase
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+
+  const authorLabel =
+    (profile?.full_name as string | null)?.trim() ||
+    (profile?.email as string | null)?.trim() ||
+    "Admin";
+
+  const comment: TaskCardComment = {
+    id: inserted.id as string,
+    body: inserted.body as string,
+    createdAt: inserted.created_at as string,
+    authorId: inserted.user_id as string,
+    authorLabel,
+  };
+
+  try {
+    await notifyTaskCreatorOnComment({
+      supabase: auth.supabase,
+      cardId,
+      boardId,
+      taskTitle: (card.title as string).trim() || "Task",
+      commentBody: text,
+      commenterUserId: auth.user.id,
+    });
+  } catch (e) {
+    console.warn("[task-comment] Notification error:", e);
+  }
+
+  revalidateBoard(boardId);
+  return { ok: true, comment };
 }

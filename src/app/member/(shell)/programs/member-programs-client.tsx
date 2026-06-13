@@ -140,7 +140,7 @@ export function MemberProgramsLibraryClient({
                 loadError={loadErrorMy}
                 title="Your programs"
                 description="Courses you&apos;ve purchased. Open a card to continue training."
-                programHref={(slug) => `/programs/${slug}/take`}
+                programHref={(slug) => `/programs/${slug}`}
                 emptyState={{
                   title: "No programs here",
                   body: "Your purchased programs will appear in this tab.",

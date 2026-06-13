@@ -1,11 +1,20 @@
 import type { GeminiProgramDraft } from "@/lib/programs/gemini-generate-program";
 import type { ProgramAiContext } from "@/lib/programs/exercise-catalog";
 
+import type { ExerciseDurationUnit } from "@/app/admin/programs/new/create-program-form";
+import {
+  inferExercisePrescriptionType,
+  type ExercisePrescriptionType,
+} from "@/lib/programs/program-exercises";
+
 export type AiProgramExerciseRow = {
   exerciseId: string;
-  durationMinutes: string;
+  prescriptionType: ExercisePrescriptionType;
+  durationValue: string;
+  durationUnit: ExerciseDurationUnit;
   sets: string;
   reps: string;
+  restBetweenSetsSeconds: string;
   restAfterSeconds: string;
 };
 
@@ -67,12 +76,14 @@ export function mapGeminiDraftToForm(
   const locationBySlug = new Map(ctx.locations.map((l) => [normalizeSlug(l.slug), l]));
   const exercisesByLocation = new Map<string, Set<string>>();
   for (const ex of ctx.exercises) {
-    let set = exercisesByLocation.get(ex.locationId);
-    if (!set) {
-      set = new Set();
-      exercisesByLocation.set(ex.locationId, set);
+    for (const locId of ex.locationIds) {
+      let set = exercisesByLocation.get(locId);
+      if (!set) {
+        set = new Set();
+        exercisesByLocation.set(locId, set);
+      }
+      set.add(ex.id);
     }
-    set.add(ex.id);
   }
 
   const tracks: AiProgramTrackRow[] = [];
@@ -105,9 +116,17 @@ export function mapGeminiDraftToForm(
 
         exercises.push({
           exerciseId: ex.exercise_id,
-          durationMinutes: intToField(ex.duration_minutes),
+          prescriptionType: inferExercisePrescriptionType({
+            durationSeconds: null,
+            durationMinutes: ex.duration_minutes,
+            sets: ex.sets,
+            restBetweenSetsSeconds: ex.rest_between_sets_seconds,
+          }),
+          durationValue: intToField(ex.duration_minutes),
+          durationUnit: "min",
           sets: intToField(ex.sets),
           reps: intToField(ex.reps),
+          restBetweenSetsSeconds: intToField(ex.rest_between_sets_seconds),
           restAfterSeconds: intToField(ex.rest_after_seconds),
         });
       }

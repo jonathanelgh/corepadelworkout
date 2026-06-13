@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { CheckCircle2, PlayCircle } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { userHasProgramAccess } from "@/lib/programs/check-program-access";
-import { ProgramEnrollBar } from "../program-enroll-bar";
+import { fetchProgramExercises } from "@/lib/programs/program-exercises";
 import { ProgramExperienceLayout } from "../program-experience-layout";
+import { ProgramStartBar } from "../program-start-bar";
+import { ProgramDetailTabs } from "@/components/programs/program-detail-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -62,76 +63,6 @@ function formatStatMins(n: number | null): string {
   return `${n} Min${n === 1 ? "" : "s"}`;
 }
 
-function formatPriceEur(price: number | null): string {
-  if (price == null) return "—";
-  try {
-    return new Intl.NumberFormat("en-IE", {
-      style: "currency",
-      currency: "EUR",
-    }).format(Number(price));
-  } catch {
-    return `€${Number(price).toFixed(2)}`;
-  }
-}
-
-type CurriculumSession = {
-  id: string;
-  name: string;
-  description: string | null;
-  duration_minutes: number | null;
-  sort_order: number;
-};
-
-type CurriculumTrack = {
-  sort_order: number;
-  locationName: string | null;
-  sessions: CurriculumSession[];
-};
-
-function firstLocationName(
-  v: { name: string } | { name: string }[] | null | undefined
-): string | null {
-  if (v == null) return null;
-  const row = Array.isArray(v) ? v[0] : v;
-  if (!row || typeof row !== "object" || !("name" in row)) return null;
-  const n = String((row as { name: string }).name).trim();
-  return n.length > 0 ? n : null;
-}
-
-function normalizeSessionsList(
-  raw: CurriculumSession | CurriculumSession[] | null | undefined
-): CurriculumSession[] {
-  if (raw == null) return [];
-  const arr = Array.isArray(raw) ? raw : [raw];
-  return arr
-    .filter((s) => s && typeof s.id === "string")
-    .slice()
-    .sort((a, b) => a.sort_order - b.sort_order);
-}
-
-function formatSessionMeta(mins: number | null): string {
-  if (mins == null || !Number.isFinite(mins) || mins < 0) return "—";
-  return `${Math.round(mins)} min`;
-}
-
-function buildCurriculumPreview(
-  rows: Array<{
-    sort_order: number;
-    locations: { name: string } | { name: string }[] | null;
-    program_sessions: CurriculumSession | CurriculumSession[] | null;
-  }> | null
-): CurriculumTrack[] {
-  if (!rows?.length) return [];
-  const tracks = [...rows]
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map((row) => ({
-      sort_order: row.sort_order,
-      locationName: firstLocationName(row.locations),
-      sessions: normalizeSessionsList(row.program_sessions),
-    }));
-  return tracks.filter((t) => t.sessions.length > 0);
-}
-
 type PageProps = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -169,6 +100,7 @@ export default async function ProgramDetail({ params }: PageProps) {
       body,
       cover_image_url,
       promo_video_url,
+      song_url,
       price,
       duration_weeks,
       sessions_per_week,
@@ -190,38 +122,8 @@ export default async function ProgramDetail({ params }: PageProps) {
   }
 
   const program = raw as ProgramRow;
+  const exercises = await fetchProgramExercises(supabase, program.id);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const hasAccess =
-    user != null ? await userHasProgramAccess(supabase, user.id, program.id) : false;
-
-  const { data: curriculumRows } = await supabase
-    .from("program_location_tracks")
-    .select(
-      `
-      sort_order,
-      locations ( name ),
-      program_sessions (
-        id,
-        name,
-        description,
-        duration_minutes,
-        sort_order
-      )
-    `
-    )
-    .eq("program_id", program.id)
-    .order("sort_order", { ascending: true });
-
-  const curriculumTracks = buildCurriculumPreview(
-    (curriculumRows ?? []) as Array<{
-      sort_order: number;
-      locations: { name: string } | { name: string }[] | null;
-      program_sessions: CurriculumSession | CurriculumSession[] | null;
-    }>
-  );
   const outcomes = normalizeOutcomes(program.outcomes);
   const aboutBlocks = bodyParagraphs(program.body, program.description);
   const difficultyLabel = firstDifficultyName(program.difficulty_levels) ?? "Program";
@@ -230,7 +132,7 @@ export default async function ProgramDetail({ params }: PageProps) {
   const subtitle =
     program.description?.trim() ||
     "Structured training to level up your game on and off the court.";
-  const priceLabel = formatPriceEur(program.price);
+  const detailsText = program.body?.trim() || program.description?.trim() || null;
 
   return (
     <ProgramExperienceLayout
@@ -246,11 +148,13 @@ export default async function ProgramDetail({ params }: PageProps) {
       backHref="/programs"
       backLabel="Back to programs"
       footer={
-        <ProgramEnrollBar programSlug={slug} priceLabel={priceLabel} hasAccess={hasAccess} />
+        <ProgramStartBar programSlug={slug} minutesPerSession={program.minutes_per_session} />
       }
     >
+      <ProgramDetailTabs description={detailsText} exercises={exercises} />
+
       {aboutBlocks.length > 0 && (
-        <div className="mb-12">
+        <div className="mb-12 mt-12">
           <h2 className="mb-4 text-2xl font-medium">About this program</h2>
           <div className="space-y-4 leading-relaxed text-gray-600">
             {aboutBlocks.map((block, i) => (
@@ -273,59 +177,6 @@ export default async function ProgramDetail({ params }: PageProps) {
           </ul>
         </div>
       )}
-
-      <div className="mb-12">
-        <h2 className="mb-6 text-2xl font-medium">Curriculum Preview</h2>
-        {curriculumTracks.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 px-5 py-8 text-center text-sm text-gray-500">
-            Session details for this program aren&apos;t available yet.
-          </p>
-        ) : (
-          <div className="space-y-8">
-            {curriculumTracks.map((track, trackIndex) => (
-              <div key={`${track.sort_order}-${trackIndex}`} className="space-y-4">
-                {curriculumTracks.length > 1 && track.locationName && (
-                  <p className="text-xs font-bold tracking-wider text-gray-400 uppercase">
-                    {track.locationName}
-                  </p>
-                )}
-                {track.sessions.map((session, si) => {
-                  const label = `Session ${si + 1}`;
-                  const desc = session.description?.trim();
-                  return (
-                    <div
-                      key={session.id}
-                      className="flex items-start justify-between gap-4 rounded-2xl border border-gray-100 p-5 transition-colors hover:border-gray-300"
-                    >
-                      <div className="flex min-w-0 flex-1 items-start gap-4">
-                        <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700">
-                          <PlayCircle className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1 text-xs font-bold tracking-wider text-gray-400 uppercase">
-                            {label}
-                          </div>
-                          <div className="font-medium text-gray-900">
-                            {session.name?.trim() || `Session ${si + 1}`}
-                          </div>
-                          {desc && (
-                            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-gray-500">
-                              {desc}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-sm tabular-nums text-gray-500">
-                        {formatSessionMeta(session.duration_minutes)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </ProgramExperienceLayout>
   );
 }

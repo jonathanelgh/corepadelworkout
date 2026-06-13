@@ -3,8 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, LayoutDashboard, LogOut, Sparkles, User } from "lucide-react";
+import {
+  BookOpen,
+  Dumbbell,
+  Home,
+  LayoutDashboard,
+  LogOut,
+  Sparkles,
+  User,
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { tabToHref, type MemberTab } from "@/lib/member/member-tabs";
+import type { MemberHubData } from "@/lib/member/load-member-hub-data";
+import { MemberHomeTab } from "@/components/member/member-home-tab";
+import { MemberCustomTab } from "@/components/member/member-custom-tab";
+import { MemberProfileTab } from "@/components/member/member-profile-tab";
+import { MemberProgramsLibraryClient } from "@/app/member/(shell)/programs/member-programs-client";
 
 type Profile = {
   full_name: string | null;
@@ -12,33 +26,63 @@ type Profile = {
   profile_image_url: string | null;
 } | null;
 
+const desktopNav: { tab: MemberTab; label: string; icon: typeof Home }[] = [
+  { tab: "home", label: "Dashboard", icon: LayoutDashboard },
+  { tab: "workouts", label: "Programs", icon: Dumbbell },
+  { tab: "custom", label: "Custom", icon: Sparkles },
+  { tab: "profile", label: "Profile", icon: User },
+];
+
+const mobileTabs: { tab: MemberTab; label: string; icon: typeof Home }[] = [
+  { tab: "home", label: "Home", icon: Home },
+  { tab: "workouts", label: "Workouts", icon: Dumbbell },
+  { tab: "custom", label: "Custom", icon: Sparkles },
+  { tab: "profile", label: "Profile", icon: User },
+];
+
+function panelStyle(visible: boolean): React.CSSProperties {
+  return { display: visible ? "block" : "none" };
+}
+
 export function MemberAppShell({
   userEmail,
   profile,
   children,
+  hubData,
+  initialTab = "home",
 }: {
   userEmail: string | null;
   profile: Profile;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  hubData?: MemberHubData;
+  initialTab?: MemberTab;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const isHub = Boolean(hubData);
+  const [tab, setTab] = useState<MemberTab>(initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   const displayName = profile?.full_name?.trim() || userEmail?.split("@")[0] || "Member";
   const uploaded = profile?.profile_image_url?.trim();
 
-  const nav = [
-    { href: "/member", label: "Dashboard", icon: LayoutDashboard, match: (p: string) => p === "/member" },
-    {
-      href: "/member/programs",
-      label: "Programs",
-      icon: Sparkles,
-      match: (p: string) => p.startsWith("/member/programs"),
-    },
-    { href: "/blog", label: "Blog", icon: BookOpen, match: (p: string) => p.startsWith("/blog") },
-  ];
+  function selectTab(next: MemberTab) {
+    if (isHub) {
+      setTab(next);
+      return;
+    }
+    router.push(tabToHref(next));
+  }
+
+  function isTabActive(item: MemberTab): boolean {
+    if (isHub) return tab === item;
+    if (item === "home") return pathname === "/member" || pathname === "/member/upgrade";
+    if (item === "workouts") return pathname.startsWith("/member/programs");
+    if (item === "custom") return pathname.startsWith("/member/custom");
+    if (item === "profile") return pathname.startsWith("/member/profile");
+    return false;
+  }
 
   async function signOut() {
     setSigningOut(true);
@@ -53,29 +97,41 @@ export function MemberAppShell({
     <div className="flex min-h-dvh flex-col bg-zinc-50 text-zinc-900">
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-6 md:px-12">
-          <Link href="/member" className="shrink-0 font-bold tracking-tight text-zinc-900">
+          <button
+            type="button"
+            onClick={() => selectTab("home")}
+            className="shrink-0 font-bold tracking-tight text-zinc-900"
+          >
             CORE<span className="text-emerald-600">PADEL</span>
             <span className="ml-2 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
               Member
             </span>
-          </Link>
+          </button>
 
-          <nav className="hidden items-center gap-1 sm:flex" aria-label="Member">
-            {nav.map(({ href, label, icon: Icon, match }) => {
-              const active = match(pathname);
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Member">
+            {desktopNav.map(({ tab: item, label, icon: Icon }) => {
+              const active = isTabActive(item);
               return (
-                <Link
-                  key={href}
-                  href={href}
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => selectTab(item)}
                   className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     active ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
                   }`}
                 >
                   <Icon className="h-4 w-4 opacity-80" />
                   {label}
-                </Link>
+                </button>
               );
             })}
+            <Link
+              href="/blog"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+            >
+              <BookOpen className="h-4 w-4 opacity-80" />
+              Blog
+            </Link>
           </nav>
 
           <div className="relative shrink-0">
@@ -114,28 +170,30 @@ export function MemberAppShell({
                     <p className="truncate text-sm font-semibold text-zinc-900">{displayName}</p>
                     {userEmail && <p className="truncate text-xs text-zinc-500">{userEmail}</p>}
                   </div>
-                  <div className="sm:hidden py-1">
-                    {nav.map(({ href, label, icon: Icon }) => (
-                      <Link
-                        key={href}
-                        href={href}
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-                      >
-                        <Icon className="h-4 w-4" />
-                        {label}
-                      </Link>
-                    ))}
+                  <div className="md:hidden py-1">
+                    <Link
+                      href="/blog"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      Blog
+                    </Link>
                   </div>
-                  <Link
-                    href="/member/profile"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-                    role="menuitem"
-                  >
-                    <User className="h-4 w-4" />
-                    Profile
-                  </Link>
+                  {!isHub && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        selectTab("profile");
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
+                      role="menuitem"
+                    >
+                      <User className="h-4 w-4" />
+                      Profile
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={signingOut}
@@ -153,7 +211,66 @@ export function MemberAppShell({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-8 md:px-12">{children}</main>
+      <main className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-8 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-12 md:pb-8">
+        {isHub && hubData ? (
+          <>
+            <div style={panelStyle(tab === "home")} aria-hidden={tab !== "home"}>
+              <MemberHomeTab
+                hasActivePro={hubData.hasActivePro}
+                programs={hubData.homePrograms}
+                programsError={hubData.homeProgramsError}
+                posts={hubData.blogPosts}
+                postsError={hubData.blogPostsError}
+                onBrowseWorkouts={() => setTab("workouts")}
+              />
+            </div>
+            <div style={panelStyle(tab === "workouts")} aria-hidden={tab !== "workouts"}>
+              <MemberProgramsLibraryClient
+                allPrograms={hubData.allPrograms}
+                myPrograms={hubData.myPrograms}
+                categoryOptionsAll={hubData.categoryOptionsAll}
+                hasActivePro={hubData.hasActivePro}
+                loadErrorAll={hubData.workoutsErrorAll}
+                loadErrorMy={hubData.workoutsErrorMy}
+              />
+            </div>
+            <div style={panelStyle(tab === "custom")} aria-hidden={tab !== "custom"}>
+              <MemberCustomTab />
+            </div>
+            <div style={panelStyle(tab === "profile")} aria-hidden={tab !== "profile"}>
+              <MemberProfileTab profile={hubData.profileDetails} />
+            </div>
+          </>
+        ) : (
+          children
+        )}
+      </main>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200/80 bg-white/95 backdrop-blur-md md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="Member mobile"
+      >
+        <div className="mx-auto flex h-16 max-w-lg items-stretch justify-around px-2">
+          {mobileTabs.map(({ tab: item, label, icon: Icon }) => {
+            const active = isTabActive(item);
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => selectTab(item)}
+                className={`flex min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors ${
+                  active ? "text-emerald-700" : "text-zinc-500 hover:text-zinc-800"
+                }`}
+                aria-current={active ? "page" : undefined}
+              >
+                <Icon className={`h-5 w-5 shrink-0 ${active ? "text-emerald-600" : "text-zinc-400"}`} />
+                <span className="truncate">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
