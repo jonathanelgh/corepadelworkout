@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { bucketJunctionByExerciseId, exerciseRowToListItem } from "@/app/admin/exercises/exercise-row-utils";
+import { bucketJunctionByExerciseId, exerciseRowToListItem, EXERCISE_LOCATIONS_SELECT } from "@/app/admin/exercises/exercise-row-utils";
 
 export type ExerciseCatalogEntry = {
   id: string;
@@ -54,12 +54,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         location_id,
         exercise_level_id,
         status,
-        locations ( name, slug ),
-        exercise_locations (
-          location_id,
-          sort_order,
-          locations ( name, slug )
-        ),
+        ${EXERCISE_LOCATIONS_SELECT},
         exercise_equipment ( equipment_id, sort_order )
       `
       )
@@ -129,10 +124,6 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         created_at: row.created_at as string,
         location_id: row.location_id as string,
         exercise_level_id: (row.exercise_level_id as string | null) ?? null,
-        locations: row.locations as
-          | { name: string; slug: string }
-          | { name: string; slug: string }[]
-          | null,
         exercise_locations: row.exercise_locations as
           | {
               location_id: string;
@@ -160,14 +151,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         if (locRow?.slug) locSlugs.push(locRow.slug);
       }
     }
-    const legacyLoc = row.locations as
-      | { name: string; slug: string }
-      | { name: string; slug: string }[]
-      | null;
-    const primarySlug =
-      locSlugs[0] ??
-      (Array.isArray(legacyLoc) ? legacyLoc[0]?.slug : legacyLoc?.slug) ??
-      null;
+    const primarySlug = locSlugs[0] ?? null;
 
     return {
       id: item.id,

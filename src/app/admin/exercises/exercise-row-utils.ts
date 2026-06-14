@@ -47,7 +47,6 @@ type ExerciseRow = {
   created_at: string;
   location_id: string;
   exercise_level_id: string | null;
-  locations?: { name: string; slug: string } | { name: string; slug: string }[] | null;
   exercise_locations?: ExerciseLocationNested[] | null | undefined;
   exercise_equipment: { equipment_id: string; sort_order: number }[] | null | undefined;
 };
@@ -71,10 +70,9 @@ function resolveLocationFields(row: ExerciseRow): {
     };
   }
 
-  const loc = pickLocation(row.locations ?? null);
   return {
     locationIds: row.location_id ? [row.location_id] : [],
-    locationNames: loc?.name ? [loc.name] : [],
+    locationNames: [],
     location_id: row.location_id,
   };
 }

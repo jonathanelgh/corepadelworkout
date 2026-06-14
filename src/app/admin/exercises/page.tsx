@@ -1,7 +1,7 @@
 import { Plus, Package, Layers } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
-import { bucketJunctionByExerciseId, exerciseRowToListItem } from "./exercise-row-utils";
+import { bucketJunctionByExerciseId, exerciseRowToListItem, EXERCISE_LOCATIONS_SELECT } from "./exercise-row-utils";
 import { ExercisesListClient } from "./exercises-list-client";
 import type { ExerciseListItem } from "./types";
 
@@ -30,12 +30,7 @@ export default async function AdminExercisesPage({
       location_id,
       exercise_level_id,
       status,
-      locations ( name, slug ),
-      exercise_locations (
-        location_id,
-        sort_order,
-        locations ( name, slug )
-      ),
+      ${EXERCISE_LOCATIONS_SELECT},
       exercise_equipment ( equipment_id, sort_order )
     `
     )
@@ -97,10 +92,6 @@ export default async function AdminExercisesPage({
         location_id: row.location_id as string,
         exercise_level_id: (row.exercise_level_id as string | null) ?? null,
         status: (row.status as string | null) ?? "published",
-        locations: row.locations as
-          | { name: string; slug: string }
-          | { name: string; slug: string }[]
-          | null,
         exercise_locations: row.exercise_locations as
           | {
               location_id: string;
