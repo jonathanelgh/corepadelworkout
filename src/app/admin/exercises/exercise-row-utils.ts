@@ -113,6 +113,11 @@ export function exerciseRowToListItem(
     bodyRegionIds: sortedJunctionIds(br, (r) => r.body_region_id),
     bodyPartIds: sortedJunctionIds(bp, (r) => r.body_part_id),
     exerciseLevelId: row.exercise_level_id ?? null,
+    exerciseLevelLabel: null,
+    categoryTypeLabels: [],
+    movementPatternLabels: [],
+    bodyRegionLabels: [],
+    bodyPartLabels: [],
   };
 }
 

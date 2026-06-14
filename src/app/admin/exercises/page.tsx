@@ -76,8 +76,29 @@ export default async function AdminExercisesPage({
       bpByExercise = bucketJunctionByExerciseId(bpRes.data);
     }
   }
-  const { data: equipLib } = await supabase.from("equipment").select("id, title").order("title", { ascending: true });
-  const equipmentTitleById = new Map((equipLib ?? []).map((e) => [e.id as string, e.title as string]));
+  const [
+    equipLibRes,
+    locationsRes,
+    levelsRes,
+    categoryTypesRes,
+    movementPatternsRes,
+    bodyRegionsRes,
+    bodyPartsRes,
+  ] = await Promise.all([
+    supabase.from("equipment").select("id, title").order("title", { ascending: true }),
+    supabase.from("locations").select("id, name").order("sort_order", { ascending: true }),
+    supabase.from("exercise_levels").select("id, name").order("sort_order", { ascending: true }),
+    supabase.from("exercise_category_types").select("id, name").order("name", { ascending: true }),
+    supabase.from("movement_patterns").select("id, name").order("name", { ascending: true }),
+    supabase.from("body_regions").select("id, name").order("name", { ascending: true }),
+    supabase.from("body_parts").select("id, name").order("name", { ascending: true }),
+  ]);
+  const equipmentTitleById = new Map((equipLibRes.data ?? []).map((e) => [e.id as string, e.title as string]));
+  const levelNameById = new Map((levelsRes.data ?? []).map((e) => [e.id as string, e.name as string]));
+  const categoryTypeNameById = new Map((categoryTypesRes.data ?? []).map((e) => [e.id as string, e.name as string]));
+  const movementPatternNameById = new Map((movementPatternsRes.data ?? []).map((e) => [e.id as string, e.name as string]));
+  const bodyRegionNameById = new Map((bodyRegionsRes.data ?? []).map((e) => [e.id as string, e.name as string]));
+  const bodyPartNameById = new Map((bodyPartsRes.data ?? []).map((e) => [e.id as string, e.name as string]));
 
   const rows: ExerciseListItem[] = (exercises ?? []).map((row) => {
     const item = exerciseRowToListItem(
@@ -113,8 +134,35 @@ export default async function AdminExercisesPage({
     const equipmentLabels = item.equipmentIds
       .map((id) => equipmentTitleById.get(id))
       .filter((t): t is string => Boolean(t));
-    return { ...item, equipmentLabels };
+    const levelId = item.exerciseLevelId;
+    return {
+      ...item,
+      equipmentLabels,
+      exerciseLevelLabel: levelId ? (levelNameById.get(levelId) ?? null) : null,
+      categoryTypeLabels: item.categoryTypeIds
+        .map((id) => categoryTypeNameById.get(id))
+        .filter((t): t is string => Boolean(t)),
+      movementPatternLabels: item.movementPatternIds
+        .map((id) => movementPatternNameById.get(id))
+        .filter((t): t is string => Boolean(t)),
+      bodyRegionLabels: item.bodyRegionIds
+        .map((id) => bodyRegionNameById.get(id))
+        .filter((t): t is string => Boolean(t)),
+      bodyPartLabels: item.bodyPartIds
+        .map((id) => bodyPartNameById.get(id))
+        .filter((t): t is string => Boolean(t)),
+    };
   });
+
+  const listFilters = {
+    locations: (locationsRes.data ?? []).map((l) => ({ id: l.id as string, label: l.name as string })),
+    equipment: (equipLibRes.data ?? []).map((e) => ({ id: e.id as string, label: e.title as string })),
+    levels: (levelsRes.data ?? []).map((l) => ({ id: l.id as string, label: l.name as string })),
+    categoryTypes: (categoryTypesRes.data ?? []).map((c) => ({ id: c.id as string, label: c.name as string })),
+    movementPatterns: (movementPatternsRes.data ?? []).map((m) => ({ id: m.id as string, label: m.name as string })),
+    bodyRegions: (bodyRegionsRes.data ?? []).map((b) => ({ id: b.id as string, label: b.name as string })),
+    bodyParts: (bodyPartsRes.data ?? []).map((b) => ({ id: b.id as string, label: b.name as string })),
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -163,7 +211,7 @@ export default async function AdminExercisesPage({
             </div>
           )}
 
-          <ExercisesListClient rows={rows} />
+          <ExercisesListClient rows={rows} filters={listFilters} />
         </div>
       </div>
     </div>

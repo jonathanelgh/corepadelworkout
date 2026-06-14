@@ -21,4 +21,21 @@ export type ExerciseListItem = {
   bodyRegionIds: string[];
   bodyPartIds: string[];
   exerciseLevelId: string | null;
+  exerciseLevelLabel: string | null;
+  categoryTypeLabels: string[];
+  movementPatternLabels: string[];
+  bodyRegionLabels: string[];
+  bodyPartLabels: string[];
+};
+
+export type ExerciseFilterOption = { id: string; label: string };
+
+export type ExerciseListFilters = {
+  locations: ExerciseFilterOption[];
+  equipment: ExerciseFilterOption[];
+  levels: ExerciseFilterOption[];
+  categoryTypes: ExerciseFilterOption[];
+  movementPatterns: ExerciseFilterOption[];
+  bodyRegions: ExerciseFilterOption[];
+  bodyParts: ExerciseFilterOption[];
 };
