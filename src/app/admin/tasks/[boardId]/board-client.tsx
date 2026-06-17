@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Plus, User } from "lucide-react";
+import { ArrowLeft, Check, MessageSquare, Plus, User } from "lucide-react";
 import {
   createTaskCard,
   createTaskColumn,
@@ -32,11 +32,16 @@ export function BoardClient({
 }) {
   const router = useRouter();
   const [columns, setColumns] = useState(board.columns);
+  const [activeCard, setActiveCard] = useState<TaskCardData | null>(null);
 
   useEffect(() => {
     setColumns(board.columns);
+    setActiveCard((current) => {
+      if (!current) return null;
+      const fresh = board.columns.flatMap((col) => col.cards).find((c) => c.id === current.id);
+      return fresh ?? current;
+    });
   }, [board]);
-  const [activeCard, setActiveCard] = useState<TaskCardData | null>(null);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dropColumnId, setDropColumnId] = useState<string | null>(null);
   const [newCardByColumn, setNewCardByColumn] = useState<Record<string, string>>({});
@@ -288,6 +293,15 @@ export function BoardClient({
                             {card.assigneeIds.length === 0 && (
                               <User className="h-3.5 w-3.5 text-gray-300" />
                             )}
+                            {card.commentCount > 0 && (
+                              <span
+                                className="inline-flex items-center gap-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600"
+                                title={`${card.commentCount} comment${card.commentCount === 1 ? "" : "s"}`}
+                              >
+                                <MessageSquare className="h-3 w-3" />
+                                {card.commentCount}
+                              </span>
+                            )}
                           </div>
                         </button>
                       </div>
@@ -371,6 +385,7 @@ export function BoardClient({
 
       {activeCard && (
         <CardDetailModal
+          key={activeCard.id}
           card={activeCard}
           boardId={board.id}
           assigneeOptions={assigneeOptions}

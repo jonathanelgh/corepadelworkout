@@ -17,8 +17,9 @@ import {
 } from "@/lib/programs/program-exercises";
 import { resolveExerciseVideoSource } from "@/lib/programs/exercise-video-url";
 import { useProgramWorkoutMusic } from "@/lib/programs/program-workout-music";
-import { playDoubleBeep } from "@/lib/programs/workout-beeps";
+import { playDoubleBeep, playWorkEndBeep, prepareWorkoutAudio } from "@/lib/programs/workout-beeps";
 import { WorkoutCompletionOverlay } from "@/components/programs/workout-completion-overlay";
+import { BothSidesChip } from "@/components/programs/both-sides-chip";
 
 type Phase = "work" | "setRest" | "rest";
 
@@ -185,7 +186,6 @@ export function ActiveWorkoutPlayer({
     if (hasTimedSets(current) && currentSet < setsCount(current)) {
       const between = hasRestBetweenSets(current) ? restBetweenSetsSeconds(current) : 0;
       if (between > 0) {
-        playDoubleBeep();
         setPhase("setRest");
         setSecondsLeft(between);
         return;
@@ -196,7 +196,6 @@ export function ActiveWorkoutPlayer({
     }
     const rest = restDurationSeconds(current);
     if (rest > 0 && !isLast) {
-      playDoubleBeep();
       setPhase("rest");
       setSecondsLeft(rest);
       return;
@@ -223,6 +222,7 @@ export function ActiveWorkoutPlayer({
     if (secondsLeft !== 0) return;
 
     if (phase === "work") {
+      playWorkEndBeep();
       finishWorkPhase();
       return;
     }
@@ -263,6 +263,7 @@ export function ActiveWorkoutPlayer({
 
   function startWorkout() {
     if (len === 0) return;
+    prepareWorkoutAudio();
     setWorkoutStarted(true);
     setPhase("work");
     setPrepCountdown(FIRST_EXERCISE_PREP_SECONDS);
@@ -296,6 +297,8 @@ export function ActiveWorkoutPlayer({
     }
     finishWorkPhase();
   }
+
+  const displayExercise = inExerciseRest && next ? next : current;
 
   if (len === 0) {
     return (
@@ -356,6 +359,11 @@ export function ActiveWorkoutPlayer({
             <p className="mt-1 text-sm text-white/70">
               {exerciseMeta(exercises[0]!)}
             </p>
+            {exercises[0]?.bothSides && (
+              <div className="mt-3">
+                <BothSidesChip variant="dark" />
+              </div>
+            )}
           </div>
 
           <button
@@ -383,6 +391,11 @@ export function ActiveWorkoutPlayer({
                 <p className="mt-2 text-sm text-white/80">
                   {exerciseMeta(current)}
                 </p>
+                {current.bothSides && (
+                  <div className="mt-3">
+                    <BothSidesChip variant="dark" />
+                  </div>
+                )}
                 <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{prepCountdown}</p>
                 <p className="mt-2 text-sm text-white/60">Starting in…</p>
               </div>
@@ -436,6 +449,11 @@ export function ActiveWorkoutPlayer({
                 <h2 className="mt-1 text-2xl font-semibold">
                   {inExerciseRest && next ? next.title : current?.title}
                 </h2>
+                {displayExercise?.bothSides && (
+                  <div className="mt-2">
+                    <BothSidesChip variant="dark" />
+                  </div>
+                )}
 
                 {currentIsTimed && secondsLeft != null && (
                   <p className="mt-3 font-mono text-5xl font-semibold tabular-nums">{secondsLeft}</p>

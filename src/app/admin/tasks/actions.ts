@@ -132,6 +132,20 @@ export async function getTaskBoard(boardId: string): Promise<TaskBoardDetail | {
   if (cardsRes.error) return { error: cardsRes.error.message };
   if (assignRes.error) return { error: assignRes.error.message };
 
+  const cardIds = (cardsRes.data ?? []).map((c) => c.id as string);
+  const commentsRes =
+    cardIds.length > 0
+      ? await auth.supabase.from("task_card_comments").select("card_id").in("card_id", cardIds)
+      : { data: [] as { card_id: string }[], error: null };
+
+  if (commentsRes.error) return { error: commentsRes.error.message };
+
+  const commentCountByCard = new Map<string, number>();
+  for (const row of commentsRes.data ?? []) {
+    const cid = row.card_id as string;
+    commentCountByCard.set(cid, (commentCountByCard.get(cid) ?? 0) + 1);
+  }
+
   const assigneesByCard = new Map<string, string[]>();
   for (const row of assignRes.data ?? []) {
     const cid = row.card_id as string;
@@ -153,6 +167,7 @@ export async function getTaskBoard(boardId: string): Promise<TaskBoardDetail | {
       sortOrder: c.sort_order as number,
       completed: Boolean(c.completed),
       assigneeIds: assigneesByCard.get(c.id as string) ?? [],
+      commentCount: commentCountByCard.get(c.id as string) ?? 0,
     });
     cardsByColumn.set(colId, list);
   }
@@ -442,7 +457,7 @@ export async function moveTaskCard(
 
 export async function listTaskCardComments(
   cardId: string
-): Promise<TaskCardComment[] | { error: string }> {
+): Promise<{ ok: true; comments: TaskCardComment[] } | { error: string }> {
   const auth = await requireAdmin();
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
@@ -453,7 +468,7 @@ export async function listTaskCardComments(
     .order("created_at", { ascending: true });
 
   if (error) return { error: error.message };
-  if (!rows?.length) return [];
+  if (!rows?.length) return { ok: true, comments: [] };
 
   const authorIds = [...new Set(rows.map((r) => r.user_id as string))];
   const { data: profiles } = await auth.supabase
@@ -470,13 +485,15 @@ export async function listTaskCardComments(
     labelById.set(p.id as string, label);
   }
 
-  return rows.map((r) => ({
+  const comments = rows.map((r) => ({
     id: r.id as string,
     body: r.body as string,
     createdAt: r.created_at as string,
     authorId: r.user_id as string,
     authorLabel: labelById.get(r.user_id as string) ?? "Admin",
   }));
+
+  return { ok: true, comments };
 }
 
 export async function addTaskCardComment(

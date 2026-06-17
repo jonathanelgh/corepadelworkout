@@ -12,11 +12,14 @@ import {
 import { createPortal } from "react-dom";
 import { ChevronDown, Search } from "lucide-react";
 
+import type { ExerciseProgramPrescriptionMode } from "@/lib/exercises/program-prescription-mode";
+
 export type ExerciseOption = {
   id: string;
   title: string;
   location_ids: string[];
   status?: "draft" | "published";
+  programPrescriptionMode?: ExerciseProgramPrescriptionMode;
 };
 
 type Props = {

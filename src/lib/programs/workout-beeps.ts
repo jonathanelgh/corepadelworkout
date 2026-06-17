@@ -26,6 +26,20 @@ function beep(ctx: AudioContext, at: number, freq = 880, duration = 0.12) {
   osc.stop(at + duration + 0.02);
 }
 
+export function prepareWorkoutAudio() {
+  const ctx = getCtx();
+  if (ctx) void ctx.resume();
+}
+
+/** Single tone when a timed work interval reaches zero. */
+export function playWorkEndBeep() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  void ctx.resume();
+  const t = ctx.currentTime;
+  beep(ctx, t, 988, 0.22);
+}
+
 export function playDoubleBeep() {
   const ctx = getCtx();
   if (!ctx) return;

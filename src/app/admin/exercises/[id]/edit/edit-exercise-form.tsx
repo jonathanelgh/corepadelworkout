@@ -10,6 +10,8 @@ import {
   type MultiSelectOption,
 } from "@/components/admin/multi-select-search-chips";
 import { ExerciseMediaPickerModal } from "@/components/admin/exercise-media-picker-modal";
+import { ExerciseProgramPrescriptionModeField } from "@/components/admin/exercise-program-prescription-mode-field";
+import { BothSidesCheckboxField } from "@/components/admin/both-sides-checkbox-field";
 import { VideoUrlPreview } from "@/components/media/video-url-preview";
 import type { ExerciseListItem } from "../../types";
 
@@ -246,6 +248,13 @@ export function EditExerciseForm({
                       Video imports start as draft. Publish when metadata and media look good.
                     </p>
                   </div>
+
+                  <ExerciseProgramPrescriptionModeField
+                    defaultValue={initial.programPrescriptionMode}
+                    disabled={pending}
+                  />
+
+                  <BothSidesCheckboxField defaultChecked={initial.bothSides} disabled={pending} />
 
                   <div className="space-y-1.5">
                     <MultiSelectSearchChips

@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bucketJunctionByExerciseId, exerciseRowToListItem, EXERCISE_LOCATIONS_SELECT } from "@/app/admin/exercises/exercise-row-utils";
+import { parseExerciseProgramPrescriptionMode, type ExerciseProgramPrescriptionMode } from "@/lib/exercises/program-prescription-mode";
 
 export type ExerciseCatalogEntry = {
   id: string;
   title: string;
   status: "draft" | "published";
   description: string | null;
+  programPrescriptionMode: ExerciseProgramPrescriptionMode;
   locationId: string;
   locationIds: string[];
   locationSlug: string | null;
@@ -54,6 +56,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         location_id,
         exercise_level_id,
         status,
+        program_prescription_mode,
         ${EXERCISE_LOCATIONS_SELECT},
         exercise_equipment ( equipment_id, sort_order )
       `
@@ -124,6 +127,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         created_at: row.created_at as string,
         location_id: row.location_id as string,
         exercise_level_id: (row.exercise_level_id as string | null) ?? null,
+        program_prescription_mode: (row.program_prescription_mode as string | null) ?? "all",
         exercise_locations: row.exercise_locations as
           | {
               location_id: string;
@@ -158,6 +162,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
       title: item.title,
       status: row.status === "draft" ? "draft" : "published",
       description: item.description,
+      programPrescriptionMode: item.programPrescriptionMode,
       locationId: item.location_id,
       locationIds: item.locationIds,
       locationSlug: primarySlug,
@@ -205,6 +210,7 @@ export function formatExerciseCatalogForPrompt(entries: ExerciseCatalogEntry[]):
   return entries
     .map((e) => {
       const tags = [
+        e.programPrescriptionMode !== "all" ? `prescription:${e.programPrescriptionMode}` : null,
         e.levelName ? `level:${e.levelName}` : null,
         e.categoryTypes.length ? `types:${e.categoryTypes.join("/")}` : null,
         e.movementPatterns.length ? `move:${e.movementPatterns.join("/")}` : null,

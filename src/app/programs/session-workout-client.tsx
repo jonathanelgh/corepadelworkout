@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight, List, X } from "lucide-react";
 import { ExerciseInlinePlayer } from "./exercise-inline-player";
+import { BothSidesChip } from "@/components/programs/both-sides-chip";
 
 export type WorkoutExercise = {
   id: string;
@@ -11,6 +12,7 @@ export type WorkoutExercise = {
   description: string | null;
   how_to: string | null;
   video_url: string | null;
+  bothSides: boolean;
   /** Names from exercise_equipment → equipment */
   equipmentLabels: string[];
   /** Prescription for this exercise in this program session */
@@ -213,6 +215,11 @@ export function SessionWorkoutClient({
             <div>
               <p className="text-xs font-bold tracking-wider text-gray-400 uppercase">Exercise {index + 1}</p>
               <h2 className="mt-1 text-2xl font-medium tracking-tight text-gray-900">{current.title}</h2>
+              {current.bothSides && (
+                <div className="mt-2">
+                  <BothSidesChip />
+                </div>
+              )}
               {prescription && (
                 <p className="mt-2 text-sm font-medium tabular-nums text-gray-600">{prescription}</p>
               )}

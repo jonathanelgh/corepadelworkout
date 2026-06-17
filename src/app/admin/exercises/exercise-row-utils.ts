@@ -1,4 +1,5 @@
 import type { ExerciseListItem } from "./types";
+import { parseExerciseProgramPrescriptionMode } from "@/lib/exercises/program-prescription-mode";
 
 export function pickLocation(
   loc: { name: string; slug: string } | { name: string; slug: string }[] | null
@@ -47,6 +48,8 @@ type ExerciseRow = {
   created_at: string;
   location_id: string;
   exercise_level_id: string | null;
+  program_prescription_mode?: string | null;
+  both_sides?: boolean | null;
   exercise_locations?: ExerciseLocationNested[] | null | undefined;
   exercise_equipment: { equipment_id: string; sort_order: number }[] | null | undefined;
 };
@@ -113,6 +116,8 @@ export function exerciseRowToListItem(
     bodyRegionIds: sortedJunctionIds(br, (r) => r.body_region_id),
     bodyPartIds: sortedJunctionIds(bp, (r) => r.body_part_id),
     exerciseLevelId: row.exercise_level_id ?? null,
+    programPrescriptionMode: parseExerciseProgramPrescriptionMode(row.program_prescription_mode),
+    bothSides: Boolean(row.both_sides),
     exerciseLevelLabel: null,
     categoryTypeLabels: [],
     movementPatternLabels: [],

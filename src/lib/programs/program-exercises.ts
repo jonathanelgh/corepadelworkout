@@ -8,6 +8,7 @@ export type ProgramExerciseItem = {
   title: string;
   image_url: string | null;
   video_url: string | null;
+  bothSides: boolean;
   durationMinutes: number | null;
   durationSeconds: number | null;
   sets: number | null;
@@ -21,6 +22,7 @@ type ExerciseNested = {
   title: string;
   image_url: string | null;
   video_url: string | null;
+  both_sides: boolean | null;
 };
 
 type ProgramExerciseNested = {
@@ -200,7 +202,8 @@ export async function fetchProgramExercises(
             id,
             title,
             image_url,
-            video_url
+            video_url,
+            both_sides
           )
         )
       )
@@ -238,6 +241,7 @@ export async function fetchProgramExercises(
             title: ex.title,
             image_url: ex.image_url?.trim() || null,
             video_url: ex.video_url?.trim() || null,
+            bothSides: Boolean(ex.both_sides),
             durationMinutes: pe.duration_minutes,
             durationSeconds: pe.duration_seconds,
             sets: pe.sets,

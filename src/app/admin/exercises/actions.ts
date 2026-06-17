@@ -6,6 +6,7 @@ import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseExerciseStatus } from "@/lib/exercises/status";
+import { parseExerciseProgramPrescriptionMode } from "@/lib/exercises/program-prescription-mode";
 import { replaceExerciseLocations } from "@/lib/exercises/persist-exercise-relations";
 
 const ADMIN_EXERCISES_PATH = "/admin/exercises";
@@ -117,6 +118,10 @@ async function replaceExerciseBodyPartLinks(
   if (insErr) throw new Error(insErr.message);
 }
 
+function parseBothSides(formData: FormData): boolean {
+  return formData.get("both_sides") === "on";
+}
+
 export async function createExercise(formData: FormData): Promise<CreateExerciseResult> {
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() || null;
@@ -130,6 +135,10 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
   const bodyRegionIds = parseUuidList(formData, "body_region_ids");
   const bodyPartIds = parseUuidList(formData, "body_part_ids");
   const exercise_level_id = parseOptionalExerciseLevelId(formData);
+  const program_prescription_mode = parseExerciseProgramPrescriptionMode(
+    formData.get("program_prescription_mode")
+  );
+  const both_sides = parseBothSides(formData);
 
   if (!title) {
     return { error: "Title is required." };
@@ -164,6 +173,8 @@ export async function createExercise(formData: FormData): Promise<CreateExercise
       image_url,
       location_id: locationIds[0]!,
       exercise_level_id,
+      program_prescription_mode,
+      both_sides,
       status: "published",
     })
     .select("id")
@@ -233,6 +244,10 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
   const bodyPartIds = parseUuidList(formData, "body_part_ids");
   const exercise_level_id = parseOptionalExerciseLevelId(formData);
   const status = parseExerciseStatus(formData.get("status"));
+  const program_prescription_mode = parseExerciseProgramPrescriptionMode(
+    formData.get("program_prescription_mode")
+  );
+  const both_sides = parseBothSides(formData);
 
   const { error } = await supabase
     .from("exercises")
@@ -244,6 +259,8 @@ export async function updateExercise(formData: FormData): Promise<CreateExercise
       image_url,
       location_id: locationIds[0]!,
       exercise_level_id,
+      program_prescription_mode,
+      both_sides,
       status,
     })
     .eq("id", id);

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExerciseOption } from "@/app/admin/programs/new/exercise-search-combobox";
+import { parseExerciseProgramPrescriptionMode } from "@/lib/exercises/program-prescription-mode";
 import { sortedJunctionIds } from "@/app/admin/exercises/exercise-row-utils";
 
 export async function loadProgramExerciseOptions(
@@ -12,6 +13,7 @@ export async function loadProgramExerciseOptions(
       id,
       title,
       status,
+      program_prescription_mode,
       location_id,
       exercise_locations ( location_id, sort_order )
     `
@@ -36,6 +38,7 @@ export async function loadProgramExerciseOptions(
             ? [row.location_id as string]
             : [],
       status: row.status === "draft" ? "draft" : "published",
+      programPrescriptionMode: parseExerciseProgramPrescriptionMode(row.program_prescription_mode),
     };
   });
 

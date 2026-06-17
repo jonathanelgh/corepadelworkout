@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { inferExercisePrescriptionType } from "@/lib/programs/program-exercises";
 import { loadProgramExerciseOptions } from "@/lib/exercises/program-exercise-options";
+import { clampProgramPrescriptionType } from "@/lib/exercises/program-prescription-mode";
 import { listMembersForAiPicker } from "@/lib/programs/profile-ai-context";
 import {
   CreateProgramForm,
@@ -45,7 +46,13 @@ function normalizeOutcomesJson(v: unknown): string[] {
     .filter((s) => s.length > 0);
 }
 
-function mapTracks(rows: TrackRow[] | null, fallbackLocationId: string): TrackBlock[] {
+import type { ExerciseOption } from "../../new/exercise-search-combobox";
+
+function mapTracks(
+  rows: TrackRow[] | null,
+  fallbackLocationId: string,
+  exerciseOptions: ExerciseOption[]
+): TrackBlock[] {
   if (!rows?.length) {
     return [
       {
@@ -84,15 +91,18 @@ function mapTracks(rows: TrackRow[] | null, fallbackLocationId: string): TrackBl
           durationValue = String(e.duration_minutes);
           durationUnit = "min";
         }
-        return {
-          key: randomUUID(),
-          exerciseId: e.exercise_id,
-          prescriptionType: inferExercisePrescriptionType({
+        const inferred = inferExercisePrescriptionType({
             durationSeconds: e.duration_seconds,
             durationMinutes: e.duration_minutes,
             sets: e.sets,
             restBetweenSetsSeconds: e.rest_between_sets_seconds,
-          }),
+          });
+        const mode =
+          exerciseOptions.find((x) => x.id === e.exercise_id)?.programPrescriptionMode ?? "all";
+        return {
+          key: randomUUID(),
+          exerciseId: e.exercise_id,
+          prescriptionType: clampProgramPrescriptionType(mode, inferred),
           durationValue,
           durationUnit,
           sets: e.sets != null && Number.isFinite(e.sets) ? String(e.sets) : "",
@@ -240,7 +250,11 @@ export default async function EditProgramPage({ params }: PageProps) {
   const locations = locationsRes.data ?? [];
   const defaultLocationId = locations[0]?.id ?? "";
 
-  const tracks = mapTracks(tracksRes.data as TrackRow[] | null, defaultLocationId);
+  const tracks = mapTracks(
+    tracksRes.data as TrackRow[] | null,
+    defaultLocationId,
+    exerciseOptionsRes.exercises
+  );
 
   const initial: ProgramFormInitialValues = {
     title: p.title,

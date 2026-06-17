@@ -30,6 +30,8 @@ export default async function AdminExercisesPage({
       location_id,
       exercise_level_id,
       status,
+      program_prescription_mode,
+      both_sides,
       ${EXERCISE_LOCATIONS_SELECT},
       exercise_equipment ( equipment_id, sort_order )
     `
@@ -113,6 +115,8 @@ export default async function AdminExercisesPage({
         location_id: row.location_id as string,
         exercise_level_id: (row.exercise_level_id as string | null) ?? null,
         status: (row.status as string | null) ?? "published",
+        program_prescription_mode: (row.program_prescription_mode as string | null) ?? "all",
+        both_sides: Boolean(row.both_sides),
         exercise_locations: row.exercise_locations as
           | {
               location_id: string;

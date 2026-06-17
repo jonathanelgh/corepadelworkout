@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Info, Save, Sparkles, Video } from "lucide-react";
 import { BulkExerciseVideoImportModal } from "@/components/admin/bulk-exercise-video-import-modal";
+import { ExerciseProgramPrescriptionModeField } from "@/components/admin/exercise-program-prescription-mode-field";
+import { BothSidesCheckboxField } from "@/components/admin/both-sides-checkbox-field";
 import { createExercise } from "../actions";
 import {
   MultiSelectSearchChips,
@@ -270,6 +272,10 @@ export function CreateExerciseForm({
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   </div>
                 </div>
+
+                <ExerciseProgramPrescriptionModeField disabled={pending} />
+
+                <BothSidesCheckboxField disabled={pending} />
 
                 <div>
                   <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1.5">

@@ -13,6 +13,7 @@ export type TaskCardData = {
   sortOrder: number;
   completed: boolean;
   assigneeIds: string[];
+  commentCount: number;
 };
 
 export type TaskColumnData = {

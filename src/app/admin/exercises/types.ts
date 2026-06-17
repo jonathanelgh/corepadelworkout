@@ -1,4 +1,5 @@
 import type { ExerciseStatus } from "@/lib/exercises/status";
+import type { ExerciseProgramPrescriptionMode } from "@/lib/exercises/program-prescription-mode";
 
 export type ExerciseListItem = {
   id: string;
@@ -22,6 +23,8 @@ export type ExerciseListItem = {
   bodyPartIds: string[];
   exerciseLevelId: string | null;
   exerciseLevelLabel: string | null;
+  programPrescriptionMode: ExerciseProgramPrescriptionMode;
+  bothSides: boolean;
   categoryTypeLabels: string[];
   movementPatternLabels: string[];
   bodyRegionLabels: string[];

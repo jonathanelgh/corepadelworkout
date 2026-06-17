@@ -47,21 +47,26 @@ export function CardDetailModal({
 
   useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    let cancelled = false;
+  async function loadComments() {
     setCommentsLoading(true);
-    void listTaskCardComments(card.id).then((res) => {
-      if (cancelled) return;
+    try {
+      const res = await listTaskCardComments(card.id);
       if ("error" in res) {
         setComments([]);
+        setError(res.error);
       } else {
-        setComments(res);
+        setComments(res.comments);
       }
+    } catch (e) {
+      setComments([]);
+      setError(e instanceof Error ? e.message : "Could not load comments.");
+    } finally {
       setCommentsLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
+    }
+  }
+
+  useEffect(() => {
+    void loadComments();
   }, [card.id]);
 
   useEffect(() => {
@@ -131,6 +136,7 @@ export function CardDetailModal({
     }
     setComments((prev) => [...prev, res.comment]);
     setCommentBody("");
+    onUpdated();
   }
 
   async function handleDelete() {

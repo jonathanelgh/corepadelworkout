@@ -6,6 +6,9 @@ import {
   inferExercisePrescriptionType,
   type ExercisePrescriptionType,
 } from "@/lib/programs/program-exercises";
+import {
+  clampProgramPrescriptionType,
+} from "@/lib/exercises/program-prescription-mode";
 
 export type AiProgramExerciseRow = {
   exerciseId: string;
@@ -114,14 +117,18 @@ export function mapGeminiDraftToForm(
         if (seenInSession.has(ex.exercise_id)) continue;
         seenInSession.add(ex.exercise_id);
 
-        exercises.push({
-          exerciseId: ex.exercise_id,
-          prescriptionType: inferExercisePrescriptionType({
+        const inferred = inferExercisePrescriptionType({
             durationSeconds: null,
             durationMinutes: ex.duration_minutes,
             sets: ex.sets,
             restBetweenSetsSeconds: ex.rest_between_sets_seconds,
-          }),
+          });
+        const catalogEntry = ctx.exercises.find((e) => e.id === ex.exercise_id);
+        const mode = catalogEntry?.programPrescriptionMode ?? "all";
+
+        exercises.push({
+          exerciseId: ex.exercise_id,
+          prescriptionType: clampProgramPrescriptionType(mode, inferred),
           durationValue: intToField(ex.duration_minutes),
           durationUnit: "min",
           sets: intToField(ex.sets),

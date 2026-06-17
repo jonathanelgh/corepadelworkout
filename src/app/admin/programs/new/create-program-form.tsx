@@ -2,6 +2,12 @@
 
 import { useMemo, useState } from "react";
 import type { ExercisePrescriptionType } from "@/lib/programs/program-exercises";
+import {
+  allowedProgramPrescriptionTypes,
+  clampProgramPrescriptionType,
+  defaultProgramPrescriptionType,
+  type ExerciseProgramPrescriptionMode,
+} from "@/lib/exercises/program-prescription-mode";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
@@ -60,6 +66,18 @@ const PRESCRIPTION_OPTIONS: { id: ExercisePrescriptionType; label: string; hint:
     hint: "Repeat work and rest (e.g. 20s on, 20s off × 5).",
   },
 ];
+
+function exerciseProgramMode(
+  exercises: ExerciseOption[],
+  exerciseId: string
+): ExerciseProgramPrescriptionMode {
+  return exercises.find((e) => e.id === exerciseId)?.programPrescriptionMode ?? "all";
+}
+
+function prescriptionOptionsForMode(mode: ExerciseProgramPrescriptionMode) {
+  const allowed = new Set(allowedProgramPrescriptionTypes(mode));
+  return PRESCRIPTION_OPTIONS.filter((opt) => allowed.has(opt.id));
+}
 
 export type SessionExerciseEntry = {
   key: string;
@@ -228,17 +246,20 @@ export function CreateProgramForm({
         name: s.name.trim() || `Day ${i + 1}`,
         description: s.description,
         durationMinutes: s.durationMinutes,
-        exercises: s.exercises.map((ex) => ({
-          key: crypto.randomUUID(),
-          exerciseId: ex.exerciseId,
-          prescriptionType: ex.prescriptionType,
-          durationValue: ex.durationValue,
-          durationUnit: ex.durationUnit,
-          sets: ex.sets,
-          reps: ex.reps,
-          restBetweenSetsSeconds: ex.restBetweenSetsSeconds,
-          restAfterSeconds: ex.restAfterSeconds,
-        })),
+        exercises: s.exercises.map((ex) => {
+          const mode = exerciseProgramMode(exercises, ex.exerciseId);
+          return {
+            key: crypto.randomUUID(),
+            exerciseId: ex.exerciseId,
+            prescriptionType: clampProgramPrescriptionType(mode, ex.prescriptionType),
+            durationValue: ex.durationValue,
+            durationUnit: ex.durationUnit,
+            sets: ex.sets,
+            reps: ex.reps,
+            restBetweenSetsSeconds: ex.restBetweenSetsSeconds,
+            restAfterSeconds: ex.restAfterSeconds,
+          };
+        }),
       })),
     }));
 
@@ -497,6 +518,7 @@ export function CreateProgramForm({
           sessions: t.sessions.map((s) => {
             if (s.key !== sessionKey) return s;
             if (s.exercises.some((e) => e.exerciseId === pick)) return s;
+            const mode = exerciseProgramMode(exercises, pick);
             return {
               ...s,
               exercises: [
@@ -504,7 +526,7 @@ export function CreateProgramForm({
                 {
                   key: crypto.randomUUID(),
                   exerciseId: pick,
-                  prescriptionType: "sets_reps",
+                  prescriptionType: defaultProgramPrescriptionType(mode),
                   durationValue: "",
                   durationUnit: "sec",
                   sets: "",
@@ -702,20 +724,24 @@ export function CreateProgramForm({
       }
       const curriculumPayload = tracks.map((tr) => ({
         location_id: tr.locationId,
-        sessions: tr.sessions.map(({ name, description, durationMinutes, exercises }) => {
+        sessions: tr.sessions.map(({ name, description, durationMinutes, exercises: sessionExercises }) => {
           let duration_minutes: number | null = null;
           if (durationMinutes.trim() !== "") {
             const n = Number.parseInt(durationMinutes, 10);
             if (Number.isFinite(n) && n >= 0) duration_minutes = n;
           }
-          const exerciseRows = exercises.map((e) => {
+          const exerciseRows = sessionExercises.map((e) => {
+            const prescriptionType = clampProgramPrescriptionType(
+              exerciseProgramMode(exercises, e.exerciseId),
+              e.prescriptionType
+            );
             let duration_seconds: number | null = null;
             let duration_minutes: number | null = null;
             let sets: number | null = null;
             let reps: number | null = null;
             let rest_between_sets_seconds: number | null = null;
 
-            if (e.prescriptionType === "time" || e.prescriptionType === "timed_intervals") {
+            if (prescriptionType === "time" || prescriptionType === "timed_intervals") {
               if (e.durationValue.trim() !== "") {
                 const n = Number.parseInt(e.durationValue, 10);
                 if (Number.isFinite(n) && n >= 0) {
@@ -725,7 +751,7 @@ export function CreateProgramForm({
               }
             }
 
-            if (e.prescriptionType === "sets_reps") {
+            if (prescriptionType === "sets_reps") {
               if (e.sets.trim() !== "") {
                 const n = Number.parseInt(e.sets, 10);
                 if (Number.isFinite(n) && n >= 0) sets = n;
@@ -736,7 +762,7 @@ export function CreateProgramForm({
               }
             }
 
-            if (e.prescriptionType === "timed_intervals") {
+            if (prescriptionType === "timed_intervals") {
               if (e.sets.trim() !== "") {
                 const n = Number.parseInt(e.sets, 10);
                 if (Number.isFinite(n) && n > 0) sets = n;
@@ -1668,7 +1694,15 @@ export function CreateProgramForm({
                             </div>
 
                             <ul className="space-y-3">
-                              {session.exercises.map((entry, index) => (
+                              {session.exercises.map((entry, index) => {
+                                const programMode = exerciseProgramMode(exercises, entry.exerciseId);
+                                const prescriptionOptions = prescriptionOptionsForMode(programMode);
+                                const activeType = clampProgramPrescriptionType(
+                                  programMode,
+                                  entry.prescriptionType
+                                );
+
+                                return (
                                 <li
                                   key={entry.key}
                                   className="border border-gray-200 rounded-lg bg-white p-3 sm:p-4"
@@ -1684,39 +1718,47 @@ export function CreateProgramForm({
                                           Choose how this exercise runs in the workout player. Rest after applies
                                           before the next exercise.
                                         </p>
-                                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                                          {PRESCRIPTION_OPTIONS.map((opt) => (
-                                            <label
-                                              key={opt.id}
-                                              className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-lg border px-3 py-2.5 transition ${
-                                                entry.prescriptionType === opt.id
-                                                  ? "border-black bg-gray-50 ring-1 ring-black"
-                                                  : "border-gray-200 bg-white hover:border-gray-300"
-                                              }`}
-                                            >
-                                              <span className="flex items-center gap-2">
-                                                <input
-                                                  type="radio"
-                                                  name={`prescription-${entry.key}`}
-                                                  checked={entry.prescriptionType === opt.id}
-                                                  onChange={() =>
-                                                    setSessionExercisePrescriptionType(
-                                                      activeTrack.key,
-                                                      session.key,
-                                                      entry.key,
-                                                      opt.id
-                                                    )
-                                                  }
-                                                  className="h-4 w-4 border-gray-300 text-black focus:ring-black"
-                                                />
-                                                <span className="text-sm font-medium text-gray-900">{opt.label}</span>
-                                              </span>
-                                              <span className="mt-1 pl-6 text-xs text-gray-500">{opt.hint}</span>
-                                            </label>
-                                          ))}
-                                        </div>
+                                        {prescriptionOptions.length === 1 ? (
+                                          <p className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                                            This exercise only supports{" "}
+                                            <span className="font-medium">{prescriptionOptions[0]!.label}</span> in
+                                            programs.
+                                          </p>
+                                        ) : (
+                                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                                            {prescriptionOptions.map((opt) => (
+                                              <label
+                                                key={opt.id}
+                                                className={`flex min-w-0 flex-1 cursor-pointer flex-col rounded-lg border px-3 py-2.5 transition ${
+                                                  activeType === opt.id
+                                                    ? "border-black bg-gray-50 ring-1 ring-black"
+                                                    : "border-gray-200 bg-white hover:border-gray-300"
+                                                }`}
+                                              >
+                                                <span className="flex items-center gap-2">
+                                                  <input
+                                                    type="radio"
+                                                    name={`prescription-${entry.key}`}
+                                                    checked={activeType === opt.id}
+                                                    onChange={() =>
+                                                      setSessionExercisePrescriptionType(
+                                                        activeTrack.key,
+                                                        session.key,
+                                                        entry.key,
+                                                        opt.id
+                                                      )
+                                                    }
+                                                    className="h-4 w-4 border-gray-300 text-black focus:ring-black"
+                                                  />
+                                                  <span className="text-sm font-medium text-gray-900">{opt.label}</span>
+                                                </span>
+                                                <span className="mt-1 pl-6 text-xs text-gray-500">{opt.hint}</span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        )}
 
-                                        {entry.prescriptionType === "sets_reps" && (
+                                        {activeType === "sets_reps" && (
                                           <div className="mt-3 grid grid-cols-2 gap-2 sm:max-w-md">
                                             <div>
                                               <label
@@ -1773,7 +1815,7 @@ export function CreateProgramForm({
                                           </div>
                                         )}
 
-                                        {entry.prescriptionType === "time" && (
+                                        {activeType === "time" && (
                                           <div className="mt-3 max-w-xs">
                                             <label
                                               className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
@@ -1820,7 +1862,7 @@ export function CreateProgramForm({
                                           </div>
                                         )}
 
-                                        {entry.prescriptionType === "timed_intervals" && (
+                                        {activeType === "timed_intervals" && (
                                           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:max-w-xl">
                                             <div>
                                               <label
@@ -1999,7 +2041,8 @@ export function CreateProgramForm({
                                     </div>
                                   </div>
                                 </li>
-                              ))}
+                                );
+                              })}
                             </ul>
                           </>
                         )}
