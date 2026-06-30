@@ -10,28 +10,25 @@ export default async function OnboardingPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let initialName = "";
-  const isAuthenticated = Boolean(user);
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name, onboarding_completed_at")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profile?.onboarding_completed_at) {
-      redirect("/member");
-    }
-
-    initialName = profile?.full_name?.trim() ?? "";
+  if (!user) {
+    redirect("/signup");
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, onboarding_completed_at")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profile?.onboarding_completed_at) {
+    redirect("/member");
+  }
+
+  const metaName =
+    typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "";
+  const initialName = profile?.full_name?.trim() || metaName;
+
   return (
-    <OnboardingFlow
-      isAuthenticated={isAuthenticated}
-      initialName={initialName}
-      initialEmail={user?.email ?? ""}
-    />
+    <OnboardingFlow initialName={initialName} initialEmail={user.email ?? ""} />
   );
 }

@@ -266,3 +266,61 @@ export async function fetchProgramExercises(
   flat.sort((a, b) => a.order - b.order);
   return flat.map((f) => f.item);
 }
+
+export async function fetchProgramSessionExercises(
+  supabase: SupabaseClient,
+  sessionId: string
+): Promise<ProgramExerciseItem[]> {
+  const { data, error } = await supabase
+    .from("program_exercises")
+    .select(
+      `
+      id,
+      sort_order,
+      duration_minutes,
+      duration_seconds,
+      sets,
+      reps,
+      rest_between_sets_seconds,
+      rest_after_seconds,
+      session_phase,
+      choice_group,
+      exercises (
+        id,
+        title,
+        image_url,
+        video_url,
+        both_sides
+      )
+    `
+    )
+    .eq("session_id", sessionId)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  const items: ProgramExerciseItem[] = [];
+  for (const pe of data ?? []) {
+    const row = pe as ProgramExerciseNested;
+    const exRaw = row.exercises;
+    const ex = Array.isArray(exRaw) ? exRaw[0] : exRaw;
+    if (!ex?.id || !ex.title) continue;
+    items.push({
+      id: row.id,
+      exerciseId: ex.id,
+      title: ex.title,
+      image_url: ex.image_url?.trim() || null,
+      video_url: ex.video_url?.trim() || null,
+      bothSides: Boolean(ex.both_sides),
+      sessionPhase: row.session_phase ?? "main",
+      choiceGroup: row.choice_group?.trim() || null,
+      durationMinutes: row.duration_minutes,
+      durationSeconds: row.duration_seconds,
+      sets: row.sets,
+      reps: row.reps,
+      restBetweenSetsSeconds: row.rest_between_sets_seconds,
+      restAfterSeconds: row.rest_after_seconds,
+    });
+  }
+  return items;
+}

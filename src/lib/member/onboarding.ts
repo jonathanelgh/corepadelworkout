@@ -6,6 +6,17 @@ export const LEVEL_TO_PADEL_SLUG = {
 
 export type OnboardingLevel = keyof typeof LEVEL_TO_PADEL_SLUG;
 
+export const PADEL_SLUG_TO_LEVEL: Record<string, OnboardingLevel> = {
+  "padel-beginner": "beginner",
+  "padel-intermediate": "intermediate",
+  "padel-advanced": "advanced",
+};
+
+export function levelFromPadelSlug(slug: string | null | undefined): OnboardingLevel | null {
+  if (!slug) return null;
+  return PADEL_SLUG_TO_LEVEL[slug] ?? null;
+}
+
 export const ONBOARDING_GOAL_SLUGS = [
   "power",
   "speed",

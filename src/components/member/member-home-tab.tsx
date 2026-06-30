@@ -1,13 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Crown, Newspaper } from "lucide-react";
-import type { MemberHubBlogPost, MemberHubHomeProgram } from "@/lib/member/load-member-hub-data";
+import { ArrowRight, Crown, Newspaper, Play } from "lucide-react";
+import type { MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
+import type {
+  ActiveProgramSummary,
+  MemberHubBlogPost,
+  MemberHubHomeProgram,
+  QuickWorkoutSummary,
+} from "@/lib/member/load-member-hub-data";
 
 const COVER_FALLBACK = "/Padel_coach_standing.webp";
 
+function formatRenewalDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function MemberHomeTab({
   hasActivePro,
+  subscription,
+  activePrograms,
+  quickWorkouts,
   programs,
   programsError,
   posts,
@@ -15,6 +31,9 @@ export function MemberHomeTab({
   onBrowseWorkouts,
 }: {
   hasActivePro: boolean;
+  subscription: MemberSubscriptionStatus;
+  activePrograms: ActiveProgramSummary[];
+  quickWorkouts: QuickWorkoutSummary[];
   programs: MemberHubHomeProgram[];
   programsError: string | null;
   posts: MemberHubBlogPost[];
@@ -59,9 +78,125 @@ export function MemberHomeTab({
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
           <Crown className="h-5 w-5 shrink-0 text-emerald-700" />
           <p>
-            <span className="font-semibold">Pro is active.</span> You have access to all published programs.
+            <span className="font-semibold">
+              {subscription.planName ? `${subscription.planName} is active` : "Pro is active"}
+            </span>
+            {subscription.currentPeriodEnd && (
+              <>
+                {" "}
+                · renews {formatRenewalDate(subscription.currentPeriodEnd)}
+                {subscription.cancelAtPeriodEnd ? " (cancels at period end)" : ""}
+              </>
+            )}
+            {!subscription.currentPeriodEnd && " — you have access to all published programs."}
           </p>
         </div>
+      )}
+
+      {activePrograms.length > 0 && (
+        <section>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-zinc-900">Your training</h2>
+            <p className="text-sm text-zinc-500">Programs you&apos;ve started — pick up where you left off</p>
+          </div>
+          <ul className="space-y-3">
+            {activePrograms.map((p) => {
+              const pct =
+                p.totalSessions > 0 ? Math.round((p.completedCount / p.totalSessions) * 100) : 0;
+              const img = p.coverImageUrl?.trim() || COVER_FALLBACK;
+              return (
+                <li key={p.programId}>
+                  <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+                    <div className="flex flex-col sm:flex-row">
+                      <div className="relative aspect-16/10 w-full shrink-0 overflow-hidden bg-zinc-100 sm:aspect-auto sm:h-auto sm:w-36">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt="" className="h-full w-full object-cover" />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <Link
+                              href={p.trainingHref}
+                              className="font-semibold text-zinc-900 hover:text-emerald-800"
+                            >
+                              {p.title}
+                            </Link>
+                            <p className="mt-0.5 text-sm text-zinc-600">
+                              {p.isComplete
+                                ? "Program complete"
+                                : p.nextSessionName
+                                  ? `Next up · ${p.nextSessionName}`
+                                  : "Continue your plan"}
+                            </p>
+                          </div>
+                          <span className="text-xs font-medium text-zinc-500">
+                            {p.completedCount}/{p.totalSessions} days
+                          </span>
+                        </div>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                          <div
+                            className="h-full rounded-full bg-[#ccff00]"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        {!p.isComplete && (
+                          <Link
+                            href={p.trainingHref}
+                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
+                          >
+                            <Play className="h-4 w-4" />
+                            {p.nextSessionHref ? "Continue training" : "Open program"}
+                          </Link>
+                        )}
+                        {p.isComplete && (
+                          <Link
+                            href={p.trainingHref}
+                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 sm:w-auto"
+                          >
+                            View training log
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {quickWorkouts.length > 0 && (
+        <section>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-zinc-900">Quick workouts</h2>
+            <p className="text-sm text-zinc-500">One-off routines — warm up before a match anytime</p>
+          </div>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {quickWorkouts.map((w) => {
+              const img = w.coverImageUrl?.trim() || COVER_FALLBACK;
+              return (
+                <li key={w.programId}>
+                  <Link
+                    href={w.playHref}
+                    className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+                  >
+                    <div className="relative h-24 w-24 shrink-0 overflow-hidden bg-zinc-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img} alt="" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col justify-center p-4">
+                      <h3 className="font-semibold text-zinc-900">{w.title}</h3>
+                      {w.minutesPerSession != null && (
+                        <p className="mt-0.5 text-sm text-zinc-500">{w.minutesPerSession} min</p>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       <section>
@@ -87,20 +222,16 @@ export function MemberHomeTab({
           <p className="text-sm text-zinc-500">No published programs yet.</p>
         )}
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {programs.map((p) => {
-            const slug = p.slug?.trim();
-            if (!slug) return null;
-            const img = p.cover_image_url?.trim() || COVER_FALLBACK;
-            return (
-              <li key={slug}>
+          {programs.map((p) => (
+              <li key={p.slug}>
                 <Link
-                  href={`/programs/${slug}`}
+                  href={`/programs/${p.slug}`}
                   className="group flex h-full flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-300 hover:shadow-md"
                 >
                   <div className="relative aspect-16/10 w-full overflow-hidden bg-zinc-100">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={img}
+                      src={p.image || COVER_FALLBACK}
                       alt=""
                       className="h-full w-full object-cover transition group-hover:scale-[1.02]"
                     />
@@ -110,15 +241,22 @@ export function MemberHomeTab({
                     {p.description && (
                       <p className="mt-1 line-clamp-2 text-sm text-zinc-600">{p.description}</p>
                     )}
-                    <div className="mt-auto flex items-center justify-between pt-3 text-xs text-zinc-500">
-                      {p.price != null && <span>{Number(p.price).toFixed(0)} €</span>}
-                      {p.duration_weeks != null && <span>{p.duration_weeks} wk</span>}
+                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-3 text-xs text-zinc-500">
+                      {p.categoryName && (
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5">{p.categoryName}</span>
+                      )}
+                      {p.difficultyName && <span>{p.difficultyName}</span>}
+                      {p.durationLabel !== "—" && <span>{p.durationLabel}</span>}
+                      {p.isFree && (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
+                          Free
+                        </span>
+                      )}
                     </div>
                   </div>
                 </Link>
               </li>
-            );
-          })}
+          ))}
         </ul>
       </section>
 

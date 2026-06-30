@@ -10,7 +10,7 @@ import { ManageSubscriptionButton } from "@/components/billing/manage-subscripti
 const perks = [
   "All paid training programs",
   "Exercise library",
-  "AI Coach (when available)",
+  "AI Coach",
   "Cancel any time from your profile",
 ];
 

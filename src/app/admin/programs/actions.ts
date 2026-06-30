@@ -5,6 +5,13 @@ import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseChoiceGroup, parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
+import {
+  insertProgramCurriculum,
+  type TrackPayload,
+  type SessionPayload,
+  type ProgramExercisePayload,
+} from "@/lib/programs/program-curriculum";
+import { parseProgramFormat, type ProgramFormat } from "@/lib/programs/program-format";
 
 const ADMIN_PROGRAMS_PATH = "/admin/programs";
 
@@ -19,30 +26,6 @@ export type ProgramMediaUrls = {
   cover_image_url: string;
   promo_video_url: string;
   song_url: string;
-};
-
-type ProgramExercisePayload = {
-  exercise_id: string;
-  duration_minutes: number | null;
-  duration_seconds: number | null;
-  sets: number | null;
-  reps: number | null;
-  rest_between_sets_seconds: number | null;
-  rest_after_seconds: number | null;
-  session_phase: SessionPhase;
-  choice_group: string | null;
-};
-
-type SessionPayload = {
-  name: string;
-  description: string | null;
-  duration_minutes: number | null;
-  exercises: ProgramExercisePayload[];
-};
-
-type TrackPayload = {
-  location_id: string;
-  sessions: SessionPayload[];
 };
 
 function slugifyTitle(title: string): string {
@@ -193,7 +176,15 @@ function parseCurriculumJson(raw: FormDataEntryValue | null): TrackPayload[] | {
           }
         }
       }
-      out.push({ location_id: locRaw, sessions });
+      const weekSizesRaw = o.week_sizes;
+      let week_sizes: number[] | undefined;
+      if (Array.isArray(weekSizesRaw)) {
+        const parsed = weekSizesRaw
+          .map((n) => (typeof n === "number" ? n : Number.parseInt(String(n), 10)))
+          .filter((n) => Number.isFinite(n) && n > 0);
+        if (parsed.length > 0) week_sizes = parsed;
+      }
+      out.push({ location_id: locRaw, sessions, ...(week_sizes ? { week_sizes } : {}) });
     }
     const seen = new Set<string>();
     for (const t of out) {
@@ -278,9 +269,10 @@ export async function createProgram(
       cover_image_url: fields.cover_image_url,
       promo_video_url: fields.promo_video_url,
       song_url: fields.song_url,
-      price: fields.price,
-      compare_at_price: fields.compare_at_price,
+      price: null,
+      compare_at_price: null,
       is_free: fields.is_free,
+      program_format: fields.program_format,
       duration_weeks: fields.duration_weeks,
       sessions_per_week: fields.sessions_per_week,
       minutes_per_session: fields.minutes_per_session,
@@ -295,7 +287,10 @@ export async function createProgram(
 
   try {
     await syncProgramCategories(supabase, program.id, fields.category_ids);
-    await insertCurriculumForProgram(supabase, program.id, tracks);
+    await insertProgramCurriculum(supabase, program.id, tracks, {
+      programFormat: fields.program_format,
+      sessionsPerWeek: fields.sessions_per_week,
+    });
   } catch (e) {
     await supabase.from("programs").delete().eq("id", program.id);
     return { error: e instanceof Error ? e.message : "Could not save curriculum." };
@@ -326,62 +321,13 @@ async function syncProgramCategories(
 async function insertCurriculumForProgram(
   supabase: Awaited<ReturnType<typeof createClient>>,
   programId: string,
-  tracks: TrackPayload[]
+  tracks: TrackPayload[],
+  options: { programFormat: ProgramFormat; sessionsPerWeek: number | null }
 ): Promise<void> {
-  for (let ti = 0; ti < tracks.length; ti++) {
-    const tr = tracks[ti];
-    const { data: trackRow, error: tErr } = await supabase
-      .from("program_location_tracks")
-      .insert({
-        program_id: programId,
-        location_id: tr.location_id,
-        sort_order: ti,
-      })
-      .select("id")
-      .single();
-
-    if (tErr || !trackRow) {
-      throw new Error(tErr?.message ?? "Could not create location track.");
-    }
-
-    for (let si = 0; si < tr.sessions.length; si++) {
-      const s = tr.sessions[si];
-      const label = s.name.trim() || `Session ${si + 1}`;
-      const { data: sessionRow, error: sErr } = await supabase
-        .from("program_sessions")
-        .insert({
-          track_id: trackRow.id,
-          name: label,
-          description: s.description,
-          duration_minutes: s.duration_minutes,
-          sort_order: si,
-        })
-        .select("id")
-        .single();
-
-      if (sErr || !sessionRow) {
-        throw new Error(sErr?.message ?? "Could not create session.");
-      }
-
-      if (s.exercises.length > 0) {
-        const rows = s.exercises.map((ex, j) => ({
-          session_id: sessionRow.id,
-          exercise_id: ex.exercise_id,
-          sort_order: j,
-          duration_minutes: ex.duration_seconds != null ? null : ex.duration_minutes,
-          duration_seconds: ex.duration_seconds,
-          sets: ex.sets,
-          reps: ex.reps,
-          rest_between_sets_seconds: ex.rest_between_sets_seconds,
-          rest_after_seconds: ex.rest_after_seconds,
-          session_phase: ex.session_phase,
-          choice_group: ex.choice_group,
-        }));
-        const { error: peError } = await supabase.from("program_exercises").insert(rows);
-        if (peError) throw new Error(peError.message);
-      }
-    }
-  }
+  await insertProgramCurriculum(supabase, programId, tracks, {
+    programFormat: options.programFormat,
+    sessionsPerWeek: options.sessionsPerWeek,
+  });
 }
 
 function parseCategoryIds(formData: FormData): string[] {
@@ -406,9 +352,8 @@ function parseProgramFields(
   cover_image_url: string | null;
   promo_video_url: string | null;
   song_url: string | null;
-  price: number | null;
-  compare_at_price: number | null;
   is_free: boolean;
+  program_format: ProgramFormat;
   duration_weeks: number | null;
   sessions_per_week: number | null;
   minutes_per_session: number | null;
@@ -421,11 +366,16 @@ function parseProgramFields(
   const cover_image_url = mediaUrls.cover_image_url.trim() || null;
   const promo_video_url = mediaUrls.promo_video_url.trim() || null;
   const song_url = mediaUrls.song_url.trim() || null;
-  const price = parseOptionalNumber(formData.get("price"));
-  const compare_at_price = parseOptionalNumber(formData.get("compare_at_price"));
   const is_free = formData.get("is_free") === "1" || formData.get("is_free") === "on";
-  const duration_weeks = parseOptionalNonNegInt(formData.get("duration_weeks"));
-  const sessions_per_week = parseOptionalNonNegInt(formData.get("sessions_per_week"));
+  const program_format = parseProgramFormat(formData.get("program_format"));
+  const duration_weeks =
+    program_format === "single_workout"
+      ? null
+      : parseOptionalNonNegInt(formData.get("duration_weeks"));
+  const sessions_per_week =
+    program_format === "single_workout"
+      ? null
+      : parseOptionalNonNegInt(formData.get("sessions_per_week"));
   const minutes_per_session = parseOptionalNonNegInt(formData.get("minutes_per_session"));
 
   const category_ids = parseCategoryIds(formData);
@@ -445,9 +395,8 @@ function parseProgramFields(
     cover_image_url,
     promo_video_url,
     song_url,
-    price,
-    compare_at_price,
     is_free,
+    program_format,
     duration_weeks,
     sessions_per_week,
     minutes_per_session,
@@ -514,9 +463,10 @@ export async function updateProgram(
       cover_image_url: fields.cover_image_url,
       promo_video_url: fields.promo_video_url,
       song_url: fields.song_url,
-      price: fields.price,
-      compare_at_price: fields.compare_at_price,
+      price: null,
+      compare_at_price: null,
       is_free: fields.is_free,
+      program_format: fields.program_format,
       duration_weeks: fields.duration_weeks,
       sessions_per_week: fields.sessions_per_week,
       minutes_per_session: fields.minutes_per_session,
@@ -540,7 +490,10 @@ export async function updateProgram(
   }
 
   try {
-    await insertCurriculumForProgram(supabase, programId, tracks);
+    await insertProgramCurriculum(supabase, programId, tracks, {
+      programFormat: fields.program_format,
+      sessionsPerWeek: fields.sessions_per_week,
+    });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not save curriculum." };
   }
@@ -651,6 +604,7 @@ export async function duplicateProgram(formData: FormData) {
       price,
       compare_at_price,
       is_free,
+      program_format,
       duration_weeks,
       sessions_per_week,
       minutes_per_session,
@@ -723,9 +677,10 @@ export async function duplicateProgram(formData: FormData) {
       cover_image_url: src.cover_image_url,
       promo_video_url: src.promo_video_url,
       song_url: src.song_url,
-      price: src.price,
-      compare_at_price: src.compare_at_price,
+      price: null,
+      compare_at_price: null,
       is_free: src.is_free,
+      program_format: parseProgramFormat(src.program_format),
       duration_weeks: src.duration_weeks,
       sessions_per_week: src.sessions_per_week,
       minutes_per_session: src.minutes_per_session,
@@ -740,7 +695,10 @@ export async function duplicateProgram(formData: FormData) {
 
   try {
     await syncProgramCategories(supabase, inserted.id, categoryIds);
-    await insertCurriculumForProgram(supabase, inserted.id, tracks);
+    await insertCurriculumForProgram(supabase, inserted.id, tracks, {
+      programFormat: parseProgramFormat(src.program_format),
+      sessionsPerWeek: src.sessions_per_week,
+    });
   } catch (e) {
     await supabase.from("programs").delete().eq("id", inserted.id);
     redirectProgramsError(e instanceof Error ? e.message : "Could not copy curriculum.");

@@ -1,6 +1,6 @@
 import { ArrowLeft, Clock, Music, Star, Target, Zap } from "lucide-react";
-import Link from "next/link";
 import { ProgramHeroPlayer } from "./program-hero-player";
+import { BackButton } from "@/components/navigation/back-button";
 
 type Props = {
   programTitle: string;
@@ -40,12 +40,13 @@ export function ProgramExperienceLayout({
   return (
     <div className="min-h-screen bg-white pb-24 font-sans text-black selection:bg-[#ccff00] selection:text-black md:pb-0">
       <div className="fixed top-0 right-0 left-0 z-50 flex items-center justify-between bg-linear-to-b from-white via-white/80 to-transparent px-4 pt-4 pb-6 md:hidden">
-        <Link
-          href={backHref}
+        <BackButton
+          fallbackHref={backHref}
+          ariaLabel={backLabel}
           className="-ml-2 rounded-full bg-white/50 p-2 text-gray-800 shadow-sm backdrop-blur-md hover:text-black"
         >
           <ArrowLeft className="h-6 w-6" />
-        </Link>
+        </BackButton>
         <span className="max-w-[55%] truncate rounded-full bg-white/50 px-4 py-1.5 text-sm font-semibold shadow-sm backdrop-blur-md">
           {programTitle}
         </span>
@@ -61,13 +62,14 @@ export function ProgramExperienceLayout({
             className="h-full min-h-[60vh] md:min-h-0"
           />
 
-          <Link
-            href={backHref}
+          <BackButton
+            fallbackHref={backHref}
+            ariaLabel={backLabel}
             className="absolute top-8 left-8 z-20 hidden items-center gap-2 rounded-full bg-black/20 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-md transition-colors hover:text-white md:flex"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>{backLabel}</span>
-          </Link>
+          </BackButton>
 
           <div className="absolute right-0 bottom-0 left-0 z-20 p-6 text-white md:hidden">
             <div className="mb-3 flex items-center gap-2">

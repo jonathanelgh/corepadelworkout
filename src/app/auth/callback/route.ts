@@ -1,11 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/onboarding/apply";
+  const next = searchParams.get("next") ?? "/onboarding";
 
   if (code) {
     const cookieStore = await cookies();
@@ -28,10 +29,18 @@ export async function GET(request: Request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/onboarding/apply";
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const safeNext =
+        user != null
+          ? await resolvePostAuthRedirect(supabase, user.id, next)
+          : next.startsWith("/") && !next.startsWith("//")
+            ? next
+            : "/onboarding";
       return NextResponse.redirect(`${origin}${safeNext}`);
     }
   }
 
-  return NextResponse.redirect(`${origin}/onboarding?error=auth`);
+  return NextResponse.redirect(`${origin}/signup?error=auth`);
 }

@@ -11,5 +11,15 @@ export default async function MemberLayout({ children }: { children: React.React
     redirect(`/login?next=${encodeURIComponent("/member")}`);
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("onboarding_completed_at")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.onboarding_completed_at) {
+    redirect("/onboarding");
+  }
+
   return children;
 }

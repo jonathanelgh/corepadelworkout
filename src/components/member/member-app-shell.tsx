@@ -36,7 +36,7 @@ const desktopNav: { tab: MemberTab; label: string; icon: typeof Home }[] = [
 const mobileTabs: { tab: MemberTab; label: string; icon: typeof Home }[] = [
   { tab: "home", label: "Home", icon: Home },
   { tab: "workouts", label: "Workouts", icon: Dumbbell },
-  { tab: "custom", label: "Custom", icon: Sparkles },
+  { tab: "custom", label: "Coach", icon: Sparkles },
   { tab: "profile", label: "Profile", icon: User },
 ];
 
@@ -219,6 +219,9 @@ export function MemberAppShell({
             <div style={panelStyle(tab === "home")} aria-hidden={tab !== "home"}>
               <MemberHomeTab
                 hasActivePro={hubData.hasActivePro}
+                subscription={hubData.subscription}
+                activePrograms={hubData.activePrograms}
+                quickWorkouts={hubData.quickWorkouts}
                 programs={hubData.homePrograms}
                 programsError={hubData.homeProgramsError}
                 posts={hubData.blogPosts}

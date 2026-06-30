@@ -43,7 +43,7 @@ export type ProgramRow = {
   description: string | null;
   cover_image_url: string | null;
   duration_weeks: number | null;
-  price: number | null;
+  price?: number | null;
   /** Many-to-many categories (preferred). */
   program_categories?: ProgramCategoryLinkRow[] | ProgramCategoryLinkRow | null;
   /** @deprecated Legacy single relation; kept for compatibility if present in old queries. */
@@ -73,7 +73,7 @@ export function mapProgramRowToCard(row: ProgramRow): ProgramCard | null {
     categoryNames,
     difficultyName: diff?.name ?? null,
     durationLabel: formatDurationWeeks(row.duration_weeks),
-    price: row.price,
+    price: row.price ?? null,
   };
 }
 

@@ -2,12 +2,6 @@
 
 import { createClient } from "@/utils/supabase/server";
 
-function safeNextPath(next: string | null | undefined): string {
-  const trimmed = next?.trim() ?? "";
-  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) return trimmed;
-  return "/member";
-}
-
 export async function sendLoginMagicLink(input: {
   email: string;
   next?: string | null;
@@ -18,7 +12,10 @@ export async function sendLoginMagicLink(input: {
     return { error: "Enter your email address." };
   }
 
-  const next = safeNextPath(input.next);
+  const nextParam = input.next?.trim();
+  const next =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/member";
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,

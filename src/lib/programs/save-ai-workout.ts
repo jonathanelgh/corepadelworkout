@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkoutProposal } from "./ai-coach-gemini";
+import { insertProgramCurriculum, type ProgramExercisePayload } from "./program-curriculum";
 import { slugifyTitle, uniqueProgramSlug } from "./program-slug";
 
 function estimateTotalMinutes(proposal: WorkoutProposal): number {
@@ -74,9 +75,10 @@ export async function saveAiWorkoutProgram(
       slug,
       description: proposal.description,
       status,
+      program_format: "single_workout",
       minutes_per_session: totalMinutes,
-      sessions_per_week: 1,
-      duration_weeks: 1,
+      sessions_per_week: null,
+      duration_weeks: null,
     })
     .select("id, slug, title")
     .single();
@@ -87,51 +89,37 @@ export async function saveAiWorkoutProgram(
 
   const programId = program.id as string;
 
+  const exerciseRows: ProgramExercisePayload[] = proposal.exercises.map((ex) => ({
+    exercise_id: ex.exercise_id,
+    duration_minutes: null,
+    duration_seconds: ex.duration_minutes ? Math.ceil(ex.duration_minutes * 60) : null,
+    sets: ex.sets ? Math.ceil(ex.sets) : null,
+    reps: ex.reps ? Math.ceil(ex.reps) : null,
+    rest_between_sets_seconds: null,
+    rest_after_seconds: Math.ceil(ex.rest_after_seconds ?? 0),
+    session_phase: ex.phase,
+    choice_group: ex.choice_group ?? null,
+  }));
+
   try {
-    const { data: track, error: trackErr } = await supabase
-      .from("program_location_tracks")
-      .insert({
-        program_id: programId,
-        location_id: homeLocationId,
-        sort_order: 0,
-      })
-      .select("id")
-      .single();
-
-    if (trackErr || !track) {
-      throw new Error(trackErr?.message ?? "Could not create location track.");
-    }
-
-    const { data: session, error: sessionErr } = await supabase
-      .from("program_sessions")
-      .insert({
-        track_id: track.id,
-        name: "Day 1",
-        duration_minutes: totalMinutes,
-        sort_order: 0,
-      })
-      .select("id")
-      .single();
-
-    if (sessionErr || !session) {
-      throw new Error(sessionErr?.message ?? "Could not create session.");
-    }
-
-    const exerciseRows = proposal.exercises.map((ex, i) => ({
-      session_id: session.id as string,
-      exercise_id: ex.exercise_id,
-      sort_order: i,
-      duration_minutes: null,
-      duration_seconds: ex.duration_minutes ? Math.ceil(ex.duration_minutes * 60) : null,
-      sets: ex.sets ? Math.ceil(ex.sets) : null,
-      reps: ex.reps ? Math.ceil(ex.reps) : null,
-      rest_after_seconds: Math.ceil(ex.rest_after_seconds ?? 0),
-      session_phase: ex.phase,
-      choice_group: ex.choice_group ?? null,
-    }));
-
-    const { error: linkErr } = await supabase.from("program_exercises").insert(exerciseRows);
-    if (linkErr) throw new Error(linkErr.message);
+    await insertProgramCurriculum(
+      supabase,
+      programId,
+      [
+        {
+          location_id: homeLocationId,
+          sessions: [
+            {
+              name: proposal.title.trim() || "Workout",
+              description: proposal.description?.trim() || null,
+              duration_minutes: totalMinutes,
+              exercises: exerciseRows,
+            },
+          ],
+        },
+      ],
+      { programFormat: "single_workout", sessionsPerWeek: null }
+    );
   } catch (e) {
     await supabase.from("programs").delete().eq("id", programId);
     throw e;

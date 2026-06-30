@@ -1,12 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-function safeNextPath(next: string | null | undefined): string {
-  const trimmed = next?.trim() ?? "";
-  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) return trimmed;
-  return "/member";
-}
+import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 
 function loginRedirectUrl(request: Request, params: Record<string, string>) {
   const url = new URL("/login", request.url);
@@ -32,8 +27,7 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies();
-  const targetPath = safeNextPath(next);
-  let response = NextResponse.redirect(new URL(targetPath, request.url));
+  let response = NextResponse.redirect(new URL("/member", request.url));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +47,7 @@ export async function POST(request: Request) {
     }
   );
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     const msg = error.message.toLowerCase();
@@ -64,6 +58,16 @@ export async function POST(request: Request) {
 
     return NextResponse.redirect(loginRedirectUrl(request, { error: friendly, next }));
   }
+
+  const userId = signInData.user?.id;
+  if (!userId) {
+    return NextResponse.redirect(
+      loginRedirectUrl(request, { error: "Sign in failed. Try again.", next })
+    );
+  }
+
+  const targetPath = await resolvePostAuthRedirect(supabase, userId, next || null);
+  response = NextResponse.redirect(new URL(targetPath, request.url));
 
   return response;
 }

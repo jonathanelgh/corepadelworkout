@@ -13,18 +13,16 @@ import {
   normalizePainSelection,
 } from "@/lib/member/onboarding";
 
-export type OnboardingPayload = {
+export type UpdateMemberProfilePayload = {
   displayName: string;
   level: OnboardingLevel;
   pains: PainKey[];
   goal: OnboardingGoal;
   environments: OnboardingEnvironment[];
-  /** When set, must match the signed-in user's email (magic-link sign-up flow). */
-  signupEmail?: string;
 };
 
-export async function completeOnboarding(
-  payload: OnboardingPayload,
+export async function updateMemberProfile(
+  payload: UpdateMemberProfilePayload,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const name = payload.displayName.trim();
   if (name.length < 1 || name.length > 80) {
@@ -45,10 +43,12 @@ export async function completeOnboarding(
     return { ok: false, message: "Invalid goal." };
   }
 
-  const envs: OnboardingEnvironment[] = ["gym", "home", "club"];
-  const environments = [...new Set(payload.environments)].filter((v): v is OnboardingEnvironment => envs.includes(v));
+  const envOptions: OnboardingEnvironment[] = ["gym", "home", "club"];
+  const environments = [...new Set(payload.environments)].filter((v): v is OnboardingEnvironment =>
+    envOptions.includes(v),
+  );
   if (environments.length === 0) {
-    return { ok: false, message: "Invalid training location." };
+    return { ok: false, message: "Pick at least one training location." };
   }
 
   const supabase = await createClient();
@@ -56,18 +56,7 @@ export async function completeOnboarding(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return { ok: false, message: "You need to be signed in. Create an account first." };
-  }
-
-  if (payload.signupEmail) {
-    const a = user.email?.trim().toLowerCase() ?? "";
-    const b = payload.signupEmail.trim().toLowerCase();
-    if (!a || a !== b) {
-      return {
-        ok: false,
-        message: "Sign in with the same email you used for the magic link to finish setup.",
-      };
-    }
+    return { ok: false, message: "You need to be signed in." };
   }
 
   const slug = LEVEL_TO_PADEL_SLUG[payload.level];
@@ -90,16 +79,14 @@ export async function completeOnboarding(
       primary_goal: payload.goal,
       training_environment: environments[0],
       training_environments: environments,
-      onboarding_completed_at: new Date().toISOString(),
     })
     .eq("id", user.id);
 
   if (error) {
-    console.error("onboarding update", error);
+    console.error("profile update", error);
     return { ok: false, message: error.message || "Could not save your profile." };
   }
 
   revalidatePath("/member", "layout");
-  revalidatePath("/onboarding");
   return { ok: true };
 }

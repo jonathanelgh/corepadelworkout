@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { CheckCircle2 } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { fetchProgramExercises } from "@/lib/programs/program-exercises";
+import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
+import { loadProgramProgress } from "@/lib/programs/program-progress";
+import { programTrainingHref } from "@/lib/programs/program-routes";
+import { ProgramSchedulePanel } from "@/components/programs/program-schedule-panel";
 import { ProgramExperienceLayout } from "../program-experience-layout";
 import { ProgramAccessBar } from "../program-access-bar";
 import { ProgramDetailTabs } from "@/components/programs/program-detail-tabs";
@@ -19,6 +23,7 @@ type ProgramRow = {
   song_url: string | null;
   price: number | null;
   is_free: boolean;
+  program_format: string | null;
   duration_weeks: number | null;
   sessions_per_week: number | null;
   minutes_per_session: number | null;
@@ -64,7 +69,10 @@ function formatStatMins(n: number | null): string {
   return `${n} Min${n === 1 ? "" : "s"}`;
 }
 
-type PageProps = { params: Promise<{ slug: string }> };
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ view?: string; upgrade?: string }>;
+};
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -87,8 +95,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function ProgramDetail({ params }: PageProps) {
+export default async function ProgramDetail({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const sp = await searchParams;
   const supabase = await createClient();
 
   const { data: raw, error } = await supabase
@@ -104,6 +113,7 @@ export default async function ProgramDetail({ params }: PageProps) {
       song_url,
       price,
       is_free,
+      program_format,
       duration_weeks,
       sessions_per_week,
       minutes_per_session,
@@ -124,7 +134,31 @@ export default async function ProgramDetail({ params }: PageProps) {
   }
 
   const program = raw as ProgramRow;
+  const programFormat = parseProgramFormat(program.program_format);
   const exercises = await fetchProgramExercises(supabase, program.id);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let progress = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("training_environment, training_environments")
+      .eq("id", user.id)
+      .maybeSingle();
+    progress = await loadProgramProgress(supabase, user.id, program.id, profile, programFormat);
+  }
+
+  if (
+    user &&
+    usesProgramProgress(programFormat) &&
+    progress?.runId &&
+    sp.view !== "info"
+  ) {
+    redirect(programTrainingHref(slug));
+  }
 
   const outcomes = normalizeOutcomes(program.outcomes);
   const aboutBlocks = bodyParagraphs(program.body, program.description);
@@ -144,8 +178,10 @@ export default async function ProgramDetail({ params }: PageProps) {
       heroImage={heroImage}
       promoVideoUrl={program.promo_video_url}
       songUrl={program.song_url}
-      statWeeks={formatStatWeeks(program.duration_weeks)}
-      statFrequency={formatStatFrequency(program.sessions_per_week)}
+      statWeeks={programFormat === "single_workout" ? "—" : formatStatWeeks(program.duration_weeks)}
+      statFrequency={
+        programFormat === "single_workout" ? "One-off" : formatStatFrequency(program.sessions_per_week)
+      }
       statMinutes={formatStatMins(program.minutes_per_session)}
       backHref="/programs"
       backLabel="Back to programs"
@@ -155,9 +191,14 @@ export default async function ProgramDetail({ params }: PageProps) {
           programSlug={slug}
           isFree={program.is_free}
           minutesPerSession={program.minutes_per_session}
+          programFormat={programFormat}
         />
       }
     >
+      {usesProgramProgress(programFormat) && progress && progress.totalSessions > 0 && (
+        <ProgramSchedulePanel programSlug={slug} progress={progress} />
+      )}
+
       <ProgramDetailTabs description={detailsText} exercises={exercises} />
 
       {aboutBlocks.length > 0 && (

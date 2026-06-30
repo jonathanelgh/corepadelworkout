@@ -26,14 +26,9 @@ import {
   Zap,
 } from "lucide-react";
 import type { OnboardingEnvironment, OnboardingGoal, OnboardingLevel, PainKey } from "@/lib/member/onboarding";
-import {
-  PENDING_ONBOARDING_STORAGE_KEY,
-  type PendingOnboardingV1,
-} from "@/lib/member/pending-onboarding";
-import { createClient } from "@/utils/supabase/client";
 import { completeOnboarding } from "./actions";
 
-const STEPS = 7;
+const STEPS = 6;
 
 const LEVELS: {
   id: OnboardingLevel;
@@ -164,24 +159,20 @@ function displayClassName(extra = "") {
 export function OnboardingFlow({
   initialName,
   initialEmail,
-  isAuthenticated,
 }: {
   initialName: string;
   initialEmail: string;
-  isAuthenticated: boolean;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [showPrivacyNote, setShowPrivacyNote] = useState(true);
   const [name, setName] = useState(initialName);
-  const [email, setEmail] = useState(initialEmail);
   const [level, setLevel] = useState<OnboardingLevel | null>(null);
   const [pains, setPains] = useState<PainKey[]>([]);
   const [goal, setGoal] = useState<OnboardingGoal | null>(null);
   const [environments, setEnvironments] = useState<OnboardingEnvironment[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const handleBack = useCallback(() => {
     if (submitting) return;
@@ -220,12 +211,10 @@ export function OnboardingFlow({
         return goal !== null;
       case 5:
         return environments.length > 0;
-      case 6:
-        return isAuthenticated ? true : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
       default:
         return false;
     }
-  }, [step, name, level, pains, goal, environments, email, isAuthenticated]);
+  }, [step, name, level, pains, goal, environments]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -244,56 +233,21 @@ export function OnboardingFlow({
     if (!level || !goal || environments.length === 0 || pains.length === 0) return;
     setSubmitting(true);
     setError(null);
-    setMagicLinkSent(false);
 
-    const payload = {
+    const res = await completeOnboarding({
       displayName: name.trim(),
       level,
       pains,
       goal,
       environments,
-    };
-
-    if (isAuthenticated) {
-      const res = await completeOnboarding(payload);
-      setSubmitting(false);
-      if (!res.ok) {
-        setError(res.message);
-        return;
-      }
-      router.push("/member");
-      router.refresh();
-      return;
-    }
-
-    const trimmedEmail = email.trim();
-    const pending: PendingOnboardingV1 = {
-      v: 1,
-      ...payload,
-      signupEmail: trimmedEmail,
-    };
-
-    try {
-      localStorage.setItem(PENDING_ONBOARDING_STORAGE_KEY, JSON.stringify(pending));
-    } catch {
-      setSubmitting(false);
-      setError("Could not save your answers in this browser. Try again or use another browser.");
-      return;
-    }
-
-    const supabase = createClient();
-    const callback = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/onboarding/apply")}`;
-    const { error: magicErr } = await supabase.auth.signInWithOtp({
-      email: trimmedEmail,
-      options: { emailRedirectTo: callback },
     });
     setSubmitting(false);
-    if (magicErr) {
-      localStorage.removeItem(PENDING_ONBOARDING_STORAGE_KEY);
-      setError(magicErr.message || "Could not send magic link right now.");
+    if (!res.ok) {
+      setError(res.message);
       return;
     }
-    setMagicLinkSent(true);
+    router.push("/member");
+    router.refresh();
   }
 
   return (
@@ -548,50 +502,15 @@ export function OnboardingFlow({
                 <Target className="mt-0.5 h-5 w-5 shrink-0 text-[#ccff00]/80" />
                 <p>
                   You&apos;re all set, <span className="font-medium text-zinc-900">{name.trim() || "champion"}</span>! 🎉
-                  Tap below to open your dashboard — everything will adapt to what you picked.
+                  Tap below to save your plan and open your dashboard.
+                  {initialEmail ? (
+                    <>
+                      {" "}
+                      Signed in as <span className="font-medium text-zinc-900">{initialEmail}</span>.
+                    </>
+                  ) : null}
                 </p>
               </div>
-            </>
-          )}
-
-          {step === 6 && (
-            <>
-              <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
-                {isAuthenticated ? "Save your plan & head to your hub 🎾" : "Create your personal Padel training hub 🎾"}
-              </h2>
-              {isAuthenticated ? (
-                <>
-                  <p className="mt-2 text-base text-zinc-600">
-                    You&apos;re signed in as <span className="font-medium text-zinc-900">{initialEmail || email}</span>.
-                    Tap below to save your answers and open your dashboard.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="mt-2 text-base text-zinc-600">
-                    Enter your email and we&apos;ll create your account instantly.
-                  </p>
-                  <p className="mt-1 text-base text-zinc-600">
-                    We&apos;ll send you a secure magic link so you can jump straight into your personalized plan — no
-                    password needed.
-                  </p>
-                  <label className="mt-8 block">
-                    <span className="mb-1.5 block text-sm font-medium text-zinc-700">Email</span>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 py-4 text-lg text-zinc-900 outline-none ring-0 transition placeholder:text-zinc-400 focus:border-[#ccff00]/90"
-                    />
-                  </label>
-                  {magicLinkSent && (
-                    <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                      Magic link sent! Check your inbox 📬 — then come back here after you tap the link.
-                    </p>
-                  )}
-                </>
-              )}
             </>
           )}
         </div>
@@ -641,18 +560,18 @@ export function OnboardingFlow({
               <button
                 type="button"
                 onClick={() => void handleFinish()}
-                disabled={!canContinue || submitting || (!isAuthenticated && magicLinkSent)}
+                disabled={!canContinue || submitting}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#ccff00] px-6 py-3.5 text-sm font-bold text-zinc-950 shadow-lg shadow-[#ccff00]/25 transition hover:bg-[#b8e600] sm:w-auto disabled:pointer-events-none disabled:opacity-40"
               >
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {isAuthenticated ? "Saving…" : "Sending link…"}
+                    Saving…
                   </>
                 ) : (
                   <>
                     <Timer className="h-4 w-4" />
-                    {isAuthenticated ? "Save & go to hub" : "Send my magic link"}
+                    Save & go to dashboard
                   </>
                 )}
               </button>

@@ -132,6 +132,7 @@ export async function saveAiProgram(
       minutes_per_session: minutesPerSession,
       sessions_per_week: sessionsPerWeek,
       duration_weeks: durationWeeks,
+      program_format: "training_plan",
     })
     .select("id, slug, title")
     .single();
@@ -143,7 +144,10 @@ export async function saveAiProgram(
   const programId = program.id as string;
 
   try {
-    await insertProgramCurriculum(supabase, programId, tracks);
+    await insertProgramCurriculum(supabase, programId, tracks, {
+      programFormat: "training_plan",
+      sessionsPerWeek,
+    });
   } catch (e) {
     await supabase.from("programs").delete().eq("id", programId);
     throw e;

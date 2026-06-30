@@ -68,7 +68,7 @@ export function SubscriptionSettings({
           {[
             "All paid training programs",
             "Exercise library",
-            "AI Coach (when available)",
+            "AI Coach",
           ].map((perk) => (
             <li key={perk} className="flex gap-2 text-sm text-zinc-700">
               <Check className="h-4 w-4 shrink-0 text-emerald-600" />

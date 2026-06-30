@@ -67,10 +67,10 @@ function LoginForm() {
             CORE<span className="text-[#ccff00]">PADEL</span>
           </Link>
           <Link
-            href="/onboarding/apply"
+            href="/signup"
             className="hidden rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15 md:inline-flex"
           >
-            Get Started Now
+            Create account
           </Link>
         </header>
 
@@ -180,7 +180,10 @@ function LoginForm() {
                     {pending ? "Sending…" : "Email me a sign-in link"}
                   </button>
                   <p className="text-center text-xs text-white/50">
-                    Signed up via onboarding? Use the magic link — no password needed.
+                    New here?{" "}
+                    <Link href="/signup" className="font-medium text-white underline underline-offset-4 hover:text-white/80">
+                      Create an account
+                    </Link>
                   </p>
                 </form>
               )}

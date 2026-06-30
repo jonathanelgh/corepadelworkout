@@ -45,6 +45,7 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isAdminRoute = path.startsWith("/admin")
   const isLoginRoute = path === "/login"
+  const isSignupRoute = path === "/signup"
   const code = request.nextUrl.searchParams.get("code")
 
   // Supabase may fall back to Site URL (/) when redirect URLs are not allowlisted.
@@ -75,11 +76,22 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  if (user && isLoginRoute) {
+  if (user && (isLoginRoute || isSignupRoute)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarding_completed_at")
+      .eq("id", user.id)
+      .maybeSingle()
+
     const next = request.nextUrl.searchParams.get("next")
     const safeNext =
-      next && next.startsWith("/") && !next.startsWith("//") ? next : "/member"
-    return withSessionCookies(NextResponse.redirect(new URL(safeNext, request.url)))
+      next && next.startsWith("/") && !next.startsWith("//") ? next : null
+
+    const target = profile?.onboarding_completed_at
+      ? safeNext ?? "/member"
+      : "/onboarding"
+
+    return withSessionCookies(NextResponse.redirect(new URL(target, request.url)))
   }
 
   return supabaseResponse

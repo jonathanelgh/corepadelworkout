@@ -10,6 +10,7 @@ import {
 } from "@/lib/exercises/program-prescription-mode";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import type { SessionPhase } from "@/lib/programs/session-phase";
+import type { ProgramFormat } from "@/lib/programs/program-format";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -110,6 +111,8 @@ export type TrackBlock = {
   key: string;
   locationId: string;
   sessions: SessionBlock[];
+  /** Day counts per week; when omitted, derived from frequency on first render */
+  weekSizes?: number[];
 };
 
 export type ProgramFormInitialValues = {
@@ -121,13 +124,12 @@ export type ProgramFormInitialValues = {
   coverImageUrl: string;
   promoVideoUrl: string;
   songUrl: string;
-  price: string;
-  compareAtPrice: string;
   isFree: boolean;
   status: "draft" | "published";
   durationWeeks: string;
   sessionsPerWeek: string;
   minutesPerSession: string;
+  programFormat: ProgramFormat;
   outcomes: string[];
   tracks: TrackBlock[];
 };
@@ -176,6 +178,60 @@ function effectiveSessionsPerWeek(raw: string, sessionCount: number): number {
   return Math.max(1, sessionCount);
 }
 
+function defaultSessionsPerWeekForNewWeek(raw: string): number {
+  const n = Number.parseInt(raw.trim(), 10);
+  if (Number.isFinite(n) && n > 0) return n;
+  return 3;
+}
+
+function resolveWeekSizes(track: TrackBlock, sessionsPerWeekRaw: string): number[] {
+  if (track.weekSizes?.length) {
+    const total = track.weekSizes.reduce((sum, n) => sum + n, 0);
+    if (total === track.sessions.length) return track.weekSizes;
+  }
+  const perWeek = effectiveSessionsPerWeek(sessionsPerWeekRaw, track.sessions.length);
+  const sizes: number[] = [];
+  for (let i = 0; i < track.sessions.length; i += perWeek) {
+    sizes.push(Math.min(perWeek, track.sessions.length - i));
+  }
+  return sizes.length > 0 ? sizes : [Math.max(1, track.sessions.length)];
+}
+
+function sessionIndexToWeek(weekSizes: number[], index: number): number {
+  let acc = 0;
+  for (let wi = 0; wi < weekSizes.length; wi++) {
+    acc += weekSizes[wi]!;
+    if (index < acc) return wi;
+  }
+  return Math.max(0, weekSizes.length - 1);
+}
+
+function groupSessionsByWeekSizes(
+  sessions: SessionBlock[],
+  weekSizes: number[]
+): { weekIndex: number; items: { session: SessionBlock; globalIndex: number }[] }[] {
+  const weeks: { weekIndex: number; items: { session: SessionBlock; globalIndex: number }[] }[] = [];
+  let i = 0;
+  for (let wi = 0; wi < weekSizes.length; wi++) {
+    const size = weekSizes[wi]!;
+    const chunk = sessions.slice(i, i + size);
+    if (chunk.length === 0) continue;
+    weeks.push({
+      weekIndex: weeks.length,
+      items: chunk.map((session, j) => ({ session, globalIndex: i + j })),
+    });
+    i += size;
+  }
+  return weeks;
+}
+
+function groupSessionsByWeek(
+  sessions: SessionBlock[],
+  sessionsPerWeekRaw: string
+): { weekIndex: number; items: { session: SessionBlock; globalIndex: number }[] }[] {
+  return groupSessionsByWeekSizes(sessions, resolveWeekSizes({ key: "", locationId: "", sessions }, sessionsPerWeekRaw));
+}
+
 function deriveDuplicatedSessionName(srcName: string, dayNumber: number, weekNumber: number): string {
   const trimmed = srcName.trim();
   if (/^day\s+\d+/i.test(trimmed)) {
@@ -185,20 +241,12 @@ function deriveDuplicatedSessionName(srcName: string, dayNumber: number, weekNum
   return `Day ${dayNumber}`;
 }
 
-function groupSessionsByWeek(
-  sessions: SessionBlock[],
-  sessionsPerWeekRaw: string
-): { weekIndex: number; items: { session: SessionBlock; globalIndex: number }[] }[] {
-  const perWeek = effectiveSessionsPerWeek(sessionsPerWeekRaw, sessions.length);
-  const weeks: { weekIndex: number; items: { session: SessionBlock; globalIndex: number }[] }[] = [];
-  for (let i = 0; i < sessions.length; i += perWeek) {
-    const chunk = sessions.slice(i, i + perWeek);
-    weeks.push({
-      weekIndex: weeks.length,
-      items: chunk.map((session, j) => ({ session, globalIndex: i + j })),
-    });
-  }
-  return weeks;
+function weekSectionKey(trackKey: string, weekIndex: number) {
+  return `${trackKey}|week-${weekIndex}`;
+}
+
+function sessionSectionKey(trackKey: string, sessionKey: string) {
+  return `${trackKey}|session-${sessionKey}`;
 }
 
 function extFromFile(file: File, fallback: string) {
@@ -259,6 +307,7 @@ export function CreateProgramForm({
             key: crypto.randomUUID(),
             locationId: defaultLocationId,
             sessions: [newSession(1)],
+            weekSizes: [1],
           },
         ]
   );
@@ -270,6 +319,11 @@ export function CreateProgramForm({
   );
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(() => initial?.categoryIds ?? []);
   const [sessionsPerWeek, setSessionsPerWeek] = useState(initial?.sessionsPerWeek ?? "");
+  const [programFormat, setProgramFormat] = useState<ProgramFormat>(
+    initial?.programFormat ?? "training_plan"
+  );
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Set<string>>(() => new Set());
+  const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(() => new Set());
   const [activeLocationTabKey, setActiveLocationTabKey] = useState<string | null>(null);
   const [draggingExercise, setDraggingExercise] = useState<{
     trackKey: string;
@@ -280,6 +334,24 @@ export function CreateProgramForm({
     sessionKey: string;
     index: number;
   } | null>(null);
+
+  function toggleWeekCollapsed(weekKey: string) {
+    setCollapsedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(weekKey)) next.delete(weekKey);
+      else next.add(weekKey);
+      return next;
+    });
+  }
+
+  function toggleSessionCollapsed(sessionKey: string) {
+    setCollapsedSessions((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionKey)) next.delete(sessionKey);
+      else next.add(sessionKey);
+      return next;
+    });
+  }
 
   function toggleCategory(id: string) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -413,7 +485,7 @@ export function CreateProgramForm({
     const newKey = crypto.randomUUID();
     setTracks((prev) => [
       ...prev,
-      { key: newKey, locationId: nextLoc, sessions: [newSession(1)] },
+      { key: newKey, locationId: nextLoc, sessions: [newSession(1)], weekSizes: [1] },
     ]);
     setActiveLocationTabKey(newKey);
   }
@@ -468,8 +540,56 @@ export function CreateProgramForm({
     setTracks((prev) =>
       prev.map((t) => {
         if (t.key !== trackKey) return t;
+        const sizes = resolveWeekSizes(t, sessionsPerWeek);
         const n = t.sessions.length + 1;
-        return { ...t, sessions: [...t.sessions, newSession(n)] };
+        const lastWeek = sizes.length - 1;
+        const newSizes = [...sizes];
+        newSizes[lastWeek] = (newSizes[lastWeek] ?? 0) + 1;
+        return {
+          ...t,
+          weekSizes: newSizes,
+          sessions: [...t.sessions, newSession(n)],
+        };
+      })
+    );
+  }
+
+  function addWeekToTrack(trackKey: string) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        const sizes = resolveWeekSizes(t, sessionsPerWeek);
+        const count = defaultSessionsPerWeekForNewWeek(sessionsPerWeek);
+        const startDay = t.sessions.length + 1;
+        const newSessions = Array.from({ length: count }, (_, i) => newSession(startDay + i));
+        return {
+          ...t,
+          weekSizes: [...sizes, count],
+          sessions: [...t.sessions, ...newSessions],
+        };
+      })
+    );
+  }
+
+  function addDayToWeek(trackKey: string, weekIndex: number) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        const sizes = resolveWeekSizes(t, sessionsPerWeek);
+        if (weekIndex < 0 || weekIndex >= sizes.length) return t;
+        const start = sizes.slice(0, weekIndex).reduce((sum, n) => sum + n, 0);
+        const insertAt = start + sizes[weekIndex]!;
+        const newSizes = [...sizes];
+        newSizes[weekIndex] = (newSizes[weekIndex] ?? 0) + 1;
+        return {
+          ...t,
+          weekSizes: newSizes,
+          sessions: [
+            ...t.sessions.slice(0, insertAt),
+            newSession(insertAt + 1),
+            ...t.sessions.slice(insertAt),
+          ],
+        };
       })
     );
   }
@@ -479,7 +599,18 @@ export function CreateProgramForm({
       prev.map((t) => {
         if (t.key !== trackKey) return t;
         if (t.sessions.length <= 1) return t;
-        return { ...t, sessions: t.sessions.filter((s) => s.key !== sessionKey) };
+        const idx = t.sessions.findIndex((s) => s.key === sessionKey);
+        if (idx < 0) return t;
+        const sizes = resolveWeekSizes(t, sessionsPerWeek);
+        const weekIndex = sessionIndexToWeek(sizes, idx);
+        const newSizes = [...sizes];
+        newSizes[weekIndex] = (newSizes[weekIndex] ?? 1) - 1;
+        if (newSizes[weekIndex]! <= 0) newSizes.splice(weekIndex, 1);
+        return {
+          ...t,
+          weekSizes: newSizes,
+          sessions: t.sessions.filter((s) => s.key !== sessionKey),
+        };
       })
     );
     setSessionPicks((p) => {
@@ -525,27 +656,23 @@ export function CreateProgramForm({
     setTracks((prev) =>
       prev.map((t) => {
         if (t.key !== trackKey) return t;
-        const perWeek = effectiveSessionsPerWeek(sessionsPerWeek, t.sessions.length);
-        const start = weekIndex * perWeek;
-        const weekSessions = t.sessions.slice(start, start + perWeek);
+        const sizes = resolveWeekSizes(t, sessionsPerWeek);
+        if (weekIndex < 0 || weekIndex >= sizes.length) return t;
+        const start = sizes.slice(0, weekIndex).reduce((sum, n) => sum + n, 0);
+        const weekSize = sizes[weekIndex]!;
+        const weekSessions = t.sessions.slice(start, start + weekSize);
         if (weekSessions.length === 0) return t;
 
-        const existingWeeks = Math.ceil(t.sessions.length / perWeek);
-        const newWeekNumber = existingWeeks + 1;
+        const newWeekNumber = sizes.length + 1;
         const duplicated = weekSessions.map((src, dayInWeek) => {
-          const dayNumber = existingWeeks * perWeek + dayInWeek + 1;
-          const name = deriveDuplicatedSessionName(src.name, dayNumber, newWeekNumber);
-          return cloneSessionBlock(src, name);
+          const dayNumber = t.sessions.length + dayInWeek + 1;
+          return cloneSessionBlock(src, deriveDuplicatedSessionName(src.name, dayNumber, newWeekNumber));
         });
 
-        const insertAt = start + perWeek;
         return {
           ...t,
-          sessions: [
-            ...t.sessions.slice(0, insertAt),
-            ...duplicated,
-            ...t.sessions.slice(insertAt),
-          ],
+          weekSizes: [...sizes, weekSize],
+          sessions: [...t.sessions, ...duplicated],
         };
       })
     );
@@ -833,9 +960,18 @@ export function CreateProgramForm({
       for (const cid of selectedCategoryIds) {
         fd.append("category_ids", cid);
       }
-      const curriculumPayload = tracks.map((tr) => ({
-        location_id: tr.locationId,
-        sessions: tr.sessions.map(({ name, description, durationMinutes, exercises: sessionExercises }) => {
+      fd.set("program_format", programFormat);
+      const curriculumPayload = tracks.map((tr) => {
+        const sessionList =
+          programFormat === "single_workout" ? tr.sessions.slice(0, 1) : tr.sessions;
+        const week_sizes =
+          programFormat === "training_plan"
+            ? resolveWeekSizes(tr, sessionsPerWeek)
+            : undefined;
+        return {
+          location_id: tr.locationId,
+          ...(week_sizes?.length ? { week_sizes } : {}),
+          sessions: sessionList.map(({ name, description, durationMinutes, exercises: sessionExercises }) => {
           let duration_minutes: number | null = null;
           if (durationMinutes.trim() !== "") {
             const n = Number.parseInt(durationMinutes, 10);
@@ -908,7 +1044,8 @@ export function CreateProgramForm({
             exercises: exerciseRows,
           };
         }),
-      }));
+        };
+      });
       fd.set("curriculum_json", JSON.stringify(curriculumPayload));
       const outcomesPayload = outcomeLines.map((o) => o.text.trim()).filter(Boolean);
       fd.set("outcomes_json", JSON.stringify(outcomesPayload));
@@ -1124,6 +1261,45 @@ export function CreateProgramForm({
                 </div>
 
                 <div className="pt-1">
+                  <p className="text-sm font-medium text-gray-900 mb-3">Program type</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(
+                      [
+                        {
+                          id: "training_plan" as const,
+                          title: "Training plan",
+                          desc: "Multi-week schedule with days to complete in order",
+                        },
+                        {
+                          id: "single_workout" as const,
+                          title: "Single workout",
+                          desc: "One-off routine (e.g. pre-match warm-up)",
+                        },
+                      ] as const
+                    ).map((opt) => {
+                      const selected = programFormat === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setProgramFormat(opt.id)}
+                          className={`rounded-xl border-2 p-4 text-left transition ${
+                            selected
+                              ? "border-black bg-gray-50"
+                              : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold text-gray-900">{opt.title}</span>
+                          <span className="mt-1 block text-xs text-gray-500">{opt.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <input type="hidden" name="program_format" value={programFormat} />
+                </div>
+
+                {programFormat === "training_plan" && (
+                <div className="pt-1">
                   <p className="text-sm font-medium text-gray-900 mb-3">Schedule</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                     <div>
@@ -1186,6 +1362,28 @@ export function CreateProgramForm({
                     Optional summary for program cards; session lengths in the curriculum can still vary.
                   </p>
                 </div>
+                )}
+
+                {programFormat === "single_workout" && (
+                  <div className="pt-1">
+                    <label htmlFor="minutes_per_session_single" className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Duration
+                    </label>
+                    <div className="flex items-center gap-2 max-w-xs">
+                      <input
+                        id="minutes_per_session_single"
+                        name="minutes_per_session"
+                        type="number"
+                        min={0}
+                        step={1}
+                        defaultValue={initial?.minutesPerSession ?? ""}
+                        placeholder="e.g. 7"
+                        className="min-w-0 flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                      />
+                      <span className="shrink-0 text-sm text-gray-500 tabular-nums">mins</span>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -1674,33 +1872,95 @@ export function CreateProgramForm({
                 </div>
 
                 <div className="p-4 sm:p-6 space-y-6">
-                  {groupSessionsByWeek(activeTrack.sessions, sessionsPerWeek).map((week) => (
+                  {(programFormat === "training_plan"
+                    ? groupSessionsByWeekSizes(
+                        activeTrack.sessions,
+                        resolveWeekSizes(activeTrack, sessionsPerWeek)
+                      )
+                    : [
+                        {
+                          weekIndex: 0,
+                          items: activeTrack.sessions.map((session, globalIndex) => ({
+                            session,
+                            globalIndex,
+                          })),
+                        },
+                      ]
+                  ).map((week) => {
+                    const weekKey = weekSectionKey(activeTrack.key, week.weekIndex);
+                    const isWeekCollapsed = collapsedWeeks.has(weekKey);
+                    return (
                     <div key={`week-${activeTrack.key}-${week.weekIndex}`} className="space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-2.5">
-                        <p className="text-sm font-semibold text-gray-800">
-                          Week {week.weekIndex + 1}
-                          <span className="ml-2 font-normal text-gray-500">
-                            {week.items.length} session{week.items.length === 1 ? "" : "s"}
-                          </span>
-                        </p>
                         <button
                           type="button"
-                          onClick={() => duplicateWeekInTrack(activeTrack.key, week.weekIndex)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
-                          title="Duplicate all sessions in this week"
+                          onClick={() => toggleWeekCollapsed(weekKey)}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          aria-expanded={!isWeekCollapsed}
                         >
-                          <Copy className="h-3.5 w-3.5" />
-                          Duplicate week
+                          <ChevronDown
+                            className={`h-4 w-4 shrink-0 text-gray-500 transition-transform duration-200 ${
+                              isWeekCollapsed ? "-rotate-90" : ""
+                            }`}
+                          />
+                          <p className="text-sm font-semibold text-gray-800">
+                            {programFormat === "training_plan" ? `Week ${week.weekIndex + 1}` : "Workout"}
+                            <span className="ml-2 font-normal text-gray-500">
+                              {week.items.length}{" "}
+                              {programFormat === "training_plan"
+                                ? `day${week.items.length === 1 ? "" : "s"}`
+                                : `session${week.items.length === 1 ? "" : "s"}`}
+                            </span>
+                          </p>
                         </button>
+                        {programFormat === "training_plan" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => addDayToWeek(activeTrack.key, week.weekIndex)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                            title="Add a day to this week"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add day
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => duplicateWeekInTrack(activeTrack.key, week.weekIndex)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                            title="Duplicate all sessions in this week"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            Duplicate week
+                          </button>
+                        </div>
+                        )}
                       </div>
 
-                      {week.items.map(({ session, globalIndex: si }) => (
+                      {!isWeekCollapsed &&
+                      week.items.map(({ session, globalIndex: si }) => {
+                    const sessionCollapseKey = sessionSectionKey(activeTrack.key, session.key);
+                    const isSessionCollapsed = collapsedSessions.has(sessionCollapseKey);
+                    return (
                     <div
                       key={session.key}
                       className="bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm"
                     >
                       <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleSessionCollapsed(sessionCollapseKey)}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                            aria-expanded={!isSessionCollapsed}
+                            aria-label={isSessionCollapsed ? "Expand session" : "Collapse session"}
+                          >
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform duration-200 ${
+                                isSessionCollapsed ? "-rotate-90" : ""
+                              }`}
+                            />
+                          </button>
                           <GripVertical className="w-4 h-4 text-gray-400 shrink-0" />
                           <label className="sr-only" htmlFor={`session-name-${activeTrack.key}-${session.key}`}>
                             Session name
@@ -1713,6 +1973,12 @@ export function CreateProgramForm({
                             placeholder="e.g. Day 1: Upper body"
                             className="flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                           />
+                          {isSessionCollapsed && (
+                            <span className="hidden shrink-0 text-xs text-gray-500 sm:inline">
+                              {session.exercises.length} exercise
+                              {session.exercises.length === 1 ? "" : "s"}
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-2 shrink-0">
                           <button
@@ -1752,6 +2018,7 @@ export function CreateProgramForm({
                         </div>
                       </div>
 
+                      {!isSessionCollapsed && (
                       <div className="p-6 space-y-4">
                         <div className="grid gap-4 lg:grid-cols-[1fr_140px] lg:items-start">
                           <div>
@@ -2263,19 +2530,33 @@ export function CreateProgramForm({
                           </>
                         )}
                       </div>
+                      )}
                     </div>
-                      ))}
+                      );
+                      })}
                     </div>
-                  ))}
+                  );
+                  })}
 
-                  <button
-                    type="button"
-                    onClick={() => addSessionToTrack(activeTrack.key)}
-                    className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:text-black hover:border-gray-300 hover:bg-white transition-all flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add session to this location
-                  </button>
+                  {programFormat === "training_plan" ? (
+                    <button
+                      type="button"
+                      onClick={() => addWeekToTrack(activeTrack.key)}
+                      className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:text-black hover:border-gray-300 hover:bg-white transition-all flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add week
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => addSessionToTrack(activeTrack.key)}
+                      className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:text-black hover:border-gray-300 hover:bg-white transition-all flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add session to this location
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -2300,9 +2581,9 @@ export function CreateProgramForm({
 
           <div className={activeTab === "settings" ? "space-y-6" : "hidden"}>
             <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Pricing</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Access</h2>
 
-              <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <input
                   type="checkbox"
                   name="is_free"
@@ -2313,50 +2594,11 @@ export function CreateProgramForm({
                 <span>
                   <span className="block text-sm font-medium text-gray-900">Free program</span>
                   <span className="mt-1 block text-xs text-gray-500">
-                    Available to all signed-in members without Pro. Paid programs require an active Pro subscription.
+                    Available to all signed-in members without Pro. Other programs require an active Pro
+                    subscription.
                   </span>
                 </span>
               </label>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Price (€)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">€</span>
-                    <input
-                      id="price"
-                      name="price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      defaultValue={initial?.price ?? ""}
-                      placeholder="15.00"
-                      className="w-full pl-8 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="compare_at_price" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Compare at price (€)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">€</span>
-                    <input
-                      id="compare_at_price"
-                      name="compare_at_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      defaultValue={initial?.compareAtPrice ?? ""}
-                      placeholder="25.00"
-                      className="w-full pl-8 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <p className="mt-1.5 text-xs text-gray-500">Optional strikethrough “was” price.</p>
-                </div>
-              </div>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">

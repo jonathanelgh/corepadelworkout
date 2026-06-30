@@ -24,6 +24,10 @@ import {
   resolveWorkoutPlaylist,
   SESSION_PHASE_LABELS,
 } from "@/lib/programs/session-phase";
+import { logProgramSessionComplete, logProgramSessionStart } from "@/app/programs/program-progress-actions";
+import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
+import { programTrainingHref } from "@/lib/programs/program-routes";
+import { BackButton } from "@/components/navigation/back-button";
 import { WorkoutCompletionOverlay } from "@/components/programs/workout-completion-overlay";
 import { BothSidesChip } from "@/components/programs/both-sides-chip";
 
@@ -105,19 +109,35 @@ function WorkoutVideo({
 }
 
 export function ActiveWorkoutPlayer({
+  programId,
   programSlug,
   programTitle,
+  programFormat,
+  sessionId,
+  sessionName,
   coverImageUrl,
   songUrl,
   exercises,
+  nextSessionHref = null,
+  nextSessionLabel = null,
+  programComplete = false,
 }: {
+  programId: string;
   programSlug: string;
   programTitle: string;
+  programFormat: ProgramFormat;
+  sessionId: string;
+  sessionName: string;
   coverImageUrl: string | null;
   songUrl: string | null;
   exercises: ProgramExerciseItem[];
+  nextSessionHref?: string | null;
+  nextSessionLabel?: string | null;
+  programComplete?: boolean;
 }) {
-  const detailHref = `/programs/${programSlug}`;
+  const detailHref = usesProgramProgress(programFormat)
+    ? programTrainingHref(programSlug)
+    : `/programs/${programSlug}`;
 
   const [workoutStarted, setWorkoutStarted] = useState(false);
   const [workoutFinished, setWorkoutFinished] = useState(false);
@@ -130,6 +150,8 @@ export function ActiveWorkoutPlayer({
   const [musicMuted, setMusicMuted] = useState(false);
   /** Non-null while counting down before the first exercise begins. */
   const [prepCountdown, setPrepCountdown] = useState<number | null>(null);
+  const [completionLogged, setCompletionLogged] = useState(false);
+  const [startLogged, setStartLogged] = useState(false);
 
   const choiceGroups = useMemo(() => listChoiceGroups(exercises), [exercises]);
   const [choiceSelections, setChoiceSelections] = useState<Record<string, string>>(() =>
@@ -175,6 +197,17 @@ export function ActiveWorkoutPlayer({
     isRestPhase: inRest,
     isRunning,
   });
+
+  useEffect(() => {
+    if (!workoutFinished || completionLogged) return;
+    setCompletionLogged(true);
+    void logProgramSessionComplete({
+      programId,
+      programSlug,
+      sessionId,
+      programFormat,
+    });
+  }, [workoutFinished, completionLogged, programId, programSlug, sessionId, programFormat]);
 
   useEffect(() => {
     setVideoReady(false);
@@ -297,6 +330,10 @@ export function ActiveWorkoutPlayer({
     setPrepCountdown(FIRST_EXERCISE_PREP_SECONDS);
     setSecondsLeft(null);
     setIsRunning(false);
+    if (!startLogged) {
+      setStartLogged(true);
+      void logProgramSessionStart({ programId, programSlug, sessionId });
+    }
   }
 
   function goPrev() {
@@ -351,13 +388,13 @@ export function ActiveWorkoutPlayer({
       {!workoutStarted && <div className="absolute inset-0 bg-black/55" aria-hidden />}
 
       <header className="relative z-30 flex items-center justify-between px-4 py-3">
-        <Link
-          href={detailHref}
+        <BackButton
+          fallbackHref={detailHref}
+          ariaLabel="Go back"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
-          aria-label="Back"
         >
           <ArrowLeft className="h-5 w-5" />
-        </Link>
+        </BackButton>
         {workoutStarted && songUrl?.trim() && (
           <button
             type="button"
@@ -372,9 +409,10 @@ export function ActiveWorkoutPlayer({
 
       {!workoutStarted ? (
         <div className="relative z-20 mx-auto flex max-w-lg flex-col px-6 pb-32 pt-8">
-          <h1 className="text-2xl font-semibold">{programTitle}</h1>
+          <h1 className="text-2xl font-semibold">{sessionName}</h1>
+          <p className="mt-1 text-sm text-white/60">{programTitle}</p>
           <p className="mt-2 text-sm text-white/75">
-            {len} exercises · follows each exercise prescription
+            {len} exercise{len === 1 ? "" : "s"} · follows each exercise prescription
           </p>
 
           <div className="pointer-events-none absolute -left-[9999px] h-px w-px overflow-hidden opacity-0">
@@ -589,7 +627,15 @@ export function ActiveWorkoutPlayer({
       )}
 
       {workoutFinished && (
-        <WorkoutCompletionOverlay programTitle={programTitle} detailHref={detailHref} />
+        <WorkoutCompletionOverlay
+          programTitle={programTitle}
+          sessionName={sessionName}
+          detailHref={detailHref}
+          nextSessionHref={usesProgramProgress(programFormat) ? nextSessionHref : null}
+          nextSessionLabel={nextSessionLabel}
+          programComplete={programComplete}
+          isSingleWorkout={!usesProgramProgress(programFormat)}
+        />
       )}
     </div>
   );

@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProgramCard } from "@/app/programs/programs-library-client";
-import { PRIMARY_GOAL_LABELS, isOnboardingGoal } from "@/lib/member/onboarding";
+import { PRIMARY_GOAL_LABELS, isOnboardingGoal, isPainKey, levelFromPadelSlug } from "@/lib/member/onboarding";
+import type { OnboardingEnvironment, OnboardingGoal, OnboardingLevel, PainKey } from "@/lib/member/onboarding";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { loadMemberSubscriptionStatus, type MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
 import { mapProgramRowsToCards, type ProgramRow } from "@/lib/programs/map-program-cards";
+import { loadUserActivePrograms, loadQuickWorkouts, type ActiveProgramSummary, type QuickWorkoutSummary } from "@/lib/programs/program-progress";
 
 function programsFromEnrollments(
   rows: { programs: ProgramRow | ProgramRow[] | null }[] | null | undefined
@@ -21,10 +23,12 @@ function programsFromEnrollments(
 export type MemberHubHomeProgram = {
   slug: string;
   title: string;
-  description: string | null;
-  cover_image_url: string | null;
-  price: number | null;
-  duration_weeks: number | null;
+  description: string;
+  image: string;
+  categoryName: string | null;
+  difficultyName: string | null;
+  durationLabel: string;
+  isFree: boolean;
 };
 
 export type MemberHubBlogPost = {
@@ -44,11 +48,19 @@ export type MemberHubProfile = {
   goalLabel: string;
   envLabel: string;
   painsStr: string;
+  level: OnboardingLevel | null;
+  goal: OnboardingGoal | null;
+  environments: OnboardingEnvironment[];
+  pains: PainKey[];
 };
+
+export type { ActiveProgramSummary, QuickWorkoutSummary };
 
 export type MemberHubData = {
   hasActivePro: boolean;
   subscription: MemberSubscriptionStatus;
+  activePrograms: ActiveProgramSummary[];
+  quickWorkouts: QuickWorkoutSummary[];
   homePrograms: MemberHubHomeProgram[];
   homeProgramsError: string | null;
   blogPosts: MemberHubBlogPost[];
@@ -80,8 +92,24 @@ export async function loadMemberHubData(
     loadMemberSubscriptionStatus(supabase, userId),
     supabase
       .from("programs")
-      .select("slug, title, description, cover_image_url, price, duration_weeks, is_free")
+      .select(
+        `
+        slug,
+        title,
+        description,
+        cover_image_url,
+        duration_weeks,
+        is_free,
+        program_format,
+        program_categories (
+          sort_order,
+          categories ( name )
+        ),
+        difficulty_levels ( name )
+      `
+      )
       .eq("status", "published")
+      .eq("program_format", "training_plan")
       .order("updated_at", { ascending: false })
       .limit(6),
     supabase
@@ -136,7 +164,7 @@ export async function loadMemberHubData(
     supabase
       .from("profiles")
       .select(
-        "full_name, email, birth_date, gender, profile_image_url, primary_goal, training_environment, training_environments, padel_pains, padel_levels ( name )"
+        "full_name, email, birth_date, gender, profile_image_url, primary_goal, training_environment, training_environments, padel_pains, padel_levels ( name, slug )"
       )
       .eq("id", userId)
       .maybeSingle(),
@@ -161,15 +189,31 @@ export async function loadMemberHubData(
   ];
 
   const profile = profileRes.data;
+  const levelRel = profile?.padel_levels;
+  const levelRow = levelRel && typeof levelRel === "object" ? (Array.isArray(levelRel) ? levelRel[0] : levelRel) : null;
   const levelName =
-    profile && typeof profile.padel_levels === "object" && profile.padel_levels && "name" in profile.padel_levels
-      ? String((profile.padel_levels as { name: string }).name)
+    levelRow && typeof levelRow === "object" && "name" in levelRow
+      ? String((levelRow as { name: string }).name)
       : "—";
+  const level =
+    levelRow && typeof levelRow === "object" && "slug" in levelRow
+      ? levelFromPadelSlug(String((levelRow as { slug: string }).slug))
+      : null;
 
-  const goalLabel =
-    profile?.primary_goal && isOnboardingGoal(profile.primary_goal)
-      ? PRIMARY_GOAL_LABELS[profile.primary_goal]
-      : "—";
+  const goal: OnboardingGoal | null =
+    profile?.primary_goal && isOnboardingGoal(profile.primary_goal) ? profile.primary_goal : null;
+
+  const goalLabel = goal ? PRIMARY_GOAL_LABELS[goal] : "—";
+
+  const envOptions = new Set<OnboardingEnvironment>(["gym", "home", "club"]);
+  const environments: OnboardingEnvironment[] =
+    profile?.training_environments && profile.training_environments.length > 0
+      ? profile.training_environments.filter((v: string): v is OnboardingEnvironment =>
+          envOptions.has(v as OnboardingEnvironment),
+        )
+      : profile?.training_environment && envOptions.has(profile.training_environment as OnboardingEnvironment)
+        ? [profile.training_environment as OnboardingEnvironment]
+        : [];
 
   const envName: Record<string, string> = { gym: "Gym", home: "Home", club: "Club" };
   const envLabel =
@@ -179,6 +223,9 @@ export async function loadMemberHubData(
         ? envName[profile.training_environment] ?? profile.training_environment
         : "—";
 
+  const pains: PainKey[] =
+    profile?.padel_pains?.filter((p: string): p is PainKey => isPainKey(p)) ?? [];
+
   const painLabels: Record<string, string> = {
     padel_elbow: "Padel elbow",
     jumpers_knee: "Jumper's knee",
@@ -187,14 +234,35 @@ export async function loadMemberHubData(
     none: "None — general strength",
   };
   const painsStr =
-    profile?.padel_pains && profile.padel_pains.length > 0
-      ? profile.padel_pains.map((p: string) => painLabels[p] ?? p).join(", ")
-      : "—";
+    pains.length > 0 ? pains.map((p) => painLabels[p] ?? p).join(", ") : "—";
+
+  const activePrograms = await loadUserActivePrograms(supabase, userId, profile);
+  const quickWorkouts = await loadQuickWorkouts(supabase, 6);
+
+  const homeProgramRows = (homeProgramsRes.data ?? []) as (ProgramRow & { is_free?: boolean | null })[];
+  const homePrograms: MemberHubHomeProgram[] = homeProgramRows
+    .map((row) => {
+      const card = mapProgramRowsToCards([row])[0];
+      if (!card) return null;
+      return {
+        slug: card.slug,
+        title: card.title,
+        description: card.description,
+        image: card.image,
+        categoryName: card.categoryName,
+        difficultyName: card.difficultyName,
+        durationLabel: card.durationLabel,
+        isFree: Boolean(row.is_free),
+      };
+    })
+    .filter((p): p is MemberHubHomeProgram => p != null);
 
   return {
     hasActivePro,
     subscription,
-    homePrograms: (homeProgramsRes.data ?? []) as MemberHubHomeProgram[],
+    activePrograms,
+    quickWorkouts,
+    homePrograms,
     homeProgramsError: homeProgramsRes.error?.message ?? null,
     blogPosts: (blogRes.data ?? []) as MemberHubBlogPost[],
     blogPostsError: blogRes.error?.message ?? null,
@@ -213,6 +281,10 @@ export async function loadMemberHubData(
       goalLabel,
       envLabel,
       painsStr,
+      level,
+      goal,
+      environments,
+      pains,
     },
   };
 }
