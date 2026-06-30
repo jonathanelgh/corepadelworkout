@@ -13,6 +13,8 @@ export async function loadProgramExerciseOptions(
       id,
       title,
       status,
+      image_url,
+      video_url,
       program_prescription_mode,
       location_id,
       exercise_locations ( location_id, sort_order )
@@ -39,6 +41,8 @@ export async function loadProgramExerciseOptions(
             : [],
       status: row.status === "draft" ? "draft" : "published",
       programPrescriptionMode: parseExerciseProgramPrescriptionMode(row.program_prescription_mode),
+      image_url: (row.image_url as string | null) ?? null,
+      video_url: (row.video_url as string | null) ?? null,
     };
   });
 

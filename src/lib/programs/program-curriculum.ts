@@ -12,6 +12,7 @@ export type ProgramExercisePayload = {
   rest_after_seconds: number | null;
   session_phase: SessionPhase;
   choice_group: string | null;
+  note: string | null;
 };
 
 export type SessionPayload = {
@@ -56,6 +57,7 @@ async function insertSessionExercises(
     rest_after_seconds: ex.rest_after_seconds,
     session_phase: ex.session_phase,
     choice_group: ex.choice_group,
+    note: ex.note?.trim() || null,
   }));
   const { error } = await supabase.from("program_exercises").insert(rows);
   if (error) throw new Error(error.message);

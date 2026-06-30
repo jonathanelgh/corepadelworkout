@@ -17,7 +17,7 @@ import {
 } from "@/lib/programs/program-exercises";
 import { resolveExerciseVideoSource } from "@/lib/programs/exercise-video-url";
 import { useProgramWorkoutMusic } from "@/lib/programs/program-workout-music";
-import { playDoubleBeep, playWorkEndBeep, prepareWorkoutAudio } from "@/lib/programs/workout-beeps";
+import { playExerciseEndBeeps, playExerciseStartBeeps, prepareWorkoutAudio } from "@/lib/programs/workout-beeps";
 import {
   defaultChoiceSelections,
   listChoiceGroups,
@@ -45,10 +45,12 @@ function WorkoutVideo({
   url,
   playing,
   onReady,
+  className = "",
 }: {
   url: string | null;
   playing: boolean;
   onReady?: () => void;
+  className?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const player = useMemo(
@@ -75,7 +77,7 @@ function WorkoutVideo({
 
   if (!player) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-sm text-zinc-400">
+      <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-sm text-zinc-400">
         No video
       </div>
     );
@@ -86,7 +88,7 @@ function WorkoutVideo({
       <iframe
         src={player.src}
         title="Exercise video"
-        className="h-full w-full border-0"
+        className={`absolute inset-0 h-full w-full border-0 ${className}`}
         allow={IFRAME_ALLOW}
         allowFullScreen
       />
@@ -97,7 +99,7 @@ function WorkoutVideo({
     <video
       ref={videoRef}
       src={player.src}
-      className="h-full w-full object-cover"
+      className={`absolute inset-0 h-full w-full object-contain ${className}`}
       playsInline
       loop
       muted
@@ -221,6 +223,7 @@ export function ActiveWorkoutPlayer({
       setCurrentSet(1);
       setPhase("work");
       if (exerciseUsesTimedPlayback(ex)) {
+        playExerciseStartBeeps();
         setSecondsLeft(workDurationSeconds(ex));
       } else {
         setSecondsLeft(null);
@@ -252,6 +255,7 @@ export function ActiveWorkoutPlayer({
         return;
       }
       setCurrentSet((s) => s + 1);
+      playExerciseStartBeeps();
       setSecondsLeft(workDurationSeconds(current));
       return;
     }
@@ -273,7 +277,6 @@ export function ActiveWorkoutPlayer({
   useEffect(() => {
     if (prepCountdown !== 0) return;
     setPrepCountdown(null);
-    playDoubleBeep();
     setIsRunning(true);
     beginWorkForCurrent(0);
   }, [prepCountdown, beginWorkForCurrent]);
@@ -283,13 +286,13 @@ export function ActiveWorkoutPlayer({
     if (secondsLeft !== 0) return;
 
     if (phase === "work") {
-      playWorkEndBeep();
+      playExerciseEndBeeps();
       finishWorkPhase();
       return;
     }
 
     if (phase === "setRest") {
-      playDoubleBeep();
+      playExerciseStartBeeps();
       setCurrentSet((s) => s + 1);
       setPhase("work");
       if (current) setSecondsLeft(workDurationSeconds(current));
@@ -297,7 +300,6 @@ export function ActiveWorkoutPlayer({
     }
 
     if (phase === "rest") {
-      playDoubleBeep();
       advanceExercise();
     }
   }, [
@@ -349,12 +351,11 @@ export function ActiveWorkoutPlayer({
       return;
     }
     if (phase === "rest") {
-      playDoubleBeep();
       advanceExercise();
       return;
     }
     if (phase === "setRest") {
-      playDoubleBeep();
+      playExerciseStartBeeps();
       setCurrentSet((s) => s + 1);
       setPhase("work");
       if (current) setSecondsLeft(workDurationSeconds(current));
@@ -364,6 +365,7 @@ export function ActiveWorkoutPlayer({
   }
 
   const displayExercise = inExerciseRest && next ? next : current;
+  const displayNote = displayExercise?.note?.trim() || null;
 
   if (len === 0) {
     return (
@@ -493,7 +495,7 @@ export function ActiveWorkoutPlayer({
               </p>
             </div>
           )}
-          <div className="relative z-10 mx-auto aspect-video w-full max-w-3xl overflow-hidden bg-black">
+          <div className="relative z-10 mx-auto aspect-video w-[min(100%,42rem,calc(min(40dvh,17.5rem)*16/9))] overflow-hidden bg-black sm:w-[min(100%,42rem,calc(min(42dvh,20rem)*16/9))]">
             <WorkoutVideo
               url={displayVideoUrl}
               playing={!workoutFinished && (inPrep || isRunning)}
@@ -511,6 +513,11 @@ export function ActiveWorkoutPlayer({
                   <div className="mt-3">
                     <BothSidesChip variant="dark" />
                   </div>
+                )}
+                {current.note?.trim() && (
+                  <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
+                    {current.note.trim()}
+                  </p>
                 )}
                 <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{prepCountdown}</p>
                 <p className="mt-2 text-sm text-white/60">Starting in…</p>
@@ -569,6 +576,11 @@ export function ActiveWorkoutPlayer({
                   <div className="mt-2">
                     <BothSidesChip variant="dark" />
                   </div>
+                )}
+                {displayNote && (
+                  <p className="mt-3 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-sm leading-relaxed text-white/90">
+                    {displayNote}
+                  </p>
                 )}
 
                 {currentIsTimed && secondsLeft != null && (

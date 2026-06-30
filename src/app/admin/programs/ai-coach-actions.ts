@@ -15,7 +15,7 @@ import {
   fetchProgramsCatalog,
   type ProgramCatalogRow,
 } from "@/lib/programs/programs-catalog";
-import { formatExerciseCatalogForPrompt, loadProgramAiContext } from "@/lib/programs/exercise-catalog";
+import { formatExerciseCatalogForPrompt, loadProgramAiContext, type ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import {
   listMembersForAiPicker,
   loadProfileAiContext,
@@ -25,13 +25,18 @@ import {
 import { coachShouldCreateNew, coachShouldRecommendCatalogOnly } from "@/lib/programs/coach-intent";
 import {
   buildConsultationState,
+  buildConsultationPrompt,
+  buildConsultationResponseText,
   coachWantsProgram,
-  formatConsultationBrief,
+  formatConsultationGuide,
+  formatGenerationCoachBrief,
+  getCurrentConsultationTopic,
   isConsultationComplete,
   isValidLocationSlug,
-  lastAssistantText,
-  nextConsultationQuestion,
+  sanitizeCoachChatReply,
   shouldRunConsultation,
+  type ConsultationLocationOption,
+  type ConsultationPrompt,
 } from "@/lib/programs/coach-consultation";
 import {
   ensureProgramProposalRotation,
@@ -53,6 +58,18 @@ async function requireAdmin() {
     return { error: "Not authorized.", supabase: null as null, user: null as null };
   }
   return { error: null, supabase, user };
+}
+
+function exercisesForLocation(
+  exercises: ExerciseCatalogEntry[],
+  locationSlug: string | undefined,
+  locations: ConsultationLocationOption[]
+): ExerciseCatalogEntry[] {
+  if (!locationSlug) return exercises;
+  const loc = locations.find((l) => l.slug === locationSlug);
+  if (!loc) return exercises;
+  const filtered = exercises.filter((e) => e.locationIds.includes(loc.id));
+  return filtered.length > 0 ? filtered : exercises;
 }
 
 export type AiCoachInitialData = {
@@ -79,6 +96,7 @@ export async function loadAiCoachData(): Promise<
 
 export type SendAiCoachMessageResult =
   | { type: "text"; text: string }
+  | { type: "consultation"; text: string; prompt: ConsultationPrompt }
   | {
       type: "recommend_programs";
       introText: string;
@@ -107,8 +125,15 @@ export async function sendAiCoachMessage(input: {
       return { error: "Your exercise library has no published exercises. Publish exercises before generating workouts." };
     }
 
-    const catalogById = new Map(publishedExercises.map((e) => [e.id, e.title]));
-    const exerciseCatalog = formatExerciseCatalogForPrompt(publishedExercises);
+    const { data: locationRows } = await auth.supabase
+      .from("locations")
+      .select("id, name, slug")
+      .order("sort_order", { ascending: true });
+    const locations: ConsultationLocationOption[] = (locationRows ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      slug: row.slug as string,
+    }));
 
     const { data: equipmentRows } = await auth.supabase
       .from("equipment")
@@ -126,30 +151,41 @@ export async function sendAiCoachMessage(input: {
 
     const isProgram = coachWantsProgram(userTexts);
     const consultation = buildConsultationState(
-      userTexts,
+      input.history,
+      userMessage,
       equipmentLibrary,
-      lastAssistantText(input.history)
+      locations
     );
-    const consultationQuestion = nextConsultationQuestion(
+    const consultationComplete = isConsultationComplete(
       consultation,
       isProgram,
       equipmentLibrary
     );
     const inCreateFlow =
       !coachShouldRecommendCatalogOnly(userMessage) &&
-      (coachShouldCreateNew(userMessage) || shouldRunConsultation(input.history, userMessage));
+      (userTexts.some((t) => coachShouldCreateNew(t)) ||
+        shouldRunConsultation(input.history, userMessage));
 
-    if (inCreateFlow && consultationQuestion) {
-      return { type: "text", text: consultationQuestion };
+    if (inCreateFlow && !consultationComplete) {
+      const topic = getCurrentConsultationTopic(consultation, isProgram);
+      if (topic) {
+        const prompt = buildConsultationPrompt(topic, locations, equipmentLibrary, isProgram);
+        const text = buildConsultationResponseText(consultation, topic, prompt.question, locations);
+        return { type: "consultation", text, prompt };
+      }
     }
 
-    if (
-      inCreateFlow &&
-      !isConsultationComplete(consultation, isProgram, equipmentLibrary)
-    ) {
-      const fallback = nextConsultationQuestion(consultation, isProgram, equipmentLibrary);
-      if (fallback) return { type: "text", text: fallback };
-    }
+    const generationExercises =
+      inCreateFlow && consultationComplete
+        ? exercisesForLocation(
+            publishedExercises,
+            consultation.locationSlug,
+            locations
+          )
+        : publishedExercises;
+
+    const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
+    const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
 
     const fullHistory: ChatHistoryMessage[] = [
       ...input.history,
@@ -161,11 +197,10 @@ export async function sendAiCoachMessage(input: {
       ? await loadProfileAiContext(auth.supabase, input.targetUserId)
       : null;
     const consultationBrief = inCreateFlow
-      ? formatConsultationBrief(consultation, isProgram)
+      ? formatConsultationGuide(consultation, isProgram, equipmentLibrary)
       : undefined;
 
-    const result = await chatWithAiCoach({
-      history: fullHistory,
+    const coachParams = {
       programsCatalog: catalogForAiPayload(input.programsCatalog),
       exerciseCatalog,
       catalogById,
@@ -173,10 +208,86 @@ export async function sendAiCoachMessage(input: {
       userContextBlock: userContextBlock(profileContext),
       creationOnly: inCreateFlow,
       consultationBrief,
+      toolsEnabled: !inCreateFlow || consultationComplete,
+    };
+
+    const toolName = isProgram ? "generate_program" : "generate_workout";
+
+    const generationBrief =
+      inCreateFlow && consultationComplete
+        ? formatGenerationCoachBrief(consultation, isProgram, toolName)
+        : consultationBrief;
+
+    const generationHistory: ChatHistoryMessage[] =
+      inCreateFlow && consultationComplete
+        ? [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: [
+                    consultation.goal ?? userMessage,
+                    "",
+                    `Consultation is complete. Call ${toolName} now using the consultation parameters in your instructions.`,
+                  ].join("\n"),
+                },
+              ],
+            },
+          ]
+        : fullHistory;
+
+    let result = await chatWithAiCoach({
+      history: generationHistory,
+      ...coachParams,
+      consultationBrief: generationBrief,
+      forcedTool: inCreateFlow && consultationComplete ? toolName : undefined,
     });
 
+    if (
+      inCreateFlow &&
+      !consultationComplete &&
+      result.type === "functionCall" &&
+      (result.name === "generate_program" || result.name === "generate_workout")
+    ) {
+      result = await chatWithAiCoach({
+        history: fullHistory,
+        ...coachParams,
+        toolsEnabled: false,
+        consultationBrief: `${consultationBrief ?? ""}\n\n## Not ready to generate yet\nConsultation is still missing required details. Reply with one friendly conversational question about the next missing topic. Do not call tools this turn.`,
+      });
+    }
+
+    if (
+      inCreateFlow &&
+      consultationComplete &&
+      result.type === "text"
+    ) {
+      result = await chatWithAiCoach({
+        history: [
+          ...generationHistory,
+          { role: "model", parts: [{ text: result.text }] },
+          {
+            role: "user",
+            parts: [
+              {
+                text: `Call ${toolName} now. Return the tool call with valid catalog exercise_id UUIDs — do not reply with prose.`,
+              },
+            ],
+          },
+        ],
+        ...coachParams,
+        consultationBrief: generationBrief,
+        forcedTool: toolName,
+      });
+    }
+
     if (result.type === "text") {
-      return { type: "text", text: result.text };
+      const cleaned = sanitizeCoachChatReply(result.text);
+      const text = cleaned.trim() || result.text.trim();
+      if (!text) {
+        throw new Error("AI returned an empty response. Try again.");
+      }
+      return { type: "text", text };
     }
 
     if (result.name === "recommend_programs") {
@@ -203,11 +314,13 @@ export async function sendAiCoachMessage(input: {
     const { proposal, warnings: rotationWarnings } = ensureProgramProposalRotation(
       {
         ...result.args,
+        duration_weeks: consultation.durationWeeks ?? result.args.duration_weeks,
+        sessions_per_week: consultation.sessionsPerWeek ?? result.args.sessions_per_week,
+        minutes_per_session: consultation.minutes ?? result.args.minutes_per_session,
         location_slug:
           consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
             ? consultation.locationSlug
             : result.args.location_slug,
-        minutes_per_session: consultation.minutes ?? result.args.minutes_per_session,
       },
       publishedExercises
     );
@@ -262,6 +375,9 @@ export async function saveAiCoachProgram(
     const saved = await saveAiProgram(auth.supabase, fixed, {
       status: options?.publish ? "published" : "draft",
       allowedExerciseIds,
+      durationWeeks: fixed.duration_weeks,
+      sessionsPerWeek: fixed.sessions_per_week,
+      minutesPerSession: fixed.minutes_per_session,
     });
 
     revalidatePath("/admin/programs");

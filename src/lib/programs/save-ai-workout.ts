@@ -99,6 +99,7 @@ export async function saveAiWorkoutProgram(
     rest_after_seconds: Math.ceil(ex.rest_after_seconds ?? 0),
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
+    note: null,
   }));
 
   try {

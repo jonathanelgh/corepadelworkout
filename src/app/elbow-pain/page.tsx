@@ -702,7 +702,7 @@ export default function ElbowPainPage() {
                 <Star className="w-6 h-6 fill-[#ccff00] text-[#ccff00]" />
               </div>
               <div className="mb-2">
-                <span className="text-5xl font-medium">€14.99</span>
+                <span className="text-5xl font-medium">€19.99</span>
                 <span className="text-gray-400"> /month</span>
               </div>
               <p className="text-gray-400 mb-8 pb-8 border-b border-gray-800">Everything in the library while you are a member</p>

@@ -5,6 +5,7 @@ import { getMemberShellContext } from "@/lib/member/member-shell-context";
 import { loadMemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
 import { MemberAppShell } from "@/components/member/member-app-shell";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
+import { proMonthlyPriceLabel } from "@/lib/billing/format-subscription-price";
 import { ManageSubscriptionButton } from "@/components/billing/manage-subscription-button";
 
 const perks = [
@@ -44,10 +45,7 @@ export default async function MemberUpgradePage({
     .eq("active", true)
     .maybeSingle();
 
-  const priceLabel =
-    plan?.price_amount != null
-      ? `€${Number(plan.price_amount).toFixed(0)} / ${plan.interval === "year" ? "year" : "month"}`
-      : "Pro monthly";
+  const priceLabel = proMonthlyPriceLabel(plan);
 
   return (
     <MemberAppShell userEmail={userEmail} profile={profile}>

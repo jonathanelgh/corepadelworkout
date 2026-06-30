@@ -3,6 +3,7 @@
 import { ArrowRight, CheckCircle2, Star, Menu, X, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PRO_MONTHLY_PRICE_LABEL } from "@/lib/billing/format-subscription-price";
 import { SiteFooter } from "@/components/landing/site-footer";
 
 const heroStats = [
@@ -546,7 +547,7 @@ export function MarketingHomePage({
                 <Star className="w-6 h-6 fill-[#ccff00] text-[#ccff00]" />
               </div>
               <div className="mb-2">
-                <span className="text-5xl font-medium">{proPriceLabel ?? "Pro"}</span>
+                <span className="text-5xl font-medium">{proPriceLabel ?? PRO_MONTHLY_PRICE_LABEL}</span>
               </div>
               <p className="text-gray-400 mb-8 pb-8 border-b border-gray-800">Unlimited access to everything</p>
               

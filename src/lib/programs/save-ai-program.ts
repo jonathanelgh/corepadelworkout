@@ -5,8 +5,11 @@ import {
   insertProgramCurriculum,
   type ProgramExercisePayload,
   type SessionPayload,
-  type TrackPayload,
 } from "./program-curriculum";
+import {
+  buildTrainingPlanTrack,
+  normalizeTrainingPlanSessionNames,
+} from "./training-plan-curriculum";
 import { slugifyTitle, uniqueProgramSlug } from "./program-slug";
 
 async function resolveLocationId(supabase: SupabaseClient, slug?: string): Promise<string> {
@@ -44,6 +47,7 @@ function toExercisePayload(
     rest_after_seconds: Math.ceil(ex.rest_after_seconds ?? 0),
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
+    note: null,
   }));
 }
 
@@ -59,11 +63,24 @@ export type SaveAiProgramResult = {
 export async function saveAiProgram(
   supabase: SupabaseClient,
   proposal: ProgramProposal,
-  options?: { status?: "draft" | "published"; allowedExerciseIds?: Set<string> }
+  options?: {
+    status?: "draft" | "published";
+    allowedExerciseIds?: Set<string>;
+    /** Override model output with consultation / UI schedule */
+    durationWeeks?: number;
+    sessionsPerWeek?: number;
+    minutesPerSession?: number;
+  }
 ): Promise<SaveAiProgramResult> {
   const status = options?.status ?? "draft";
-  const durationWeeks = Math.max(1, Math.floor(proposal.duration_weeks));
-  const sessionsPerWeek = Math.max(1, Math.floor(proposal.sessions_per_week));
+  const durationWeeks = Math.max(
+    1,
+    Math.floor(options?.durationWeeks ?? proposal.duration_weeks)
+  );
+  const sessionsPerWeek = Math.max(
+    1,
+    Math.floor(options?.sessionsPerWeek ?? proposal.sessions_per_week)
+  );
   const targetSessionCount = durationWeeks * sessionsPerWeek;
 
   if (proposal.sessions.length === 0) {
@@ -71,14 +88,25 @@ export async function saveAiProgram(
   }
 
   const { sessions: expandedSessions } = expandSessionsToTarget(proposal.sessions, targetSessionCount);
-  const sessions = expandedSessions.map((s) => ({
+
+  const locationId = await resolveLocationId(supabase, proposal.location_slug);
+  const slug = await uniqueProgramSlug(supabase, slugifyTitle(proposal.title));
+
+  let sessionPayloads: SessionPayload[] = expandedSessions.map((s) => ({
     name: s.name,
-    description: s.description ?? undefined,
-    duration_minutes: s.duration_minutes ?? undefined,
-    exercises: s.exercises,
+    description: s.description?.trim() || null,
+    duration_minutes:
+      s.duration_minutes ??
+      estimateSessionMinutes({
+        exercises: s.exercises,
+        name: s.name,
+      } as ProgramProposal["sessions"][number]),
+    exercises: toExercisePayload(s.exercises),
   }));
 
-  const allExerciseIds = sessions.flatMap((s) => s.exercises.map((e) => e.exercise_id));
+  sessionPayloads = normalizeTrainingPlanSessionNames(sessionPayloads);
+
+  const allExerciseIds = sessionPayloads.flatMap((s) => s.exercises.map((e) => e.exercise_id));
   if (allExerciseIds.length === 0) {
     throw new Error("Program has no exercises.");
   }
@@ -103,23 +131,15 @@ export async function saveAiProgram(
     throw new Error("One or more exercises are not in the library. Regenerate the program.");
   }
 
-  const locationId = await resolveLocationId(supabase, proposal.location_slug);
-  const slug = await uniqueProgramSlug(supabase, slugifyTitle(proposal.title));
-
-  const sessionPayloads: SessionPayload[] = sessions.map((s) => ({
-    name: s.name,
-    description: s.description?.trim() || null,
-    duration_minutes: s.duration_minutes ?? estimateSessionMinutes(s),
-    exercises: toExercisePayload(s.exercises),
-  }));
-
   const minutesPerSession =
+    options?.minutesPerSession ??
     proposal.minutes_per_session ??
     Math.round(
-      sessionPayloads.reduce((sum, s) => sum + (s.duration_minutes ?? 15), 0) / sessionPayloads.length
+      sessionPayloads.reduce((sum, s) => sum + (s.duration_minutes ?? 15), 0) /
+        sessionPayloads.length
     );
 
-  const tracks: TrackPayload[] = [{ location_id: locationId, sessions: sessionPayloads }];
+  const tracks = [buildTrainingPlanTrack(locationId, sessionPayloads, sessionsPerWeek)];
 
   const { data: program, error: programErr } = await supabase
     .from("programs")

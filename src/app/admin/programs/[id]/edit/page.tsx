@@ -27,6 +27,7 @@ type ExerciseRow = {
   rest_after_seconds: number | null;
   session_phase: "warmup" | "main" | "cooldown" | null;
   choice_group: string | null;
+  note: string | null;
 };
 type SessionRow = {
   name: string;
@@ -91,6 +92,7 @@ function mapSessionRow(
         e.rest_after_seconds != null && Number.isFinite(e.rest_after_seconds)
           ? String(e.rest_after_seconds)
           : "",
+      note: e.note?.trim() ?? "",
     };
   });
   return {
@@ -270,7 +272,8 @@ export default async function EditProgramPage({ params }: PageProps) {
             rest_between_sets_seconds,
             rest_after_seconds,
             session_phase,
-            choice_group
+            choice_group,
+            note
           )
         )
       `

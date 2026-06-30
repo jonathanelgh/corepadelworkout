@@ -18,6 +18,7 @@ export type ProgramExerciseItem = {
   reps: number | null;
   restBetweenSetsSeconds: number | null;
   restAfterSeconds: number | null;
+  note: string | null;
 };
 
 type ExerciseNested = {
@@ -39,6 +40,7 @@ type ProgramExerciseNested = {
   rest_after_seconds: number | null;
   session_phase: SessionPhase | null;
   choice_group: string | null;
+  note: string | null;
   exercises: ExerciseNested | ExerciseNested[] | null;
 };
 
@@ -205,6 +207,7 @@ export async function fetchProgramExercises(
           rest_after_seconds,
           session_phase,
           choice_group,
+          note,
           exercises (
             id,
             title,
@@ -257,6 +260,7 @@ export async function fetchProgramExercises(
             reps: pe.reps,
             restBetweenSetsSeconds: pe.rest_between_sets_seconds,
             restAfterSeconds: pe.rest_after_seconds,
+            note: pe.note?.trim() || null,
           },
         });
       }
@@ -285,6 +289,7 @@ export async function fetchProgramSessionExercises(
       rest_after_seconds,
       session_phase,
       choice_group,
+      note,
       exercises (
         id,
         title,
@@ -320,6 +325,7 @@ export async function fetchProgramSessionExercises(
       reps: row.reps,
       restBetweenSetsSeconds: row.rest_between_sets_seconds,
       restAfterSeconds: row.rest_after_seconds,
+      note: row.note?.trim() || null,
     });
   }
   return items;

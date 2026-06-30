@@ -2,11 +2,18 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { EARLY_ACCESS_OFFER, EARLY_ACCESS_PRO_MONTHS, EARLY_ACCESS_TOKEN_PARAM } from "@/lib/pre-launch/early-access";
 import { signUpWithPassword } from "./actions";
 
 function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const earlyAccessToken =
+    searchParams.get("offer") === EARLY_ACCESS_OFFER
+      ? searchParams.get(EARLY_ACCESS_TOKEN_PARAM)?.trim() || null
+      : null;
+  const hasEarlyAccess = Boolean(earlyAccessToken);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,6 +31,7 @@ function SignUpForm() {
       email,
       password,
       origin: window.location.origin,
+      earlyAccessToken,
     });
 
     setPending(false);
@@ -71,10 +79,19 @@ function SignUpForm() {
               </h1>
               <p className="mt-3 text-sm text-white/70">
                 {verifySent
-                  ? `We sent a verification link to ${email}. After you confirm, you'll continue to onboarding.`
-                  : "Sign up with your name, email, and password. You'll personalize your plan next."}
+                  ? `We sent a verification link to ${email}. After you confirm, you'll continue to onboarding${hasEarlyAccess ? ` and your ${EARLY_ACCESS_PRO_MONTHS} months of Pro will be activated` : ""}.`
+                  : hasEarlyAccess
+                    ? `Create your account with the same waitlist email to unlock ${EARLY_ACCESS_PRO_MONTHS} months of Pro free.`
+                    : "Sign up with your name, email, and password. You'll personalize your plan next."}
               </p>
             </div>
+
+            {hasEarlyAccess && !verifySent && (
+              <div className="mb-4 rounded-2xl border border-[#ccff00]/30 bg-[#ccff00]/10 px-4 py-3 text-sm text-[#e8ff99]">
+                Early-access perk: <strong className="text-white">{EARLY_ACCESS_PRO_MONTHS} months of Pro</strong> included
+                when you sign up with your waitlist email.
+              </div>
+            )}
 
             <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur-md md:p-8">
               {error && (

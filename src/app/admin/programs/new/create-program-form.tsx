@@ -36,6 +36,7 @@ import { createProgram, updateProgram } from "../actions";
 import { createClient } from "@/utils/supabase/client";
 import { STORAGE_BUCKETS } from "@/utils/supabase/storage";
 import { ExerciseSearchCombobox, type ExerciseOption } from "./exercise-search-combobox";
+import { ExerciseVideoThumbnail } from "@/components/admin/exercise-video-thumbnail";
 import type { MemberPickerOption } from "@/lib/programs/profile-ai-context";
 
 const TABS = [
@@ -96,6 +97,8 @@ export type SessionExerciseEntry = {
   restBetweenSetsSeconds: string;
   /** Seconds of pause after this exercise before the next; empty = none */
   restAfterSeconds: string;
+  /** Optional coach note shown during the workout */
+  note: string;
 };
 
 export type SessionBlock = {
@@ -168,6 +171,7 @@ function cloneSessionBlock(src: SessionBlock, name: string): SessionBlock {
       reps: e.reps,
       restBetweenSetsSeconds: e.restBetweenSetsSeconds,
       restAfterSeconds: e.restAfterSeconds,
+      note: e.note,
     })),
   };
 }
@@ -381,6 +385,7 @@ export function CreateProgramForm({
     const newTracks: TrackBlock[] = draft.tracks.map((tr) => ({
       key: crypto.randomUUID(),
       locationId: tr.locationId,
+      ...(tr.weekSizes?.length ? { weekSizes: tr.weekSizes } : {}),
       sessions: tr.sessions.map((s, i) => ({
         key: crypto.randomUUID(),
         name: s.name.trim() || `Day ${i + 1}`,
@@ -400,6 +405,7 @@ export function CreateProgramForm({
             reps: ex.reps,
             restBetweenSetsSeconds: ex.restBetweenSetsSeconds,
             restAfterSeconds: ex.restAfterSeconds,
+            note: ex.note ?? "",
           };
         }),
       })),
@@ -746,6 +752,7 @@ export function CreateProgramForm({
                   reps: "",
                   restBetweenSetsSeconds: "",
                   restAfterSeconds: "",
+                  note: "",
                 },
               ],
             };
@@ -833,6 +840,29 @@ export function CreateProgramForm({
               exercises: s.exercises.map((e) =>
                 e.key === entryKey ? { ...e, prescriptionType } : e
               ),
+            };
+          }),
+        };
+      })
+    );
+  }
+
+  function setSessionExerciseNote(
+    trackKey: string,
+    sessionKey: string,
+    entryKey: string,
+    note: string
+  ) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.key !== sessionKey) return s;
+            return {
+              ...s,
+              exercises: s.exercises.map((e) => (e.key === entryKey ? { ...e, note } : e)),
             };
           }),
         };
@@ -1025,6 +1055,7 @@ export function CreateProgramForm({
               const n = Number.parseInt(e.restAfterSeconds, 10);
               if (Number.isFinite(n) && n >= 0) rest_after_seconds = n;
             }
+            const note = e.note.trim() || null;
             return {
               exercise_id: e.exerciseId,
               duration_seconds,
@@ -1035,6 +1066,7 @@ export function CreateProgramForm({
               rest_after_seconds,
               session_phase: e.sessionPhase,
               choice_group: e.choiceGroup.trim() || null,
+              note,
             };
           });
           return {
@@ -2122,6 +2154,7 @@ export function CreateProgramForm({
                               }}
                             >
                               {session.exercises.map((entry, index) => {
+                                const exerciseMeta = exercises.find((e) => e.id === entry.exerciseId);
                                 const programMode = exerciseProgramMode(exercises, entry.exerciseId);
                                 const prescriptionOptions = prescriptionOptionsForMode(programMode);
                                 const activeType = clampProgramPrescriptionType(
@@ -2193,10 +2226,38 @@ export function CreateProgramForm({
                                       >
                                         <GripVertical className="h-4 w-4" />
                                       </div>
-                                      <div className="min-w-0">
+                                      <ExerciseVideoThumbnail
+                                        title={exerciseMeta?.title ?? exerciseTitle(entry.exerciseId)}
+                                        imageUrl={exerciseMeta?.image_url}
+                                        videoUrl={exerciseMeta?.video_url}
+                                      />
+                                      <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium text-gray-900 truncate">
                                           {exerciseTitle(entry.exerciseId)}
                                         </p>
+                                        <div className="mt-3">
+                                          <label
+                                            htmlFor={`ex-note-${entry.key}`}
+                                            className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
+                                          >
+                                            Coach note
+                                          </label>
+                                          <textarea
+                                            id={`ex-note-${entry.key}`}
+                                            value={entry.note}
+                                            onChange={(e) =>
+                                              setSessionExerciseNote(
+                                                activeTrack.key,
+                                                session.key,
+                                                entry.key,
+                                                e.target.value
+                                              )
+                                            }
+                                            rows={2}
+                                            placeholder="Optional note for the athlete (e.g. focus on form, tempo, or setup)"
+                                            className="w-full resize-y rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
+                                          />
+                                        </div>
                                         <p className="mt-2 text-xs text-gray-500">
                                           Choose how this exercise runs in the workout player. Rest after applies
                                           before the next exercise.

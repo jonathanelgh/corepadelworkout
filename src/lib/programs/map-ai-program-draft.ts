@@ -1,6 +1,7 @@
 import type { GeminiProgramDraft } from "@/lib/programs/gemini-generate-program";
 import type { ProgramAiContext } from "@/lib/programs/exercise-catalog";
 import { expandSessionsToTarget } from "@/lib/programs/expand-program-sessions";
+import { resolveWeekSizesFromSchedule } from "@/lib/programs/training-plan-curriculum";
 import type { SessionPhase } from "@/lib/programs/session-phase";
 
 import type { ExerciseDurationUnit } from "@/app/admin/programs/new/create-program-form";
@@ -23,6 +24,7 @@ export type AiProgramExerciseRow = {
   reps: string;
   restBetweenSetsSeconds: string;
   restAfterSeconds: string;
+  note: string;
 };
 
 export type AiProgramSessionRow = {
@@ -35,6 +37,7 @@ export type AiProgramSessionRow = {
 export type AiProgramTrackRow = {
   locationId: string;
   sessions: AiProgramSessionRow[];
+  weekSizes?: number[];
 };
 
 export type AiProgramFormDraft = {
@@ -167,6 +170,7 @@ export function mapGeminiDraftToForm(
           reps: intToField(ex.reps),
           restBetweenSetsSeconds: intToField(ex.rest_between_sets_seconds),
           restAfterSeconds: intToField(ex.rest_after_seconds),
+          note: "",
         });
       }
 
@@ -176,7 +180,7 @@ export function mapGeminiDraftToForm(
       }
 
       sessions.push({
-        name: sess.name,
+        name: `Day ${sessions.length + 1}`,
         description: sess.description ?? "",
         durationMinutes: intToField(sess.duration_minutes),
         exercises,
@@ -188,7 +192,16 @@ export function mapGeminiDraftToForm(
       continue;
     }
 
-    tracks.push({ locationId: loc.id, sessions });
+    const weekSizes =
+      sessionsPerWeek != null && sessionsPerWeek > 0
+        ? resolveWeekSizesFromSchedule(sessions.length, sessionsPerWeek)
+        : undefined;
+
+    tracks.push({
+      locationId: loc.id,
+      sessions,
+      ...(weekSizes ? { weekSizes } : {}),
+    });
   }
 
   if (tracks.length === 0) {

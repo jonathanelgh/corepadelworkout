@@ -5,6 +5,7 @@ import {
   type FeaturedProgram,
 } from "@/components/landing/marketing-home-page";
 import { mapProgramRowsToCards, type ProgramRow } from "@/lib/programs/map-program-cards";
+import { proMonthlyPriceLabel } from "@/lib/billing/format-subscription-price";
 
 export const metadata: Metadata = {
   title: "Strength & conditioning for padel players",
@@ -19,17 +20,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-function formatProPrice(
-  plan: { price_amount: number | null; currency: string | null; interval: string | null } | null
-): string | null {
-  if (!plan?.price_amount || !Number.isFinite(Number(plan.price_amount))) return null;
-  const amount = Number(plan.price_amount);
-  const currency = (plan.currency ?? "eur").toUpperCase();
-  const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : `${currency} `;
-  const interval = plan.interval === "year" ? "year" : "month";
-  return `${symbol}${amount.toFixed(amount % 1 === 0 ? 0 : 2)} /${interval}`;
-}
 
 export default async function Home() {
   const supabase = await createClient();
@@ -75,7 +65,7 @@ export default async function Home() {
   return (
     <MarketingHomePage
       featuredPrograms={featuredPrograms}
-      proPriceLabel={formatProPrice(planRes.data)}
+      proPriceLabel={proMonthlyPriceLabel(planRes.data)}
     />
   );
 }

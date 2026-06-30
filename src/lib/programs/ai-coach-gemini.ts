@@ -1,8 +1,10 @@
 import {
+  FunctionCallingMode,
   GoogleGenerativeAI,
   SchemaType,
   type Content,
   type FunctionDeclaration,
+  type GenerateContentResponse,
 } from "@google/generative-ai";
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
@@ -73,9 +75,16 @@ function buildSystemInstruction(
     exerciseCount: number;
     userContextBlock: string;
   },
-  options?: { creationOnly?: boolean; consultationBrief?: string }
+  options?: {
+    creationOnly?: boolean;
+    consultationBrief?: string;
+    toolsEnabled?: boolean;
+    omitProgramsCatalog?: boolean;
+  }
 ): string {
-  const catalogJson = JSON.stringify(params.programsCatalog, null, 0);
+  const catalogJson = options?.omitProgramsCatalog
+    ? "[]"
+    : JSON.stringify(params.programsCatalog, null, 0);
 
   let out = fillPromptTemplate(template, {
     user_context_block: params.userContextBlock,
@@ -90,11 +99,22 @@ function buildSystemInstruction(
   }
 
   if (options?.creationOnly) {
-    out += `
+    if (options.toolsEnabled === false) {
+      out += `
+
+## Consultation phase — text only
+The admin wants a new program or workout. Gather missing details with one short question per turn.
+Tools are OFF this turn — reply with plain text only. Do not call generate_program, generate_workout, or recommend_programs.
+1–2 short sentences + one question. No praise filler, no repeating their brief back, never expose consultation_state.`;
+    } else {
+      out += `
 
 ## CRITICAL — this message is a creation request
 The admin asked you to build something new. Use generate_program or generate_workout.
-Do NOT use recommend_programs — even if similar published programs exist in the catalog.`;
+Do NOT use recommend_programs — even if similar published programs exist in the catalog.
+When the consultation block says CONSULTATION COMPLETE, you MUST call the tool in this turn — never reply with prose only.
+During consultation: 1–2 short sentences + one question. No praise filler, no repeating their brief back, never expose consultation_state.`;
+    }
   }
 
   return out;
@@ -127,7 +147,7 @@ const TOOLS: FunctionDeclaration[] = [
         sessions: {
           type: SchemaType.ARRAY,
           description:
-            "One entry per session in the full schedule. For 4 weeks × 3/week you MUST return 12 sessions. Each session has its own exercise list.",
+            "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 entries for 3×/week). The app repeats them for duration_weeks — do NOT return every week. Each session needs warm-up, main, and cool-down exercises.",
           items: {
             type: SchemaType.OBJECT,
             properties: {
@@ -350,6 +370,13 @@ function parseRecommendPrograms(args: Record<string, unknown>): RecommendProgram
   return { intro_text, program_ids: program_ids.slice(0, 5) };
 }
 
+class IncompleteToolCallError extends Error {
+  constructor(readonly toolName: string) {
+    super(`Incomplete ${toolName} tool call`);
+    this.name = "IncompleteToolCallError";
+  }
+}
+
 export async function chatWithAiCoach(params: {
   history: ChatHistoryMessage[];
   programsCatalog: ProgramCatalogForAI[];
@@ -359,6 +386,10 @@ export async function chatWithAiCoach(params: {
   userContextBlock: string;
   creationOnly?: boolean;
   consultationBrief?: string;
+  /** When false, model replies with text only (consultation Q&A). Default true. */
+  toolsEnabled?: boolean;
+  /** Force a single tool call (generation after consultation). */
+  forcedTool?: "generate_program" | "generate_workout";
 }): Promise<AiCoachChatResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
@@ -370,7 +401,33 @@ export async function chatWithAiCoach(params: {
     throw new Error("Your exercise library has no published exercises. Add and publish exercises first.");
   }
 
-  async function runTurn(creationOnly: boolean): Promise<AiCoachChatResult> {
+  const toolsEnabled = params.toolsEnabled !== false;
+
+  function emptyResponseError(response: GenerateContentResponse): Error {
+    const candidate = response.candidates?.[0];
+    const finishReason = candidate?.finishReason;
+    const blocked = candidate?.safetyRatings?.some(
+      (r) => r.probability === "HIGH" || r.probability === "MEDIUM"
+    );
+    if (finishReason === "SAFETY" || blocked) {
+      return new Error("The AI blocked this response. Rephrase your message and try again.");
+    }
+    if (finishReason === "MAX_TOKENS") {
+      return new Error("The AI response was cut off. Try a shorter message or try again.");
+    }
+    return new Error("AI returned an empty response. Try again.");
+  }
+
+  const activeTools =
+    params.forcedTool != null
+      ? TOOLS.filter((t) => t.name === params.forcedTool)
+      : TOOLS;
+
+  async function runTurn(
+    creationOnly: boolean,
+    history: ChatHistoryMessage[],
+    turnToolsEnabled: boolean
+  ): Promise<AiCoachChatResult> {
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({
       model: resolveGeminiModel(),
@@ -382,15 +439,35 @@ export async function chatWithAiCoach(params: {
           exerciseCount: params.catalogById.size,
           userContextBlock: params.userContextBlock,
         },
-        { creationOnly, consultationBrief: params.consultationBrief }
+        {
+          creationOnly,
+          consultationBrief: params.consultationBrief,
+          toolsEnabled: turnToolsEnabled,
+          omitProgramsCatalog: params.forcedTool != null,
+        }
       ),
-      tools: [{ functionDeclarations: TOOLS }],
+      ...(turnToolsEnabled
+        ? {
+            tools: [{ functionDeclarations: activeTools }],
+            ...(params.forcedTool
+              ? {
+                  toolConfig: {
+                    functionCallingConfig: {
+                      mode: FunctionCallingMode.ANY,
+                      allowedFunctionNames: [params.forcedTool],
+                    },
+                  },
+                }
+              : {}),
+          }
+        : {}),
       generationConfig: {
-        maxOutputTokens: 8192,
+        maxOutputTokens: turnToolsEnabled ? 32768 : 8192,
+        temperature: params.forcedTool ? 0.4 : undefined,
       },
     });
 
-    const contents: Content[] = params.history.map((m) => ({
+    const contents: Content[] = history.map((m) => ({
       role: m.role,
       parts: m.parts,
     }));
@@ -399,9 +476,11 @@ export async function chatWithAiCoach(params: {
     const response = result.response;
     const parts = response.candidates?.[0]?.content?.parts ?? [];
 
+    let failedToolName: string | undefined;
     for (const part of parts) {
       const fc = part.functionCall;
       if (!fc?.name) continue;
+      failedToolName = fc.name;
       const args = (fc.args ?? {}) as Record<string, unknown>;
       if (fc.name === "recommend_programs") {
         const parsed = parseRecommendPrograms(args);
@@ -420,17 +499,90 @@ export async function chatWithAiCoach(params: {
     const text = response.text()?.trim();
     if (text) return { type: "text", text };
 
-    throw new Error("AI returned an empty response. Try again.");
+    if (failedToolName) {
+      throw new IncompleteToolCallError(failedToolName);
+    }
+
+    throw emptyResponseError(response);
+  }
+
+  function isRetryableGenerationError(err: unknown): boolean {
+    if (err instanceof IncompleteToolCallError) return true;
+    if (err instanceof Error) {
+      return (
+        err.message.includes("empty response") ||
+        err.message.includes("cut off")
+      );
+    }
+    return false;
+  }
+
+  async function runTurnWithToolRetries(
+    creationOnly: boolean,
+    initialHistory: ChatHistoryMessage[],
+    turnToolsEnabled: boolean
+  ): Promise<AiCoachChatResult> {
+    let history = initialHistory;
+    const toolName = params.forcedTool ?? "generate_program";
+    const retryMessages = [
+      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase and rest_after_seconds on each.`,
+      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs warmup, main (include rotation or anti-rotation), and cooldown.`,
+      `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
+    ];
+
+    for (let attempt = 0; attempt <= retryMessages.length; attempt++) {
+      try {
+        return await runTurn(creationOnly, history, turnToolsEnabled);
+      } catch (err) {
+        if (!isRetryableGenerationError(err) || attempt >= retryMessages.length) {
+          if (err instanceof IncompleteToolCallError || isRetryableGenerationError(err)) {
+            throw new Error(
+              "The coach could not finish the draft after several tries. Click send or try again — no need to re-enter consultation answers."
+            );
+          }
+          throw err;
+        }
+        history = [
+          ...history,
+          { role: "user", parts: [{ text: retryMessages[attempt]! }] },
+        ];
+      }
+    }
+
+    throw new Error("Generation failed. Please try again.");
+  }
+
+  async function runTurnWithRetry(
+    creationOnly: boolean,
+    history: ChatHistoryMessage[],
+    turnToolsEnabled: boolean
+  ): Promise<AiCoachChatResult> {
+    if (turnToolsEnabled && creationOnly) {
+      return runTurnWithToolRetries(creationOnly, history, turnToolsEnabled);
+    }
+    try {
+      return await runTurn(creationOnly, history, turnToolsEnabled);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (!message.includes("empty response")) throw err;
+      return runTurn(creationOnly, [
+        ...history,
+        {
+          role: "user",
+          parts: [{ text: "Please reply with a short helpful message (one question if gathering details)." }],
+        },
+      ], turnToolsEnabled);
+    }
   }
 
   const creationOnly = params.creationOnly === true;
-  const first = await runTurn(creationOnly);
+  const first = await runTurnWithRetry(creationOnly, params.history, toolsEnabled);
   if (
     creationOnly &&
     first.type === "functionCall" &&
     first.name === "recommend_programs"
   ) {
-    const second = await runTurn(true);
+    const second = await runTurnWithRetry(true, params.history, toolsEnabled);
     if (second.type === "functionCall" && second.name === "recommend_programs") {
       throw new Error(
         "The coach tried to recommend existing programs instead of creating a new one. Please try again with your program details (duration, frequency, goals)."

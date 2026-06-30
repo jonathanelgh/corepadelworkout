@@ -94,6 +94,9 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
   const rest_after_seconds = parseOptionalNonNegIntField(
     row.rest_after_seconds ?? row.restAfterSeconds ?? row.pause_seconds
   );
+  const noteRaw = row.note;
+  const note =
+    typeof noteRaw === "string" && noteRaw.trim().length > 0 ? noteRaw.trim() : null;
   return {
     exercise_id,
     duration_minutes,
@@ -104,6 +107,7 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
     rest_after_seconds,
     session_phase: parseSessionPhase(row.session_phase ?? row.sessionPhase),
     choice_group: parseChoiceGroup(row.choice_group ?? row.choiceGroup),
+    note,
   };
 }
 
@@ -145,6 +149,7 @@ function parseOneSession(o: Record<string, unknown>): SessionPayload {
             rest_after_seconds: null,
             session_phase: "main",
             choice_group: null,
+            note: null,
           });
         }
       }
@@ -515,6 +520,7 @@ type DuplicateDbExerciseRow = {
   rest_after_seconds: number | null;
   session_phase: SessionPhase | null;
   choice_group: string | null;
+  note: string | null;
 };
 
 type DuplicateDbSessionRow = {
@@ -564,6 +570,7 @@ function dbTracksToDuplicatePayloads(rows: DuplicateDbTrackRow[] | null): TrackP
         rest_after_seconds: e.rest_after_seconds,
         session_phase: e.session_phase ?? "main",
         choice_group: e.choice_group?.trim() || null,
+        note: e.note?.trim() || null,
       }));
       return {
         name: typeof s.name === "string" ? s.name : "",
@@ -639,7 +646,8 @@ export async function duplicateProgram(formData: FormData) {
           rest_between_sets_seconds,
           rest_after_seconds,
           session_phase,
-          choice_group
+          choice_group,
+          note
         )
       )
     `

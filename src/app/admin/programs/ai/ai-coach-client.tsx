@@ -15,6 +15,7 @@ import {
 import type { ProgramCatalogRow } from "@/lib/programs/programs-catalog";
 import type { MemberPickerOption } from "@/lib/programs/profile-ai-context";
 import type { ChatHistoryMessage, ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
+import type { ConsultationPrompt } from "@/lib/programs/coach-consultation";
 import {
   groupExercisesByPhase,
   SESSION_PHASE_LABELS,
@@ -47,6 +48,7 @@ type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text?: string;
+  consultationPrompt?: ConsultationPrompt;
   recommendedPrograms?: {
     introText: string;
     programs: ProgramCatalogRow[];
@@ -56,6 +58,73 @@ type ChatMessage = {
   proposalSaved?: boolean;
   generatedWorkout?: GeneratedWorkout;
 };
+
+function ConsultationOptions({
+  prompt,
+  pending,
+  multiDraft,
+  onToggleMulti,
+  onConfirmMulti,
+  onSelectSingle,
+}: {
+  prompt: ConsultationPrompt;
+  pending: boolean;
+  multiDraft: string[];
+  onToggleMulti: (value: string) => void;
+  onConfirmMulti: (values: string[]) => void;
+  onSelectSingle: (value: string) => void;
+}) {
+  if (prompt.multiSelect) {
+    return (
+      <div className="mt-3 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {prompt.options.map((opt) => {
+            const selected = multiDraft.includes(opt.value);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={pending}
+                onClick={() => onToggleMulti(opt.value)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                  selected
+                    ? "border-black bg-black text-white"
+                    : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-white"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          disabled={pending || multiDraft.length === 0}
+          onClick={() => onConfirmMulti(multiDraft)}
+          className="rounded-lg bg-[#ccff00] px-4 py-2 text-xs font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-50"
+        >
+          Continue
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {prompt.options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          disabled={pending}
+          onClick={() => onSelectSingle(opt.value)}
+          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:bg-white disabled:opacity-50"
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function simpleMarkdown(text: string): React.ReactNode {
   const lines = text.split("\n");
@@ -191,11 +260,12 @@ export function AiCoachClient({
     {
       id: "welcome",
       role: "assistant",
-      text: "I'm your **AI Padel Coach** for the admin catalog. I can recommend existing programs or help you **build a new workout or program**.\n\nWhen creating something new, I'll ask a few quick questions **one at a time** — focus, where they'll train (home / gym / court), home equipment if relevant, movement screen for programs, then duration.\n\nWhat would you like to do?",
+      text: "I can **recommend programs** from your catalog or **build a custom** workout or program from your exercises.\n\nWhat do you need?",
     },
   ]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [multiDraft, setMultiDraft] = useState<string[]>([]);
   const [savingProposalId, setSavingProposalId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -207,6 +277,37 @@ export function AiCoachClient({
   useEffect(() => {
     scrollToBottom();
   }, [messages, pending, scrollToBottom]);
+
+  const lastAssistant = messages[messages.length - 1];
+  const activeConsultationPrompt =
+    lastAssistant?.role === "assistant" && lastAssistant.consultationPrompt && !pending
+      ? lastAssistant.consultationPrompt
+      : null;
+
+  useEffect(() => {
+    if (activeConsultationPrompt?.multiSelect) {
+      setMultiDraft([]);
+    }
+  }, [activeConsultationPrompt?.topic, messages.length]);
+
+  function toggleMultiDraft(value: string) {
+    if (value === "yes to all") {
+      setMultiDraft(["yes to all"]);
+      return;
+    }
+    setMultiDraft((prev) => {
+      const withoutAll = prev.filter((v) => v !== "yes to all");
+      return withoutAll.includes(value)
+        ? withoutAll.filter((v) => v !== value)
+        : [...withoutAll, value];
+    });
+  }
+
+  function confirmMultiDraft(values: string[]) {
+    const payload =
+      values.includes("yes to all") || values.length === 0 ? "yes to all" : values.join(", ");
+    void handleSend(payload);
+  }
 
   async function handleSend(textOverride?: string) {
     const text = (textOverride ?? input).trim();
@@ -237,7 +338,17 @@ export function AiCoachClient({
     }
 
     const assistantId = `a-${Date.now()}`;
-    if (res.type === "text") {
+    if (res.type === "consultation") {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          text: res.text,
+          consultationPrompt: res.prompt,
+        },
+      ]);
+    } else if (res.type === "text") {
       setMessages((prev) => [
         ...prev,
         { id: assistantId, role: "assistant", text: res.text },
@@ -431,7 +542,7 @@ export function AiCoachClient({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="mx-auto max-w-3xl space-y-4">
-          {messages.map((m) => (
+          {messages.map((m, index) => (
             <div
               key={m.id}
               className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
@@ -448,6 +559,19 @@ export function AiCoachClient({
                     {m.role === "assistant" ? simpleMarkdown(m.text) : m.text}
                   </div>
                 )}
+
+                {m.consultationPrompt &&
+                  index === messages.length - 1 &&
+                  m.role === "assistant" && (
+                    <ConsultationOptions
+                      prompt={m.consultationPrompt}
+                      pending={pending}
+                      multiDraft={multiDraft}
+                      onToggleMulti={toggleMultiDraft}
+                      onConfirmMulti={confirmMultiDraft}
+                      onSelectSingle={(value) => void handleSend(value)}
+                    />
+                  )}
 
                 {m.recommendedPrograms && (
                   <div className="space-y-3">

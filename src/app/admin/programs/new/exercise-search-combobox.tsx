@@ -20,6 +20,8 @@ export type ExerciseOption = {
   location_ids: string[];
   status?: "draft" | "published";
   programPrescriptionMode?: ExerciseProgramPrescriptionMode;
+  image_url?: string | null;
+  video_url?: string | null;
 };
 
 type Props = {
