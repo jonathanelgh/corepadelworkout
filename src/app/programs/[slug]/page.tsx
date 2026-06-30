@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { fetchProgramExercises } from "@/lib/programs/program-exercises";
 import { ProgramExperienceLayout } from "../program-experience-layout";
-import { ProgramStartBar } from "../program-start-bar";
+import { ProgramAccessBar } from "../program-access-bar";
 import { ProgramDetailTabs } from "@/components/programs/program-detail-tabs";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,7 @@ type ProgramRow = {
   promo_video_url: string | null;
   song_url: string | null;
   price: number | null;
+  is_free: boolean;
   duration_weeks: number | null;
   sessions_per_week: number | null;
   minutes_per_session: number | null;
@@ -102,6 +103,7 @@ export default async function ProgramDetail({ params }: PageProps) {
       promo_video_url,
       song_url,
       price,
+      is_free,
       duration_weeks,
       sessions_per_week,
       minutes_per_session,
@@ -148,7 +150,12 @@ export default async function ProgramDetail({ params }: PageProps) {
       backHref="/programs"
       backLabel="Back to programs"
       footer={
-        <ProgramStartBar programSlug={slug} minutesPerSession={program.minutes_per_session} />
+        <ProgramAccessBar
+          programId={program.id}
+          programSlug={slug}
+          isFree={program.is_free}
+          minutesPerSession={program.minutes_per_session}
+        />
       }
     >
       <ProgramDetailTabs description={detailsText} exercises={exercises} />

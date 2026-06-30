@@ -6,7 +6,7 @@ import { MemberHubLoader } from "@/components/member/member-hub-loader";
 
 export const dynamic = "force-dynamic";
 
-type PageSearch = Promise<{ tab?: string }>;
+type PageSearch = Promise<{ tab?: string; billing?: string }>;
 
 export default async function MemberHubPage({ searchParams }: { searchParams: PageSearch }) {
   const sp = await searchParams;
@@ -20,6 +20,7 @@ export default async function MemberHubPage({ searchParams }: { searchParams: Pa
 
   const hubData = await loadMemberHubData(supabase, user.id, userEmail);
   const initialTab = tabFromSearchParam(sp.tab);
+  const billingSuccess = sp.billing === "success";
 
   return (
     <MemberHubLoader
@@ -27,6 +28,7 @@ export default async function MemberHubPage({ searchParams }: { searchParams: Pa
       initialTab={initialTab}
       userEmail={userEmail}
       profile={profile}
+      billingSuccess={billingSuccess}
     />
   );
 }

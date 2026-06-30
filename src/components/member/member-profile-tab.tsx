@@ -1,12 +1,24 @@
 "use client";
 
 import type { MemberHubProfile } from "@/lib/member/load-member-hub-data";
+import type { MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
+import { SubscriptionSettings } from "@/components/billing/subscription-settings";
 
-export function MemberProfileTab({ profile }: { profile: MemberHubProfile }) {
+export function MemberProfileTab({
+  profile,
+  subscription,
+  billingSuccess,
+}: {
+  profile: MemberHubProfile;
+  subscription: MemberSubscriptionStatus;
+  billingSuccess?: boolean;
+}) {
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="mx-auto max-w-lg space-y-8">
+      <SubscriptionSettings subscription={subscription} billingSuccess={billingSuccess} />
+
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900">Profile</h1>
+        <h2 className="text-lg font-semibold text-zinc-900">Profile</h2>
         <p className="mt-1 text-sm text-zinc-600">Details from your account (edit form coming next).</p>
       </div>
 

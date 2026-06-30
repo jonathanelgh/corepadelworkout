@@ -7,9 +7,17 @@ import {
 } from "@/lib/programs/exercise-catalog";
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
+import {
+  normalizeExercisePhases,
+  parseChoiceGroup,
+  parseSessionPhase,
+  type SessionPhase,
+} from "@/lib/programs/session-phase";
 
 export type GeminiProgramExercise = {
   exercise_id: string;
+  phase: SessionPhase;
+  choice_group: string | null;
   duration_minutes: number | null;
   sets: number | null;
   reps: number | null;
@@ -75,6 +83,8 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
           "exercises": [
             {
               "exercise_id": "string (UUID from catalog ONLY)",
+              "phase": "warmup | main | cooldown",
+              "choice_group": "string | null (same group = pick-one alternative in warm-up/cool-down)",
               "duration_minutes": "number | null",
               "sets": "number | null",
               "reps": "number | null",
@@ -104,6 +114,8 @@ function parseExerciseRow(row: unknown): GeminiProgramExercise | null {
   if (!exercise_id) return null;
   return {
     exercise_id,
+    phase: parseSessionPhase(r.phase),
+    choice_group: parseChoiceGroup(r.choice_group),
     duration_minutes: parseOptionalInt(r.duration_minutes),
     sets: parseOptionalInt(r.sets),
     reps: parseOptionalInt(r.reps),
@@ -119,11 +131,14 @@ function parseSession(row: unknown): GeminiProgramSession | null {
   if (!name) return null;
   const exercisesRaw = Array.isArray(r.exercises) ? r.exercises : [];
   const exercises = exercisesRaw.map(parseExerciseRow).filter((x): x is GeminiProgramExercise => x != null);
+  const normalized = normalizeExercisePhases(
+    exercises.map((e) => ({ ...e, phase: e.phase }))
+  );
   return {
     name,
     description: typeof r.description === "string" ? r.description.trim() || null : null,
     duration_minutes: parseOptionalInt(r.duration_minutes),
-    exercises,
+    exercises: normalized,
   };
 }
 
@@ -231,6 +246,12 @@ export async function generateProgramWithGemini(
   if (input.durationWeeks != null) scheduleParts.push(`Duration: ${input.durationWeeks} weeks`);
   if (input.sessionsPerWeek != null) scheduleParts.push(`Frequency: ${input.sessionsPerWeek} sessions per week`);
   if (input.minutesPerSession != null) scheduleParts.push(`Target session length: ~${input.minutesPerSession} minutes`);
+  if (input.durationWeeks != null && input.sessionsPerWeek != null) {
+    const required = input.durationWeeks * input.sessionsPerWeek;
+    scheduleParts.push(
+      `REQUIRED: Each track MUST contain exactly ${required} sessions (${input.durationWeeks} weeks × ${input.sessionsPerWeek} per week). Returning fewer sessions is not allowed.`
+    );
+  }
 
   const schedule_targets =
     scheduleParts.length > 0 ? `\n## Schedule targets\n${scheduleParts.join("\n")}\n` : "";

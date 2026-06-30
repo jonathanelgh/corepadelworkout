@@ -14,18 +14,23 @@ import {
 } from "lucide-react";
 import type { ProgramCatalogRow } from "@/lib/programs/programs-catalog";
 import type { MemberPickerOption } from "@/lib/programs/profile-ai-context";
-import type { ChatHistoryMessage, WorkoutProposal } from "@/lib/programs/ai-coach-gemini";
+import type { ChatHistoryMessage, ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
+import {
+  groupExercisesByPhase,
+  SESSION_PHASE_LABELS,
+} from "@/lib/programs/session-phase";
 import {
   getProgramCoverUrl,
+  saveAiCoachProgram,
   saveAiCoachWorkout,
   sendAiCoachMessage,
 } from "../ai-coach-actions";
 
 const SUGGESTED_PROMPTS = [
   "Recommend programs for intermediate players who want better court movement.",
-  "Build a 15-minute home core workout for padel.",
+  "Build a home strength program for padel.",
   "What published programs focus on shoulder durability?",
-  "Create a 20-min pre-match activation with mobility and activation drills.",
+  "Create a pre-match activation workout.",
 ];
 
 type GeneratedWorkout = {
@@ -47,6 +52,7 @@ type ChatMessage = {
     programs: ProgramCatalogRow[];
   };
   workoutProposal?: WorkoutProposal;
+  programProposal?: ProgramProposal;
   proposalSaved?: boolean;
   generatedWorkout?: GeneratedWorkout;
 };
@@ -73,6 +79,62 @@ function simpleMarkdown(text: string): React.ReactNode {
   });
 }
 
+function formatProposalExerciseMeta(ex: WorkoutProposalExercise): string {
+  return [
+    ex.sets != null && ex.reps != null && `${ex.sets}×${ex.reps}`,
+    ex.duration_minutes != null && `${ex.duration_minutes} min`,
+    `${ex.rest_after_seconds}s rest`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function renderPhasedExerciseList(exercises: WorkoutProposalExercise[]) {
+  const phased = groupExercisesByPhase(
+    exercises.map((ex) => ({ ...ex, sessionPhase: ex.phase }))
+  );
+  const rendered = new Set<string>();
+
+  return (
+    <div className="space-y-3">
+      {phased.map(({ phase, items }) => (
+        <div key={phase}>
+          <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+            {SESSION_PHASE_LABELS[phase]}
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {items.map((ex) => {
+              if (ex.choice_group) {
+                if (rendered.has(ex.choice_group)) return null;
+                rendered.add(ex.choice_group);
+                const options = items.filter((o) => o.choice_group === ex.choice_group);
+                return (
+                  <li key={ex.choice_group} className="text-sm text-gray-700">
+                    <span className="text-gray-500">Pick one: </span>
+                    {options.map((opt, i) => (
+                      <span key={opt.exercise_id}>
+                        {i > 0 ? " · " : ""}
+                        <span className="font-medium">{opt.title}</span>
+                        <span className="text-gray-500"> ({formatProposalExerciseMeta(opt)})</span>
+                      </span>
+                    ))}
+                  </li>
+                );
+              }
+              return (
+                <li key={ex.exercise_id} className="text-sm text-gray-700">
+                  <span className="font-medium">{ex.title}</span>
+                  <span className="text-gray-500"> — {formatProposalExerciseMeta(ex)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function toGeminiHistory(messages: ChatMessage[]): ChatHistoryMessage[] {
   const out: ChatHistoryMessage[] = [];
   for (const m of messages) {
@@ -93,6 +155,15 @@ function toGeminiHistory(messages: ChatMessage[]): ChatHistoryMessage[] {
           parts: [
             {
               text: `Proposed workout: ${m.workoutProposal.title}\n${m.workoutProposal.description}\nExercises: ${m.workoutProposal.exercises.map((e) => e.title).join(", ")}`,
+            },
+          ],
+        });
+      } else if (m.programProposal) {
+        out.push({
+          role: "model",
+          parts: [
+            {
+              text: `Proposed program: ${m.programProposal.title}\n${m.programProposal.description}\n${m.programProposal.duration_weeks} weeks × ${m.programProposal.sessions_per_week}/week, ${m.programProposal.sessions.length} session(s) drafted`,
             },
           ],
         });
@@ -120,7 +191,7 @@ export function AiCoachClient({
     {
       id: "welcome",
       role: "assistant",
-      text: "I'm your **AI Padel Coach** for the admin catalog. I can recommend existing published programs or draft a custom workout you can save as a program.\n\nWhat would you like to build?",
+      text: "I'm your **AI Padel Coach** for the admin catalog. I can recommend existing programs or help you **build a new workout or program**.\n\nWhen creating something new, I'll ask a few quick questions **one at a time** — focus, where they'll train (home / gym / court), home equipment if relevant, movement screen for programs, then duration.\n\nWhat would you like to do?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -183,7 +254,7 @@ export function AiCoachClient({
           },
         },
       ]);
-    } else {
+    } else if (res.type === "workout_proposal") {
       setMessages((prev) => [
         ...prev,
         {
@@ -192,6 +263,57 @@ export function AiCoachClient({
           workoutProposal: res.proposal,
         },
       ]);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          programProposal: res.proposal,
+        },
+      ]);
+    }
+  }
+
+  async function handleSaveProgram(
+    proposalMsgId: string,
+    proposal: ProgramProposal,
+    publish: boolean
+  ) {
+    setSavingProposalId(proposalMsgId);
+    setError(null);
+
+    const res = await saveAiCoachProgram(proposal, { publish, generateCover: true });
+    setSavingProposalId(null);
+
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+
+    setMessages((prev) =>
+      prev
+        .map((m) =>
+          m.id === proposalMsgId
+            ? { ...m, proposalSaved: true, programProposal: undefined }
+            : m
+        )
+        .concat({
+          id: `saved-${Date.now()}`,
+          role: "assistant",
+          generatedWorkout: {
+            programId: res.programId,
+            slug: res.slug,
+            title: res.title,
+            description: `${res.description} (${res.sessionCount} sessions)`,
+            status: res.status,
+            coverPending: res.coverPending,
+          },
+        })
+    );
+
+    if (res.coverPending) {
+      void pollCover(res.programId);
     }
   }
 
@@ -365,6 +487,74 @@ export function AiCoachClient({
                   </div>
                 )}
 
+                {m.programProposal && !m.proposalSaved && (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-base font-semibold text-gray-900">
+                        {m.programProposal.title}
+                      </p>
+                      <p className="mt-1 text-gray-600">{m.programProposal.description}</p>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {m.programProposal.duration_weeks} week
+                        {m.programProposal.duration_weeks === 1 ? "" : "s"} ·{" "}
+                        {m.programProposal.sessions_per_week} session
+                        {m.programProposal.sessions_per_week === 1 ? "" : "s"}/week ·{" "}
+                        {m.programProposal.sessions.length} session
+                        {m.programProposal.sessions.length === 1 ? "" : "s"} in draft
+                        {m.programProposal.sessions.length <
+                        m.programProposal.duration_weeks * m.programProposal.sessions_per_week
+                          ? " (weekly template will repeat on save if needed)"
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 p-3">
+                      {m.programProposal.sessions.map((sess, si) => (
+                        <details key={si} className="group rounded-md bg-white px-3 py-2">
+                          <summary className="cursor-pointer text-sm font-medium text-gray-900">
+                            {sess.name}
+                            <span className="ml-2 font-normal text-gray-500">
+                              ({sess.exercises.length} exercises)
+                            </span>
+                          </summary>
+                          <div className="mt-2">{renderPhasedExerciseList(sess.exercises)}</div>
+                        </details>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={savingProposalId === m.id}
+                        onClick={() => void handleSaveProgram(m.id, m.programProposal!, true)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
+                      >
+                        {savingProposalId === m.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Saving…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            Publish program
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingProposalId === m.id}
+                        onClick={() => void handleSaveProgram(m.id, m.programProposal!, false)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                      >
+                        Save as draft
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Saves all sessions with correct week/frequency metadata. Uses only published
+                      exercises from your library.
+                    </p>
+                  </div>
+                )}
+
                 {m.workoutProposal && !m.proposalSaved && (
                   <div className="space-y-3">
                     <div>
@@ -373,24 +563,7 @@ export function AiCoachClient({
                       </p>
                       <p className="mt-1 text-gray-600">{m.workoutProposal.description}</p>
                     </div>
-                    <ol className="list-decimal space-y-1.5 pl-5 text-gray-700">
-                      {m.workoutProposal.exercises.map((ex, i) => (
-                        <li key={i}>
-                          <span className="font-medium">{ex.title}</span>
-                          <span className="text-gray-500">
-                            {" "}
-                            —
-                            {[
-                              ex.sets != null && ex.reps != null && `${ex.sets}×${ex.reps}`,
-                              ex.duration_minutes != null && `${ex.duration_minutes} min`,
-                              `${ex.rest_after_seconds}s rest`,
-                            ]
-                              .filter(Boolean)
-                              .join(", ")}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
+                    {renderPhasedExerciseList(m.workoutProposal.exercises)}
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"

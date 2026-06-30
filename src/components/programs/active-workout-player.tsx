@@ -18,6 +18,12 @@ import {
 import { resolveExerciseVideoSource } from "@/lib/programs/exercise-video-url";
 import { useProgramWorkoutMusic } from "@/lib/programs/program-workout-music";
 import { playDoubleBeep, playWorkEndBeep, prepareWorkoutAudio } from "@/lib/programs/workout-beeps";
+import {
+  defaultChoiceSelections,
+  listChoiceGroups,
+  resolveWorkoutPlaylist,
+  SESSION_PHASE_LABELS,
+} from "@/lib/programs/session-phase";
 import { WorkoutCompletionOverlay } from "@/components/programs/workout-completion-overlay";
 import { BothSidesChip } from "@/components/programs/both-sides-chip";
 
@@ -125,10 +131,32 @@ export function ActiveWorkoutPlayer({
   /** Non-null while counting down before the first exercise begins. */
   const [prepCountdown, setPrepCountdown] = useState<number | null>(null);
 
-  const len = exercises.length;
-  const current = len > 0 ? exercises[Math.min(currentIndex, len - 1)] : null;
+  const choiceGroups = useMemo(() => listChoiceGroups(exercises), [exercises]);
+  const [choiceSelections, setChoiceSelections] = useState<Record<string, string>>(() =>
+    defaultChoiceSelections(listChoiceGroups(exercises))
+  );
+
+  useEffect(() => {
+    setChoiceSelections(defaultChoiceSelections(choiceGroups));
+  }, [choiceGroups]);
+
+  const resolvedExercises = useMemo(
+    () => resolveWorkoutPlaylist(exercises, choiceSelections),
+    [exercises, choiceSelections]
+  );
+
+  const len = resolvedExercises.length;
+  const current = len > 0 ? resolvedExercises[Math.min(currentIndex, len - 1)] : null;
   const next =
-    len > 0 && currentIndex < len - 1 ? exercises[currentIndex + 1] : null;
+    len > 0 && currentIndex < len - 1 ? resolvedExercises[currentIndex + 1] : null;
+  const previousPhase =
+    currentIndex > 0 ? resolvedExercises[currentIndex - 1]?.sessionPhase : null;
+  const showPhaseBanner =
+    workoutStarted &&
+    current != null &&
+    currentIndex > 0 &&
+    previousPhase != null &&
+    current.sessionPhase !== previousPhase;
   const isLast = len > 0 && currentIndex >= len - 1;
   const currentIsTimed = current != null && exerciseUsesTimedPlayback(current);
   const inPrep = workoutStarted && prepCountdown !== null && prepCountdown > 0;
@@ -156,7 +184,7 @@ export function ActiveWorkoutPlayer({
 
   const beginWorkForCurrent = useCallback(
     (index: number) => {
-      const ex = exercises[index]!;
+      const ex = resolvedExercises[index]!;
       setCurrentSet(1);
       setPhase("work");
       if (exerciseUsesTimedPlayback(ex)) {
@@ -165,7 +193,7 @@ export function ActiveWorkoutPlayer({
         setSecondsLeft(null);
       }
     },
-    [exercises]
+    [resolvedExercises]
   );
 
   const advanceExercise = useCallback(() => {
@@ -350,16 +378,59 @@ export function ActiveWorkoutPlayer({
           </p>
 
           <div className="pointer-events-none absolute -left-[9999px] h-px w-px overflow-hidden opacity-0">
-            <WorkoutVideo url={exercises[0]?.video_url ?? null} playing={false} onReady={() => setVideoReady(true)} />
+            <WorkoutVideo
+              url={resolvedExercises[0]?.video_url ?? null}
+              playing={false}
+              onReady={() => setVideoReady(true)}
+            />
           </div>
+
+          {choiceGroups.length > 0 && (
+            <div className="mt-6 space-y-4">
+              {choiceGroups.map((group) => (
+                <div
+                  key={group.id}
+                  className="rounded-2xl border border-white/15 bg-black/40 p-4 backdrop-blur-md"
+                >
+                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+                    {SESSION_PHASE_LABELS[group.phase]} · pick one
+                  </p>
+                  <div className="mt-3 flex flex-col gap-2">
+                    {group.options.map((opt) => {
+                      const selected = choiceSelections[group.id] === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            setChoiceSelections((prev) => ({ ...prev, [group.id]: opt.id }))
+                          }
+                          className={`rounded-xl border px-3 py-2.5 text-left text-sm transition ${
+                            selected
+                              ? "border-[#ccff00] bg-[#ccff00]/10 text-white"
+                              : "border-white/15 bg-white/5 text-white/80 hover:border-white/30"
+                          }`}
+                        >
+                          <span className="font-medium">{opt.title}</span>
+                          <span className="mt-0.5 block text-xs text-white/60">
+                            {exerciseMeta(opt)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-8 rounded-2xl border border-white/15 bg-black/40 p-5 backdrop-blur-md">
             <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Up first</p>
-            <p className="mt-2 text-xl font-semibold">{exercises[0]?.title}</p>
+            <p className="mt-2 text-xl font-semibold">{resolvedExercises[0]?.title}</p>
             <p className="mt-1 text-sm text-white/70">
-              {exerciseMeta(exercises[0]!)}
+              {resolvedExercises[0] ? exerciseMeta(resolvedExercises[0]) : ""}
             </p>
-            {exercises[0]?.bothSides && (
+            {resolvedExercises[0]?.bothSides && (
               <div className="mt-3">
                 <BothSidesChip variant="dark" />
               </div>
@@ -377,6 +448,13 @@ export function ActiveWorkoutPlayer({
         </div>
       ) : (
         <>
+          {showPhaseBanner && current && (
+            <div className="relative z-20 mx-auto max-w-3xl px-4 pt-2 text-center">
+              <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+                {SESSION_PHASE_LABELS[current.sessionPhase]}
+              </p>
+            </div>
+          )}
           <div className="relative z-10 mx-auto aspect-video w-full max-w-3xl overflow-hidden bg-black">
             <WorkoutVideo
               url={displayVideoUrl}

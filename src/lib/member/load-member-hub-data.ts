@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProgramCard } from "@/app/programs/programs-library-client";
 import { PRIMARY_GOAL_LABELS, isOnboardingGoal } from "@/lib/member/onboarding";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
+import { loadMemberSubscriptionStatus, type MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
 import { mapProgramRowsToCards, type ProgramRow } from "@/lib/programs/map-program-cards";
 
 function programsFromEnrollments(
@@ -47,6 +48,7 @@ export type MemberHubProfile = {
 
 export type MemberHubData = {
   hasActivePro: boolean;
+  subscription: MemberSubscriptionStatus;
   homePrograms: MemberHubHomeProgram[];
   homeProgramsError: string | null;
   blogPosts: MemberHubBlogPost[];
@@ -66,6 +68,7 @@ export async function loadMemberHubData(
 ): Promise<MemberHubData> {
   const [
     hasActivePro,
+    subscription,
     homeProgramsRes,
     blogRes,
     programsRes,
@@ -74,9 +77,10 @@ export async function loadMemberHubData(
     profileRes,
   ] = await Promise.all([
     getHasActivePro(supabase, userId),
+    loadMemberSubscriptionStatus(supabase, userId),
     supabase
       .from("programs")
-      .select("slug, title, description, cover_image_url, price, duration_weeks")
+      .select("slug, title, description, cover_image_url, price, duration_weeks, is_free")
       .eq("status", "published")
       .order("updated_at", { ascending: false })
       .limit(6),
@@ -97,6 +101,7 @@ export async function loadMemberHubData(
         cover_image_url,
         duration_weeks,
         price,
+        is_free,
         program_categories (
           sort_order,
           categories ( name )
@@ -188,6 +193,7 @@ export async function loadMemberHubData(
 
   return {
     hasActivePro,
+    subscription,
     homePrograms: (homeProgramsRes.data ?? []) as MemberHubHomeProgram[],
     homeProgramsError: homeProgramsRes.error?.message ?? null,
     blogPosts: (blogRes.data ?? []) as MemberHubBlogPost[],

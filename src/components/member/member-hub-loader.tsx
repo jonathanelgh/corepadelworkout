@@ -16,11 +16,13 @@ export function MemberHubLoader({
   initialTab,
   userEmail,
   profile,
+  billingSuccess,
 }: {
   hubData: MemberHubData;
   initialTab: MemberTab;
   userEmail: string | null;
   profile: MemberShellProfile | null;
+  billingSuccess?: boolean;
 }) {
   return (
     <MemberAppShell
@@ -28,6 +30,7 @@ export function MemberHubLoader({
       initialTab={initialTab}
       userEmail={userEmail}
       profile={profile}
+      billingSuccess={billingSuccess}
     />
   );
 }

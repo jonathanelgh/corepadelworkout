@@ -47,12 +47,20 @@ export const DEFAULT_AI_PROMPT_BODIES: Record<AiPromptKey, { label: string; desc
 {{user_context_block}}
 Rules:
 - Use markdown for replies when speaking normally (no HTML).
-- You have exactly two tools. Use only ONE tool per turn — never both.
-- recommend_programs: when existing published programs in the catalog fit the request. Use only program IDs from the catalog JSON — never invent IDs.
-- generate_workout: when the admin wants a new custom single-session workout plan.
-- For generate_workout, use ONLY exercises from the exercise catalog below. Every exercise_id MUST be copied exactly from a catalog line (the UUID in square brackets).
+- When gathering requirements for a new program or workout, ask **one question per message** — never bundle multiple questions in the same reply.
+- Do not call generate_program or generate_workout until you have: focus/goal, training location (home / gym / at the court), and for **home** — what equipment they have available. For **programs**, confirm they can **squat / lunge / push-up / jump** (or note restrictions). Always confirm **workout length in minutes** (single session or each session in a program).
+- The server may ask these consultation questions for you; if the admin is answering a consultation question, wait — do not generate yet until answers are complete.
+
+Tool selection (CRITICAL):
+1. CREATE requests — If the admin asks to create, build, make, generate, or draft a custom program or workout, use generate_program (multi-session / multi-week) or generate_workout (single session). NEVER use recommend_programs for these, even when similar published programs exist.
+2. BROWSE requests — Use recommend_programs ONLY when the admin explicitly asks to find, recommend, list, or compare EXISTING published programs in the catalog (e.g. "what programs do we have for shoulders?"). Do not use it when they want something new built.
+
+- generate_workout: one custom session (one day only). MUST include warm-up, main work, and cool-down exercises (phase on each exercise). Prefer mobility/activation for warm-up, stretching/mobility for cool-down. Optional: 1–2 choice_group alternatives in warm-up and/or cool-down (2–3 exercises per group).
+- generate_program: multi-session plan — a week, several weeks, or a full block (e.g. 4 weeks × 3 sessions/week). Set duration_weeks and sessions_per_week, and return one sessions[] entry per training day in the full schedule. Every session MUST have warm-up, main, and cool-down blocks (phase on each exercise).
+- For generate_workout and generate_program, use ONLY exercises from the exercise catalog below. Every exercise_id MUST be copied exactly from a catalog line (the UUID in square brackets).
+- REQUIRED: Every workout/session MUST include at least one rotational or anti-rotational exercise (catalog move: tag contains Rotation, Anti-rotation, or Rotational transfer). Place it in the main block unless it fits warm-up mobility.
 - Do NOT invent exercises, IDs, or names not in the catalog.
-- Each exercise in generate_workout must include exercise_id and rest_after_seconds (required).
+- Each exercise must include exercise_id and rest_after_seconds (required).
 - Be concise and practical for padel athletes.
 
 Published programs catalog (id must be copied exactly):
@@ -76,8 +84,11 @@ Design a complete, periodized training program for competitive and recreational 
 - Do NOT invent exercises, IDs, or names not in the catalog.
 - Build one track per location: {{location_list}}
 - For each track, only use exercises whose location matches that track (see @location in catalog).
-- Sessions should progress logically (warm-up → main work → accessory/mobility where appropriate).
-- Typical session: 6–12 exercises. Vary movement patterns; include padel-relevant rotation, legs, shoulders, and core.
+- Sessions should progress logically: warm-up (mobility/activation) → main work → cool-down (stretching/mobility).
+- Every exercise must include phase: warmup, main, or cooldown.
+- For warm-up and cool-down, you may add choice_group on 2–3 alternative exercises (same choice_group = athlete picks one).
+- REQUIRED: Every session MUST include at least one rotational or anti-rotational exercise (catalog move: Rotation, Anti-rotation, or Rotational transfer). This is non-negotiable for padel trunk control.
+- Typical session: 6–12 exercises. Also include legs, shoulders, and core variety.
 - Prescribe realistic sets/reps/duration/rest for padel S&C (e.g. strength 3–4×6–10, mobility timed, rest 30–90s).
 - Avoid repeating the same exercise in one session unless intentional (e.g. ladder drills).
 {{schedule_targets}}{{difficulty_hint}}
@@ -93,7 +104,7 @@ Return JSON only (no markdown), matching:
 Rules:
 - category_slugs and difficulty_level_slug must match slugs from metadata lists, or use empty/null when unsure.
 - tracks array must include exactly one entry per requested location slug.
-- Session count should match the brief and schedule (e.g. 3 sessions/week × 4 weeks → ~12 sessions per track unless brief says otherwise).
+- Session count MUST match the brief and schedule exactly (e.g. 3 sessions/week × 4 weeks → exactly 12 sessions per track).
 - body: engaging copy explaining who the program is for and how it improves padel performance.`,
   },
   ai_program_cover: {

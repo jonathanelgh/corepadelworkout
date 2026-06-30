@@ -6,7 +6,7 @@ export type EnrollResult =
   | { ok: true; alreadyEnrolled?: boolean }
   | { error: string; code?: "SIGN_IN_REQUIRED" };
 
-/** Free / pre-Stripe: enroll the current user in a published program (idempotent if already active). */
+/** Enroll the current user in a free published program (idempotent if already active). */
 export async function enrollInPublishedProgram(slug: string): Promise<EnrollResult> {
   const trimmed = slug.trim();
   if (!trimmed) {
@@ -24,13 +24,19 @@ export async function enrollInPublishedProgram(slug: string): Promise<EnrollResu
 
   const { data: program, error: pErr } = await supabase
     .from("programs")
-    .select("id, price, status")
+    .select("id, price, status, is_free")
     .eq("slug", trimmed)
     .eq("status", "published")
     .maybeSingle();
 
   if (pErr || !program) {
     return { error: "Program not found or not available." };
+  }
+
+  if (!program.is_free) {
+    return {
+      error: "This program requires a Pro subscription. Upgrade from your member settings.",
+    };
   }
 
   const pricePaid = program.price != null && Number.isFinite(Number(program.price)) ? Number(program.price) : 0;

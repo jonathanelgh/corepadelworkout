@@ -24,6 +24,8 @@ type ExerciseRow = {
   reps: number | null;
   rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
+  session_phase: "warmup" | "main" | "cooldown" | null;
+  choice_group: string | null;
 };
 type SessionRow = {
   name: string;
@@ -102,6 +104,8 @@ function mapTracks(
         return {
           key: randomUUID(),
           exerciseId: e.exercise_id,
+          sessionPhase: e.session_phase ?? "main",
+          choiceGroup: e.choice_group?.trim() ?? "",
           prescriptionType: clampProgramPrescriptionType(mode, inferred),
           durationValue,
           durationUnit,
@@ -175,6 +179,7 @@ export default async function EditProgramPage({ params }: PageProps) {
         song_url,
         price,
         compare_at_price,
+        is_free,
         duration_weeks,
         sessions_per_week,
         minutes_per_session,
@@ -203,7 +208,9 @@ export default async function EditProgramPage({ params }: PageProps) {
             sets,
             reps,
             rest_between_sets_seconds,
-            rest_after_seconds
+            rest_after_seconds,
+            session_phase,
+            choice_group
           )
         )
       `
@@ -233,6 +240,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     song_url: string | null;
     price: number | null;
     compare_at_price: number | null;
+    is_free: boolean;
     duration_weeks: number | null;
     sessions_per_week: number | null;
     minutes_per_session: number | null;
@@ -267,6 +275,7 @@ export default async function EditProgramPage({ params }: PageProps) {
     songUrl: p.song_url ?? "",
     price: p.price != null ? String(p.price) : "",
     compareAtPrice: p.compare_at_price != null ? String(p.compare_at_price) : "",
+    isFree: Boolean(p.is_free),
     status: p.status === "published" ? "published" : "draft",
     durationWeeks: p.duration_weeks != null ? String(p.duration_weeks) : "",
     sessionsPerWeek: p.sessions_per_week != null ? String(p.sessions_per_week) : "",

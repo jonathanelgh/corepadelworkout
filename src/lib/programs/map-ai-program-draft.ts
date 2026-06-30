@@ -1,5 +1,7 @@
 import type { GeminiProgramDraft } from "@/lib/programs/gemini-generate-program";
 import type { ProgramAiContext } from "@/lib/programs/exercise-catalog";
+import { expandSessionsToTarget } from "@/lib/programs/expand-program-sessions";
+import type { SessionPhase } from "@/lib/programs/session-phase";
 
 import type { ExerciseDurationUnit } from "@/app/admin/programs/new/create-program-form";
 import {
@@ -12,6 +14,8 @@ import {
 
 export type AiProgramExerciseRow = {
   exerciseId: string;
+  sessionPhase: SessionPhase;
+  choiceGroup: string;
   prescriptionType: ExercisePrescriptionType;
   durationValue: string;
   durationUnit: ExerciseDurationUnit;
@@ -50,6 +54,11 @@ function normalizeSlug(s: string): string {
   return s.trim().toLowerCase();
 }
 
+export type ScheduleHints = {
+  durationWeeks?: number | null;
+  sessionsPerWeek?: number | null;
+};
+
 function intToField(n: number | null | undefined): string {
   return n != null && Number.isFinite(n) ? String(n) : "";
 }
@@ -57,9 +66,17 @@ function intToField(n: number | null | undefined): string {
 export function mapGeminiDraftToForm(
   draft: GeminiProgramDraft,
   ctx: ProgramAiContext,
-  catalogIds: Set<string>
+  catalogIds: Set<string>,
+  scheduleHints?: ScheduleHints
 ): { draft: AiProgramFormDraft; warnings: string[] } {
   const warnings: string[] = [];
+
+  const durationWeeks = scheduleHints?.durationWeeks ?? draft.duration_weeks;
+  const sessionsPerWeek = scheduleHints?.sessionsPerWeek ?? draft.sessions_per_week;
+  const targetSessionCount =
+    durationWeeks != null && sessionsPerWeek != null && durationWeeks > 0 && sessionsPerWeek > 0
+      ? durationWeeks * sessionsPerWeek
+      : null;
 
   const difficulty =
     draft.difficulty_level_slug != null
@@ -99,9 +116,22 @@ export function mapGeminiDraftToForm(
     }
 
     const allowedAtLocation = exercisesByLocation.get(loc.id) ?? new Set<string>();
+
+    let trackSessions = tr.sessions;
+    if (targetSessionCount != null && targetSessionCount > 1) {
+      const expanded = expandSessionsToTarget(trackSessions, targetSessionCount);
+      trackSessions = expanded.sessions.map((s) => ({
+        name: s.name,
+        description: s.description ?? null,
+        duration_minutes: s.duration_minutes ?? null,
+        exercises: s.exercises,
+      }));
+      warnings.push(...expanded.warnings);
+    }
+
     const sessions: AiProgramSessionRow[] = [];
 
-    for (const sess of tr.sessions) {
+    for (const sess of trackSessions) {
       const exercises: AiProgramExerciseRow[] = [];
       const seenInSession = new Set<string>();
 
@@ -128,6 +158,8 @@ export function mapGeminiDraftToForm(
 
         exercises.push({
           exerciseId: ex.exercise_id,
+          sessionPhase: ex.phase,
+          choiceGroup: ex.choice_group ?? "",
           prescriptionType: clampProgramPrescriptionType(mode, inferred),
           durationValue: intToField(ex.duration_minutes),
           durationUnit: "min",
@@ -170,8 +202,8 @@ export function mapGeminiDraftToForm(
       body: draft.body,
       categoryIds,
       difficultyLevelId: difficulty?.id ?? "",
-      durationWeeks: intToField(draft.duration_weeks),
-      sessionsPerWeek: intToField(draft.sessions_per_week),
+      durationWeeks: intToField(durationWeeks ?? draft.duration_weeks),
+      sessionsPerWeek: intToField(sessionsPerWeek ?? draft.sessions_per_week),
       minutesPerSession: intToField(draft.minutes_per_session),
       outcomes: draft.outcomes.length > 0 ? draft.outcomes : [],
       tracks,

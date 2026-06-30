@@ -50,12 +50,14 @@ export function MemberAppShell({
   children,
   hubData,
   initialTab = "home",
+  billingSuccess,
 }: {
   userEmail: string | null;
   profile: Profile;
   children?: React.ReactNode;
   hubData?: MemberHubData;
   initialTab?: MemberTab;
+  billingSuccess?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -235,10 +237,14 @@ export function MemberAppShell({
               />
             </div>
             <div style={panelStyle(tab === "custom")} aria-hidden={tab !== "custom"}>
-              <MemberCustomTab />
+              <MemberCustomTab hasActivePro={hubData.hasActivePro} />
             </div>
             <div style={panelStyle(tab === "profile")} aria-hidden={tab !== "profile"}>
-              <MemberProfileTab profile={hubData.profileDetails} />
+              <MemberProfileTab
+                profile={hubData.profileDetails}
+                subscription={hubData.subscription}
+                billingSuccess={billingSuccess}
+              />
             </div>
           </>
         ) : (

@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { parseChoiceGroup, parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 
 const ADMIN_PROGRAMS_PATH = "/admin/programs";
 
@@ -28,6 +29,8 @@ type ProgramExercisePayload = {
   reps: number | null;
   rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
+  session_phase: SessionPhase;
+  choice_group: string | null;
 };
 
 type SessionPayload = {
@@ -116,6 +119,8 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
     reps,
     rest_between_sets_seconds,
     rest_after_seconds,
+    session_phase: parseSessionPhase(row.session_phase ?? row.sessionPhase),
+    choice_group: parseChoiceGroup(row.choice_group ?? row.choiceGroup),
   };
 }
 
@@ -155,6 +160,8 @@ function parseOneSession(o: Record<string, unknown>): SessionPayload {
             reps: null,
             rest_between_sets_seconds: null,
             rest_after_seconds: null,
+            session_phase: "main",
+            choice_group: null,
           });
         }
       }
@@ -273,6 +280,7 @@ export async function createProgram(
       song_url: fields.song_url,
       price: fields.price,
       compare_at_price: fields.compare_at_price,
+      is_free: fields.is_free,
       duration_weeks: fields.duration_weeks,
       sessions_per_week: fields.sessions_per_week,
       minutes_per_session: fields.minutes_per_session,
@@ -366,6 +374,8 @@ async function insertCurriculumForProgram(
           reps: ex.reps,
           rest_between_sets_seconds: ex.rest_between_sets_seconds,
           rest_after_seconds: ex.rest_after_seconds,
+          session_phase: ex.session_phase,
+          choice_group: ex.choice_group,
         }));
         const { error: peError } = await supabase.from("program_exercises").insert(rows);
         if (peError) throw new Error(peError.message);
@@ -398,6 +408,7 @@ function parseProgramFields(
   song_url: string | null;
   price: number | null;
   compare_at_price: number | null;
+  is_free: boolean;
   duration_weeks: number | null;
   sessions_per_week: number | null;
   minutes_per_session: number | null;
@@ -412,6 +423,7 @@ function parseProgramFields(
   const song_url = mediaUrls.song_url.trim() || null;
   const price = parseOptionalNumber(formData.get("price"));
   const compare_at_price = parseOptionalNumber(formData.get("compare_at_price"));
+  const is_free = formData.get("is_free") === "1" || formData.get("is_free") === "on";
   const duration_weeks = parseOptionalNonNegInt(formData.get("duration_weeks"));
   const sessions_per_week = parseOptionalNonNegInt(formData.get("sessions_per_week"));
   const minutes_per_session = parseOptionalNonNegInt(formData.get("minutes_per_session"));
@@ -435,6 +447,7 @@ function parseProgramFields(
     song_url,
     price,
     compare_at_price,
+    is_free,
     duration_weeks,
     sessions_per_week,
     minutes_per_session,
@@ -503,6 +516,7 @@ export async function updateProgram(
       song_url: fields.song_url,
       price: fields.price,
       compare_at_price: fields.compare_at_price,
+      is_free: fields.is_free,
       duration_weeks: fields.duration_weeks,
       sessions_per_week: fields.sessions_per_week,
       minutes_per_session: fields.minutes_per_session,
@@ -546,6 +560,8 @@ type DuplicateDbExerciseRow = {
   reps: number | null;
   rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
+  session_phase: SessionPhase | null;
+  choice_group: string | null;
 };
 
 type DuplicateDbSessionRow = {
@@ -593,6 +609,8 @@ function dbTracksToDuplicatePayloads(rows: DuplicateDbTrackRow[] | null): TrackP
         reps: e.reps,
         rest_between_sets_seconds: e.rest_between_sets_seconds,
         rest_after_seconds: e.rest_after_seconds,
+        session_phase: e.session_phase ?? "main",
+        choice_group: e.choice_group?.trim() || null,
       }));
       return {
         name: typeof s.name === "string" ? s.name : "",
@@ -632,6 +650,7 @@ export async function duplicateProgram(formData: FormData) {
       song_url,
       price,
       compare_at_price,
+      is_free,
       duration_weeks,
       sessions_per_week,
       minutes_per_session,
@@ -664,7 +683,9 @@ export async function duplicateProgram(formData: FormData) {
           sets,
           reps,
           rest_between_sets_seconds,
-          rest_after_seconds
+          rest_after_seconds,
+          session_phase,
+          choice_group
         )
       )
     `
@@ -704,6 +725,7 @@ export async function duplicateProgram(formData: FormData) {
       song_url: src.song_url,
       price: src.price,
       compare_at_price: src.compare_at_price,
+      is_free: src.is_free,
       duration_weeks: src.duration_weeks,
       sessions_per_week: src.sessions_per_week,
       minutes_per_session: src.minutes_per_session,

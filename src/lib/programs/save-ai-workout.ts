@@ -1,27 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkoutProposal } from "./ai-coach-gemini";
-
-function slugifyTitle(title: string): string {
-  const s = title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-+/g, "-");
-  return s.length > 0 ? s : "program";
-}
-
-async function uniqueProgramSlug(supabase: SupabaseClient, base: string): Promise<string> {
-  let slug = base;
-  let n = 0;
-  for (;;) {
-    const { data } = await supabase.from("programs").select("id").eq("slug", slug).maybeSingle();
-    if (!data) return slug;
-    n += 1;
-    slug = `${base}-${n}`;
-  }
-}
+import { slugifyTitle, uniqueProgramSlug } from "./program-slug";
 
 function estimateTotalMinutes(proposal: WorkoutProposal): number {
   let total = 0;
@@ -147,6 +126,8 @@ export async function saveAiWorkoutProgram(
       sets: ex.sets ? Math.ceil(ex.sets) : null,
       reps: ex.reps ? Math.ceil(ex.reps) : null,
       rest_after_seconds: Math.ceil(ex.rest_after_seconds ?? 0),
+      session_phase: ex.phase,
+      choice_group: ex.choice_group ?? null,
     }));
 
     const { error: linkErr } = await supabase.from("program_exercises").insert(exerciseRows);

@@ -9,6 +9,7 @@ import {
   type ExerciseProgramPrescriptionMode,
 } from "@/lib/exercises/program-prescription-mode";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
+import type { SessionPhase } from "@/lib/programs/session-phase";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -82,6 +83,8 @@ function prescriptionOptionsForMode(mode: ExerciseProgramPrescriptionMode) {
 export type SessionExerciseEntry = {
   key: string;
   exerciseId: string;
+  sessionPhase: SessionPhase;
+  choiceGroup: string;
   prescriptionType: ExercisePrescriptionType;
   /** Work time value; unit chosen separately */
   durationValue: string;
@@ -120,6 +123,7 @@ export type ProgramFormInitialValues = {
   songUrl: string;
   price: string;
   compareAtPrice: string;
+  isFree: boolean;
   status: "draft" | "published";
   durationWeeks: string;
   sessionsPerWeek: string;
@@ -142,6 +146,59 @@ function newSession(dayIndex: number): SessionBlock {
 
 function pickCompoundKey(trackKey: string, sessionKey: string) {
   return `${trackKey}|${sessionKey}`;
+}
+
+function cloneSessionBlock(src: SessionBlock, name: string): SessionBlock {
+  return {
+    key: crypto.randomUUID(),
+    name,
+    description: src.description,
+    durationMinutes: src.durationMinutes,
+    exercises: src.exercises.map((e) => ({
+      key: crypto.randomUUID(),
+      exerciseId: e.exerciseId,
+      sessionPhase: e.sessionPhase,
+      choiceGroup: e.choiceGroup,
+      prescriptionType: e.prescriptionType,
+      durationValue: e.durationValue,
+      durationUnit: e.durationUnit,
+      sets: e.sets,
+      reps: e.reps,
+      restBetweenSetsSeconds: e.restBetweenSetsSeconds,
+      restAfterSeconds: e.restAfterSeconds,
+    })),
+  };
+}
+
+function effectiveSessionsPerWeek(raw: string, sessionCount: number): number {
+  const n = Number.parseInt(raw.trim(), 10);
+  if (Number.isFinite(n) && n > 0) return n;
+  return Math.max(1, sessionCount);
+}
+
+function deriveDuplicatedSessionName(srcName: string, dayNumber: number, weekNumber: number): string {
+  const trimmed = srcName.trim();
+  if (/^day\s+\d+/i.test(trimmed)) {
+    return trimmed.replace(/^day\s+\d+/i, `Day ${dayNumber}`);
+  }
+  if (trimmed) return `${trimmed} (week ${weekNumber})`;
+  return `Day ${dayNumber}`;
+}
+
+function groupSessionsByWeek(
+  sessions: SessionBlock[],
+  sessionsPerWeekRaw: string
+): { weekIndex: number; items: { session: SessionBlock; globalIndex: number }[] }[] {
+  const perWeek = effectiveSessionsPerWeek(sessionsPerWeekRaw, sessions.length);
+  const weeks: { weekIndex: number; items: { session: SessionBlock; globalIndex: number }[] }[] = [];
+  for (let i = 0; i < sessions.length; i += perWeek) {
+    const chunk = sessions.slice(i, i + perWeek);
+    weeks.push({
+      weekIndex: weeks.length,
+      items: chunk.map((session, j) => ({ session, globalIndex: i + j })),
+    });
+  }
+  return weeks;
 }
 
 function extFromFile(file: File, fallback: string) {
@@ -212,7 +269,17 @@ export function CreateProgramForm({
       : [{ key: crypto.randomUUID(), text: "" }]
   );
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(() => initial?.categoryIds ?? []);
+  const [sessionsPerWeek, setSessionsPerWeek] = useState(initial?.sessionsPerWeek ?? "");
   const [activeLocationTabKey, setActiveLocationTabKey] = useState<string | null>(null);
+  const [draggingExercise, setDraggingExercise] = useState<{
+    trackKey: string;
+    sessionKey: string;
+    index: number;
+  } | null>(null);
+  const [dropExerciseTarget, setDropExerciseTarget] = useState<{
+    sessionKey: string;
+    index: number;
+  } | null>(null);
 
   function toggleCategory(id: string) {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -230,6 +297,7 @@ export function CreateProgramForm({
     setFieldValue("difficulty_level_id", draft.difficultyLevelId);
     setFieldValue("duration_weeks", draft.durationWeeks);
     setFieldValue("sessions_per_week", draft.sessionsPerWeek);
+    setSessionsPerWeek(draft.sessionsPerWeek);
     setFieldValue("minutes_per_session", draft.minutesPerSession);
     setSelectedCategoryIds(draft.categoryIds);
     setOutcomeLines(
@@ -251,6 +319,8 @@ export function CreateProgramForm({
           return {
             key: crypto.randomUUID(),
             exerciseId: ex.exerciseId,
+            sessionPhase: ex.sessionPhase,
+            choiceGroup: ex.choiceGroup,
             prescriptionType: clampProgramPrescriptionType(mode, ex.prescriptionType),
             durationValue: ex.durationValue,
             durationUnit: ex.durationUnit,
@@ -444,25 +514,39 @@ export function CreateProgramForm({
         const copyName = src.name.trim()
           ? `${src.name.trim()} (copy)`
           : `Session ${t.sessions.length + 1}`;
-        const duplicated: SessionBlock = {
-          key: crypto.randomUUID(),
-          name: copyName,
-          description: src.description,
-          durationMinutes: src.durationMinutes,
-          exercises: src.exercises.map((e) => ({
-            key: crypto.randomUUID(),
-            exerciseId: e.exerciseId,
-            prescriptionType: e.prescriptionType,
-            durationValue: e.durationValue,
-            durationUnit: e.durationUnit,
-            sets: e.sets,
-            reps: e.reps,
-            restBetweenSetsSeconds: e.restBetweenSetsSeconds,
-            restAfterSeconds: e.restAfterSeconds,
-          })),
-        };
+        const duplicated = cloneSessionBlock(src, copyName);
         const sessions = [...t.sessions.slice(0, i + 1), duplicated, ...t.sessions.slice(i + 1)];
         return { ...t, sessions };
+      })
+    );
+  }
+
+  function duplicateWeekInTrack(trackKey: string, weekIndex: number) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        const perWeek = effectiveSessionsPerWeek(sessionsPerWeek, t.sessions.length);
+        const start = weekIndex * perWeek;
+        const weekSessions = t.sessions.slice(start, start + perWeek);
+        if (weekSessions.length === 0) return t;
+
+        const existingWeeks = Math.ceil(t.sessions.length / perWeek);
+        const newWeekNumber = existingWeeks + 1;
+        const duplicated = weekSessions.map((src, dayInWeek) => {
+          const dayNumber = existingWeeks * perWeek + dayInWeek + 1;
+          const name = deriveDuplicatedSessionName(src.name, dayNumber, newWeekNumber);
+          return cloneSessionBlock(src, name);
+        });
+
+        const insertAt = start + perWeek;
+        return {
+          ...t,
+          sessions: [
+            ...t.sessions.slice(0, insertAt),
+            ...duplicated,
+            ...t.sessions.slice(insertAt),
+          ],
+        };
       })
     );
   }
@@ -526,6 +610,8 @@ export function CreateProgramForm({
                 {
                   key: crypto.randomUUID(),
                   exerciseId: pick,
+                  sessionPhase: "main",
+                  choiceGroup: "",
                   prescriptionType: defaultProgramPrescriptionType(mode),
                   durationValue: "",
                   durationUnit: "sec",
@@ -552,6 +638,31 @@ export function CreateProgramForm({
           sessions: t.sessions.map((s) => {
             if (s.key !== sessionKey) return s;
             return { ...s, exercises: s.exercises.filter((_, i) => i !== index) };
+          }),
+        };
+      })
+    );
+  }
+
+  function reorderExerciseInSession(
+    trackKey: string,
+    sessionKey: string,
+    fromIndex: number,
+    toIndex: number
+  ) {
+    if (fromIndex === toIndex) return;
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.key !== sessionKey) return s;
+            const list = [...s.exercises];
+            const [item] = list.splice(fromIndex, 1);
+            if (!item) return s;
+            list.splice(toIndex, 0, item);
+            return { ...s, exercises: list };
           }),
         };
       })
@@ -786,6 +897,8 @@ export function CreateProgramForm({
               reps,
               rest_between_sets_seconds,
               rest_after_seconds,
+              session_phase: e.sessionPhase,
+              choice_group: e.choiceGroup.trim() || null,
             };
           });
           return {
@@ -1042,7 +1155,8 @@ export function CreateProgramForm({
                           type="number"
                           min={0}
                           step={1}
-                          defaultValue={initial?.sessionsPerWeek ?? ""}
+                          value={sessionsPerWeek}
+                          onChange={(e) => setSessionsPerWeek(e.target.value)}
                           placeholder="e.g. 3"
                           className="min-w-0 flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                         />
@@ -1433,8 +1547,10 @@ export function CreateProgramForm({
                 <h2 className="text-lg font-semibold text-gray-900">Workout by location</h2>
                 <p className="text-sm text-gray-500 mt-1">
                   Add a block per place members can train (e.g. Gym vs Home). Each location has its own sessions
-                  and exercises—members pick where they work out and follow that track. Switch tabs to edit each
-                  place.
+                  and exercises—members pick where they work out and follow that track. Set{" "}
+                  <strong className="font-medium text-gray-700">Frequency</strong> on the Basic tab to group
+                  sessions into weeks and duplicate whole weeks at once. Drag exercises by the grip handle to
+                  reorder.
                 </p>
               </div>
               <button
@@ -1558,7 +1674,27 @@ export function CreateProgramForm({
                 </div>
 
                 <div className="p-4 sm:p-6 space-y-6">
-                  {activeTrack.sessions.map((session, si) => (
+                  {groupSessionsByWeek(activeTrack.sessions, sessionsPerWeek).map((week) => (
+                    <div key={`week-${activeTrack.key}-${week.weekIndex}`} className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-2.5">
+                        <p className="text-sm font-semibold text-gray-800">
+                          Week {week.weekIndex + 1}
+                          <span className="ml-2 font-normal text-gray-500">
+                            {week.items.length} session{week.items.length === 1 ? "" : "s"}
+                          </span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => duplicateWeekInTrack(activeTrack.key, week.weekIndex)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                          title="Duplicate all sessions in this week"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          Duplicate week
+                        </button>
+                      </div>
+
+                      {week.items.map(({ session, globalIndex: si }) => (
                     <div
                       key={session.key}
                       className="bg-white rounded-xl border border-gray-200 overflow-visible shadow-sm"
@@ -1693,7 +1829,31 @@ export function CreateProgramForm({
                               </button>
                             </div>
 
-                            <ul className="space-y-3">
+                            <ul
+                              className="space-y-3"
+                              onDragOver={(e) => {
+                                if (!draggingExercise || draggingExercise.sessionKey !== session.key) return;
+                                e.preventDefault();
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (
+                                  !draggingExercise ||
+                                  draggingExercise.trackKey !== activeTrack.key ||
+                                  draggingExercise.sessionKey !== session.key
+                                ) {
+                                  return;
+                                }
+                                reorderExerciseInSession(
+                                  activeTrack.key,
+                                  session.key,
+                                  draggingExercise.index,
+                                  session.exercises.length - 1
+                                );
+                                setDraggingExercise(null);
+                                setDropExerciseTarget(null);
+                              }}
+                            >
                               {session.exercises.map((entry, index) => {
                                 const programMode = exerciseProgramMode(exercises, entry.exerciseId);
                                 const prescriptionOptions = prescriptionOptionsForMode(programMode);
@@ -1705,11 +1865,67 @@ export function CreateProgramForm({
                                 return (
                                 <li
                                   key={entry.key}
-                                  className="border border-gray-200 rounded-lg bg-white p-3 sm:p-4"
+                                  onDragOver={(e) => {
+                                    if (
+                                      !draggingExercise ||
+                                      draggingExercise.trackKey !== activeTrack.key ||
+                                      draggingExercise.sessionKey !== session.key
+                                    ) {
+                                      return;
+                                    }
+                                    e.preventDefault();
+                                    setDropExerciseTarget({ sessionKey: session.key, index });
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (
+                                      !draggingExercise ||
+                                      draggingExercise.trackKey !== activeTrack.key ||
+                                      draggingExercise.sessionKey !== session.key
+                                    ) {
+                                      return;
+                                    }
+                                    reorderExerciseInSession(
+                                      activeTrack.key,
+                                      session.key,
+                                      draggingExercise.index,
+                                      index
+                                    );
+                                    setDraggingExercise(null);
+                                    setDropExerciseTarget(null);
+                                  }}
+                                  className={`border rounded-lg bg-white p-3 sm:p-4 transition-shadow ${
+                                    draggingExercise?.sessionKey === session.key &&
+                                    draggingExercise.index === index
+                                      ? "opacity-50 border-gray-200"
+                                      : dropExerciseTarget?.sessionKey === session.key &&
+                                          dropExerciseTarget.index === index
+                                        ? "border-black ring-1 ring-black shadow-sm"
+                                        : "border-gray-200"
+                                  }`}
                                 >
                                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="flex items-start gap-3 min-w-0">
-                                      <GripVertical className="w-4 h-4 text-gray-300 shrink-0 mt-1" />
+                                      <div
+                                        draggable
+                                        onDragStart={(e) => {
+                                          e.dataTransfer.effectAllowed = "move";
+                                          setDraggingExercise({
+                                            trackKey: activeTrack.key,
+                                            sessionKey: session.key,
+                                            index,
+                                          });
+                                        }}
+                                        onDragEnd={() => {
+                                          setDraggingExercise(null);
+                                          setDropExerciseTarget(null);
+                                        }}
+                                        className="mt-0.5 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing"
+                                        title="Drag to reorder"
+                                      >
+                                        <GripVertical className="h-4 w-4" />
+                                      </div>
                                       <div className="min-w-0">
                                         <p className="text-sm font-medium text-gray-900 truncate">
                                           {exerciseTitle(entry.exerciseId)}
@@ -2048,6 +2264,8 @@ export function CreateProgramForm({
                         )}
                       </div>
                     </div>
+                      ))}
+                    </div>
                   ))}
 
                   <button
@@ -2083,6 +2301,22 @@ export function CreateProgramForm({
           <div className={activeTab === "settings" ? "space-y-6" : "hidden"}>
             <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Pricing</h2>
+
+              <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <input
+                  type="checkbox"
+                  name="is_free"
+                  value="1"
+                  defaultChecked={initial?.isFree ?? false}
+                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-900">Free program</span>
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Available to all signed-in members without Pro. Paid programs require an active Pro subscription.
+                  </span>
+                </span>
+              </label>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>

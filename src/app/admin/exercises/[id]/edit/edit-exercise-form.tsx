@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Info, Save, Video } from "lucide-react";
-import { updateExercise } from "../../actions";
+import { ArrowLeft, Check, ChevronDown, Image as ImageIcon, Info, Save, Trash2, Video } from "lucide-react";
+import { deleteExercise, updateExercise } from "../../actions";
 import {
   MultiSelectSearchChips,
   type MultiSelectOption,
@@ -73,6 +73,26 @@ export function EditExerciseForm({
   const [mediaPicker, setMediaPicker] = useState<null | "image" | "video">(null);
 
   const locationOptions = locations.map((loc) => ({ id: loc.id, label: loc.name }));
+
+  function confirmDeleteExercise(): boolean {
+    return confirm(
+      `Delete "${initial.title}"? This removes the exercise and its links to programs. This cannot be undone.`
+    );
+  }
+
+  async function handleDeleteExercise() {
+    if (!confirmDeleteExercise()) return;
+    setPending(true);
+    setError(null);
+    const fd = new FormData();
+    fd.set("exercise_id", initial.id);
+    try {
+      await deleteExercise(fd);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete exercise.");
+      setPending(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -143,6 +163,15 @@ export function EditExerciseForm({
             <h1 className="truncate text-lg font-semibold text-gray-900">Edit exercise</h1>
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => void handleDeleteExercise()}
+              className="hidden items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60 sm:flex"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
             <button
               type="button"
               disabled
@@ -541,6 +570,23 @@ export function EditExerciseForm({
                   <p className="mt-1.5 text-xs text-gray-500">
                     Use a public link. For Google Drive, use &quot;Anyone with the link&quot; can view the file.
                   </p>
+                </div>
+
+                <div className="mt-8 rounded-xl border border-red-200 bg-red-50/80 p-5">
+                  <p className="text-sm font-medium text-red-900">Wrong or outdated exercise?</p>
+                  <p className="mt-1 text-sm text-red-800">
+                    If this video is an old duplicate, delete the exercise from the library. Program links to this
+                    exercise will be removed.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => void handleDeleteExercise()}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete exercise
+                  </button>
                 </div>
               </div>
 

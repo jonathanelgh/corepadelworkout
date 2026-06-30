@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SessionPhase } from "@/lib/programs/session-phase";
 
 export type ExercisePrescriptionType = "sets_reps" | "time" | "timed_intervals";
 
@@ -9,6 +10,8 @@ export type ProgramExerciseItem = {
   image_url: string | null;
   video_url: string | null;
   bothSides: boolean;
+  sessionPhase: SessionPhase;
+  choiceGroup: string | null;
   durationMinutes: number | null;
   durationSeconds: number | null;
   sets: number | null;
@@ -34,6 +37,8 @@ type ProgramExerciseNested = {
   reps: number | null;
   rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
+  session_phase: SessionPhase | null;
+  choice_group: string | null;
   exercises: ExerciseNested | ExerciseNested[] | null;
 };
 
@@ -198,6 +203,8 @@ export async function fetchProgramExercises(
           reps,
           rest_between_sets_seconds,
           rest_after_seconds,
+          session_phase,
+          choice_group,
           exercises (
             id,
             title,
@@ -242,6 +249,8 @@ export async function fetchProgramExercises(
             image_url: ex.image_url?.trim() || null,
             video_url: ex.video_url?.trim() || null,
             bothSides: Boolean(ex.both_sides),
+            sessionPhase: pe.session_phase ?? "main",
+            choiceGroup: pe.choice_group?.trim() || null,
             durationMinutes: pe.duration_minutes,
             durationSeconds: pe.duration_seconds,
             sets: pe.sets,

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { fetchProgramExercises } from "@/lib/programs/program-exercises";
 import { ActiveWorkoutPlayer } from "@/components/programs/active-workout-player";
+import { requireProgramWorkoutAccess } from "../../program-access-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export default async function ProgramPlayPage({ params }: PageProps) {
 
   const { data: program, error } = await supabase
     .from("programs")
-    .select("id, title, cover_image_url, song_url, status")
+    .select("id, title, cover_image_url, song_url, status, is_free")
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
@@ -42,7 +43,10 @@ export default async function ProgramPlayPage({ params }: PageProps) {
     title: string;
     cover_image_url: string | null;
     song_url: string | null;
+    is_free: boolean;
   };
+
+  await requireProgramWorkoutAccess(row.id, slug, row.is_free);
 
   const exercises = await fetchProgramExercises(supabase, row.id);
 

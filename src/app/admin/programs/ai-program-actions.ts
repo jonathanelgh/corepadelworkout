@@ -6,6 +6,7 @@ import { loadAiPrompt } from "@/lib/programs/ai-prompts";
 import { loadProgramAiContext } from "@/lib/programs/exercise-catalog";
 import { loadProfileAiContext, userContextBlock } from "@/lib/programs/profile-ai-context";
 import { generateProgramWithGemini, type AiProgramGenerateRequest } from "@/lib/programs/gemini-generate-program";
+import { ensureGeminiDraftRotation } from "@/lib/programs/ensure-rotational-exercise";
 import { mapGeminiDraftToForm, type AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 
 export type GenerateAiProgramResult =
@@ -46,8 +47,16 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
       promptTemplate,
       userContextBlock: userContextBlock(profileContext),
     });
+    const { draft: rotationDraft, warnings: rotationWarnings } = ensureGeminiDraftRotation(
+      geminiDraft,
+      ctx.exercises.filter((e) => e.status === "published"),
+      ctx.locations
+    );
     const catalogIds = new Set(ctx.exercises.map((e) => e.id));
-    const { draft, warnings } = mapGeminiDraftToForm(geminiDraft, ctx, catalogIds);
+    const { draft, warnings } = mapGeminiDraftToForm(rotationDraft, ctx, catalogIds, {
+      durationWeeks: input.durationWeeks,
+      sessionsPerWeek: input.sessionsPerWeek,
+    });
 
     const usedIds = new Set<string>();
     for (const tr of draft.tracks) {
@@ -59,7 +68,7 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
     return {
       ok: true,
       draft,
-      warnings,
+      warnings: [...rotationWarnings, ...warnings],
       exerciseCount: usedIds.size,
     };
   } catch (e) {
