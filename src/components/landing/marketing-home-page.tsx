@@ -3,11 +3,10 @@
 import { ArrowRight, CheckCircle2, Star, Menu, X, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { SiteFooter } from "@/components/landing/site-footer";
 
 const heroStats = [
   { emoji: "💪", value: "872", text: "Elbows fixed" },
-  { emoji: "🔥", value: "389", text: "Smashes improved" },
-  { emoji: "⚡", value: "500+", text: "Players faster on court" },
   { emoji: "🛡️", value: "1,200+", text: "Injury-free matches" },
 ];
 
@@ -120,7 +119,6 @@ export function MarketingHomePage({
 }) {
   const programs = featuredPrograms.length > 0 ? featuredPrograms : fallbackFeaturedPrograms;
   const [isScrolled, setIsScrolled] = useState(false);
-  const [currentStatIndex, setCurrentStatIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [showMobileStickyCta, setShowMobileStickyCta] = useState(false);
@@ -138,13 +136,8 @@ export function MarketingHomePage({
     // Initial check in case page is loaded already scrolled
     handleScroll();
     
-    const statInterval = setInterval(() => {
-      setCurrentStatIndex((prev) => (prev + 1) % heroStats.length);
-    }, 2500);
-
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      clearInterval(statInterval);
     };
   }, []);
 
@@ -299,23 +292,6 @@ export function MarketingHomePage({
         
         <div className="relative z-10 max-w-[1400px] mx-auto w-full flex flex-col md:flex-row justify-between items-end gap-12">
           <div className="max-w-3xl">
-            <div className="relative h-12 mb-6 overflow-hidden">
-              {heroStats.map((stat, index) => (
-                <div 
-                  key={index}
-                  className={`absolute top-0 left-0 transition-all duration-500 ease-in-out ${
-                    index === currentStatIndex 
-                      ? "opacity-100 translate-y-0 z-10" 
-                      : "opacity-0 translate-y-4 -z-10"
-                  }`}
-                >
-                  <div className="text-sm text-gray-200 leading-tight">
-                    <span className="font-bold text-white text-lg">{stat.value}</span><br/>
-                    <span className="mr-1.5">{stat.emoji}</span>{stat.text}
-                  </div>
-                </div>
-              ))}
-            </div>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-medium leading-[1.1] tracking-tight">
               The Ultimate Strength & Conditioning Hub for Padel Players.
             </h1>
@@ -465,7 +441,7 @@ export function MarketingHomePage({
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto text-center">
+          <div className="grid grid-cols-2 gap-6 max-w-3xl mx-auto text-center">
             {heroStats.map((stat, i) => (
               <div key={i} className="bg-[#f9f9f9] p-6 rounded-3xl flex flex-col items-center justify-center">
                 <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-2xl shadow-sm mb-4">
@@ -674,6 +650,8 @@ export function MarketingHomePage({
           </div>
         </div>
       </section>
+
+      <SiteFooter />
 
       {/* Mobile sticky CTA (shows when hero CTA is off-screen) */}
       <div

@@ -154,6 +154,17 @@ function SignUpForm() {
                   >
                     {pending ? "Creating account…" : "Create account"}
                   </button>
+                  <p className="text-center text-xs leading-relaxed text-white/50">
+                    By creating an account, you agree to our{" "}
+                    <Link href="/terms" className="underline underline-offset-2 hover:text-white/70">
+                      Terms &amp; Conditions
+                    </Link>{" "}
+                    and{" "}
+                    <Link href="/privacy" className="underline underline-offset-2 hover:text-white/70">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </p>
                   <p className="text-center text-sm text-white/60">
                     Already have an account?{" "}
                     <Link href="/login" className="font-medium text-white underline underline-offset-4 hover:text-white/80">
