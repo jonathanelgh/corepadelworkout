@@ -2,7 +2,7 @@
 
 import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
 import { sendLoginMagicLink, signInWithPassword } from "./actions";
@@ -10,7 +10,6 @@ import { sendLoginMagicLink, signInWithPassword } from "./actions";
 type View = "login" | "forgot" | "forgot-sent" | "magic-sent";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const emailRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("login");
@@ -35,21 +34,22 @@ function LoginForm() {
     const submittedEmail = String(formData.get("email") ?? "").trim();
     const submittedPassword = String(formData.get("password") ?? "");
 
-    const result = await signInWithPassword({
-      email: submittedEmail,
-      password: submittedPassword,
-      next: nextPath || null,
-    });
+    try {
+      const result = await signInWithPassword({
+        email: submittedEmail,
+        password: submittedPassword,
+        next: nextPath || null,
+      });
 
-    setPending(false);
+      setPending(false);
 
-    if ("error" in result) {
-      setError(result.error);
-      return;
+      if ("error" in result) {
+        setError(result.error);
+      }
+    } catch (err) {
+      setPending(false);
+      throw err;
     }
-
-    router.push(result.redirectTo);
-    router.refresh();
   }
 
   async function onSubmitMagicLink() {

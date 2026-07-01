@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Play, Video, X } from "lucide-react";
 import { resolveExerciseThumbnailUrl } from "@/lib/media/exercise-thumbnail-url";
 import { resolveVideoPlayer } from "@/lib/media/resolve-video-player";
+import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 
 const MODAL_Z = 10050;
 
@@ -75,14 +76,14 @@ export function ExerciseVideoThumbnail({ title, imageUrl, videoUrl, className = 
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`group relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg border border-gray-200 shadow-sm transition hover:border-gray-300 hover:shadow ${className}`}
+          className={`group relative aspect-square w-28 shrink-0 overflow-hidden rounded-lg border border-gray-200 shadow-sm transition hover:border-gray-300 hover:shadow ${className}`}
           aria-label={`Play video: ${title}`}
         >
           {preview}
         </button>
       ) : (
         <div
-          className={`relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 ${className}`}
+          className={`relative aspect-square w-28 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 ${className}`}
           aria-hidden
         >
           {preview}
@@ -113,19 +114,25 @@ export function ExerciseVideoThumbnail({ title, imageUrl, videoUrl, className = 
               >
                 <X className="h-5 w-5" />
               </button>
-              <div className="aspect-video w-full">
+              <ExerciseVideoFrame rounded={false}>
                 {player!.mode === "iframe" ? (
                   <iframe
                     src={player!.src}
                     title={player!.title}
-                    className="h-full w-full"
+                    className="absolute top-1/2 left-1/2 h-full w-[177.78%] max-w-none -translate-x-1/2 -translate-y-1/2"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   />
                 ) : (
-                  <video src={player!.src} className="h-full w-full" controls playsInline autoPlay />
+                  <video
+                    src={player!.src}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    controls
+                    playsInline
+                    autoPlay
+                  />
                 )}
-              </div>
+              </ExerciseVideoFrame>
             </div>
           </div>,
           document.body

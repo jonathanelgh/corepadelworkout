@@ -3,6 +3,7 @@ import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import {
   fetchProgramSessionsForProgram,
+  fetchProgramSessionsForTrack,
   type ProgramSessionRow,
   type ProgramWeekRow,
 } from "@/lib/programs/program-sessions";
@@ -77,13 +78,6 @@ export async function loadProgramProgress(
   profile?: ProfileEnv | null,
   programFormat: ProgramFormat = "training_plan"
 ): Promise<ProgramProgressView | null> {
-  const { trackId, sessions, weeks } = await fetchProgramSessionsForProgram(
-    supabase,
-    programId,
-    profile
-  );
-  if (sessions.length === 0) return null;
-
   let run: { id: string; track_id: string; started_at: string } | null = null;
   let completions: SessionCompletionRow[] = [];
 
@@ -112,6 +106,27 @@ export async function loadProgramProgress(
         .eq("program_id", programId);
       completions = (completionRows ?? []) as SessionCompletionRow[];
     }
+  }
+
+  const { trackId, sessions, weeks } = run
+    ? await fetchProgramSessionsForTrack(supabase, run.track_id)
+    : await fetchProgramSessionsForProgram(supabase, programId, profile);
+
+  if (sessions.length === 0) {
+    if (run) {
+      return {
+        runId: run.id,
+        trackId: run.track_id,
+        startedAt: run.started_at,
+        sessions: [],
+        weeks: [],
+        completedCount: 0,
+        totalSessions: 0,
+        nextSession: null,
+        isComplete: false,
+      };
+    }
+    return null;
   }
 
   const completionsBySession = new Map(
@@ -462,6 +477,8 @@ export async function loadUserActivePrograms(
     .from("program_runs")
     .select(
       `
+      program_id,
+      track_id,
       started_at,
       updated_at,
       programs (
@@ -482,8 +499,25 @@ export async function loadUserActivePrograms(
   const summaries: ActiveProgramSummary[] = [];
 
   for (const run of runs) {
-    const progRaw = run.programs;
-    const prog = Array.isArray(progRaw) ? progRaw[0] : progRaw;
+    let progRaw = run.programs;
+    let prog: {
+      id: string;
+      slug: string;
+      title: string;
+      cover_image_url: string | null;
+      status: string;
+      program_format: string | null;
+    } | null = Array.isArray(progRaw) ? progRaw[0] ?? null : progRaw ?? null;
+
+    if (!prog?.slug) {
+      const { data: progRow } = await supabase
+        .from("programs")
+        .select("id, slug, title, cover_image_url, status, program_format")
+        .eq("id", run.program_id as string)
+        .maybeSingle();
+      prog = progRow;
+    }
+
     if (!prog || typeof prog.slug !== "string" || prog.status !== "published") continue;
     if (prog.program_format === "single_workout") continue;
 
@@ -494,7 +528,7 @@ export async function loadUserActivePrograms(
       profile,
       "training_plan"
     );
-    if (!progress || progress.totalSessions === 0) continue;
+    if (!progress?.runId) continue;
 
     const next = progress.nextSession;
     summaries.push({
@@ -508,7 +542,7 @@ export async function loadUserActivePrograms(
       nextSessionHref: next ? playHrefForSession(prog.slug, next.id) : null,
       trainingHref: programTrainingHref(prog.slug),
       isComplete: progress.isComplete,
-      startedAt: (run.started_at as string | undefined) ?? null,
+      startedAt: (run.started_at as string | undefined) ?? progress.startedAt,
     });
   }
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Play, X } from "lucide-react";
 import { resolveVideoPlayer } from "@/lib/media/resolve-video-player";
+import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 
 const MODAL_Z = 10050;
 
@@ -65,19 +66,25 @@ export function ExerciseVideoButton({ videoUrl, label }: { videoUrl: string; lab
               >
                 <X className="h-5 w-5" />
               </button>
-              <div className="aspect-video w-full">
+              <ExerciseVideoFrame rounded={false}>
                 {player.mode === "iframe" ? (
                   <iframe
                     src={player.src}
                     title={player.title}
-                    className="h-full w-full"
+                    className="absolute top-1/2 left-1/2 h-full w-[177.78%] max-w-none -translate-x-1/2 -translate-y-1/2"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   />
                 ) : (
-                  <video src={player.src} className="h-full w-full" controls playsInline autoPlay />
+                  <video
+                    src={player.src}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    controls
+                    playsInline
+                    autoPlay
+                  />
                 )}
-              </div>
+              </ExerciseVideoFrame>
             </div>
           </div>,
           document.body

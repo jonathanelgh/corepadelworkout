@@ -160,6 +160,70 @@ function buildWeeksFromTrackWeeks(
   return weeks;
 }
 
+const TRACK_SESSIONS_SELECT = `
+  id,
+  sort_order,
+  locations ( slug ),
+  program_sessions (
+    id,
+    name,
+    description,
+    duration_minutes,
+    sort_order,
+    week_id,
+    program_exercises ( id ),
+    program_weeks ( id, week_number, name, sort_order )
+  )
+`;
+
+async function sessionsAndWeeksForTrack(
+  supabase: SupabaseClient,
+  track: TrackRow
+): Promise<{ trackId: string; sessions: ProgramSessionRow[]; weeks: ProgramWeekRow[] }> {
+  const sessionsRaw = track.program_sessions;
+  const sessionsArr = Array.isArray(sessionsRaw)
+    ? sessionsRaw
+    : sessionsRaw
+      ? [sessionsRaw]
+      : [];
+
+  const sorted = [...sessionsArr].sort((a, b) => a.sort_order - b.sort_order);
+  const perWeekCounts = new Map<number, number>();
+  const sessions = sorted.map((row) => {
+    const weekRaw = row.program_weeks;
+    const week = Array.isArray(weekRaw) ? weekRaw[0] : weekRaw;
+    const weekNum = week?.week_number ?? 1;
+    const dayInWeek = (perWeekCounts.get(weekNum) ?? 0) + 1;
+    perWeekCounts.set(weekNum, dayInWeek);
+    return mapSession(row, dayInWeek);
+  });
+
+  const weeksData = await fetchWeeksForTrack(supabase, track.id);
+
+  return {
+    trackId: track.id,
+    sessions,
+    weeks: buildWeeksFromTrackWeeks(weeksData, sessions),
+  };
+}
+
+/** Load sessions for the track the member already started (stable across logins). */
+export async function fetchProgramSessionsForTrack(
+  supabase: SupabaseClient,
+  trackId: string
+): Promise<{ trackId: string; sessions: ProgramSessionRow[]; weeks: ProgramWeekRow[] }> {
+  const { data, error } = await supabase
+    .from("program_location_tracks")
+    .select(TRACK_SESSIONS_SELECT)
+    .eq("id", trackId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Training track not found.");
+
+  return sessionsAndWeeksForTrack(supabase, data as TrackRow);
+}
+
 export async function fetchProgramSessionsForProgram(
   supabase: SupabaseClient,
   programId: string,
@@ -170,23 +234,7 @@ export async function fetchProgramSessionsForProgram(
 ): Promise<{ trackId: string; sessions: ProgramSessionRow[]; weeks: ProgramWeekRow[] }> {
   const { data, error } = await supabase
     .from("program_location_tracks")
-    .select(
-      `
-      id,
-      sort_order,
-      locations ( slug ),
-      program_sessions (
-        id,
-        name,
-        description,
-        duration_minutes,
-        sort_order,
-        week_id,
-        program_exercises ( id ),
-        program_weeks ( id, week_number, name, sort_order )
-      )
-    `
-    )
+    .select(TRACK_SESSIONS_SELECT)
     .eq("program_id", programId)
     .order("sort_order", { ascending: true });
 
@@ -211,31 +259,7 @@ export async function fetchProgramSessionsForProgram(
     }
   }
 
-  const sessionsRaw = picked.program_sessions;
-  const sessionsArr = Array.isArray(sessionsRaw)
-    ? sessionsRaw
-    : sessionsRaw
-      ? [sessionsRaw]
-      : [];
-
-  const sorted = [...sessionsArr].sort((a, b) => a.sort_order - b.sort_order);
-  const perWeekCounts = new Map<number, number>();
-  const sessions = sorted.map((row) => {
-    const weekRaw = row.program_weeks;
-    const week = Array.isArray(weekRaw) ? weekRaw[0] : weekRaw;
-    const weekNum = week?.week_number ?? 1;
-    const dayInWeek = (perWeekCounts.get(weekNum) ?? 0) + 1;
-    perWeekCounts.set(weekNum, dayInWeek);
-    return mapSession(row, dayInWeek);
-  });
-
-  const weeksData = await fetchWeeksForTrack(supabase, picked.id);
-
-  return {
-    trackId: picked.id,
-    sessions,
-    weeks: buildWeeksFromTrackWeeks(weeksData, sessions),
-  };
+  return sessionsAndWeeksForTrack(supabase, picked);
 }
 
 export async function getSessionBelongsToProgram(

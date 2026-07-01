@@ -28,6 +28,7 @@ import { logProgramSessionComplete, logProgramSessionStart } from "@/app/program
 import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
 import { programTrainingHref } from "@/lib/programs/program-routes";
 import { BackButton } from "@/components/navigation/back-button";
+import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 import { WorkoutCompletionOverlay } from "@/components/programs/workout-completion-overlay";
 import { BothSidesChip } from "@/components/programs/both-sides-chip";
 
@@ -88,7 +89,7 @@ function WorkoutVideo({
       <iframe
         src={player.src}
         title="Exercise video"
-        className={`absolute inset-0 h-full w-full border-0 ${className}`}
+        className={`absolute top-1/2 left-1/2 h-full w-[177.78%] max-w-none -translate-x-1/2 -translate-y-1/2 border-0 ${className}`}
         allow={IFRAME_ALLOW}
         allowFullScreen
       />
@@ -99,7 +100,7 @@ function WorkoutVideo({
     <video
       ref={videoRef}
       src={player.src}
-      className={`absolute inset-0 h-full w-full object-contain ${className}`}
+      className={`absolute inset-0 h-full w-full object-cover ${className}`}
       playsInline
       loop
       muted
@@ -495,7 +496,7 @@ export function ActiveWorkoutPlayer({
               </p>
             </div>
           )}
-          <div className="relative z-10 mx-auto aspect-video w-[min(100%,42rem,calc(min(40dvh,17.5rem)*16/9))] overflow-hidden bg-black sm:w-[min(100%,42rem,calc(min(42dvh,20rem)*16/9))]">
+          <ExerciseVideoFrame className="relative z-10">
             <WorkoutVideo
               url={displayVideoUrl}
               playing={!workoutFinished && (inPrep || isRunning)}
@@ -535,7 +536,7 @@ export function ActiveWorkoutPlayer({
                 <p className="mt-1 text-lg font-semibold">{current.title}</p>
               </div>
             )}
-          </div>
+          </ExerciseVideoFrame>
 
           {inPrep && (
             <div className="relative z-20 mx-auto max-w-lg px-6 py-6 text-center">

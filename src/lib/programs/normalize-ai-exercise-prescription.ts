@@ -3,7 +3,7 @@ import {
   inferExercisePrescriptionType,
   type ExercisePrescriptionType,
 } from "@/lib/programs/program-exercises";
-import type { SessionPhase } from "@/lib/programs/session-phase";
+import { parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
@@ -98,4 +98,60 @@ export function normalizeAiExerciseRest<T extends AiExerciseFields>(exercises: T
       isLastInSession: index === exercises.length - 1,
     }),
   }));
+}
+
+export type StoredProgramExerciseFields = {
+  session_phase: SessionPhase | string | null;
+  duration_minutes: number | null;
+  duration_seconds: number | null;
+  sets: number | null;
+  reps: number | null;
+  rest_between_sets_seconds: number | null;
+  rest_after_seconds: number | null;
+};
+
+export function storedExerciseToAiFields(ex: StoredProgramExerciseFields): AiExerciseFields {
+  const durationMinutes =
+    ex.duration_minutes != null && ex.duration_minutes > 0
+      ? Math.ceil(ex.duration_minutes)
+      : ex.duration_seconds != null && ex.duration_seconds > 0
+        ? Math.ceil(ex.duration_seconds / 60)
+        : null;
+
+  return {
+    phase: parseSessionPhase(ex.session_phase),
+    duration_minutes: durationMinutes,
+    sets: ex.sets,
+    reps: ex.reps,
+    rest_between_sets_seconds: ex.rest_between_sets_seconds,
+    rest_after_seconds: ex.rest_after_seconds,
+  };
+}
+
+/** Compute rest fields for a stored program_exercises row; only fills gaps. */
+export function backfillStoredProgramExerciseRest(
+  ex: StoredProgramExerciseFields,
+  opts: { isLastInSession: boolean }
+): {
+  rest_after_seconds: number;
+  rest_between_sets_seconds: number | null;
+  needsUpdate: boolean;
+} {
+  const fields = storedExerciseToAiFields(ex);
+  const currentAfter = ex.rest_after_seconds ?? 0;
+  const currentBetween = ex.rest_between_sets_seconds;
+
+  const targetAfter = defaultRestAfterSeconds(fields, opts);
+  const targetBetween = defaultRestBetweenSetsSeconds(fields);
+
+  const needsRestAfter =
+    !opts.isLastInSession && (ex.rest_after_seconds == null || currentAfter === 0);
+  const needsRestBetween =
+    (currentBetween == null || currentBetween === 0) && targetBetween != null;
+
+  return {
+    rest_after_seconds: needsRestAfter ? targetAfter : currentAfter,
+    rest_between_sets_seconds: needsRestBetween ? targetBetween : currentBetween,
+    needsUpdate: needsRestAfter || needsRestBetween,
+  };
 }

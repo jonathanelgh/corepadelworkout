@@ -1,9 +1,10 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 
-export type SignInResult = { ok: true; redirectTo: string } | { error: string };
+export type SignInResult = { error: string };
 
 export async function signInWithPassword(input: {
   email: string;
@@ -35,7 +36,7 @@ export async function signInWithPassword(input: {
   }
 
   const redirectTo = await resolvePostAuthRedirect(supabase, userId, input.next);
-  return { ok: true, redirectTo };
+  redirect(redirectTo);
 }
 
 export async function sendLoginMagicLink(input: {

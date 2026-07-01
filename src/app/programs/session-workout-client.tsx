@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight, List, X } from "lucide-react";
 import { ExerciseInlinePlayer } from "./exercise-inline-player";
+import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 import { BothSidesChip } from "@/components/programs/both-sides-chip";
 
 export type WorkoutExercise = {
@@ -207,9 +208,9 @@ export function SessionWorkoutClient({
             {current.video_url?.trim() ? (
               <ExerciseInlinePlayer videoUrl={current.video_url.trim()} title={current.title} />
             ) : (
-              <div className="flex aspect-video w-full items-center justify-center rounded-2xl bg-gray-100 text-sm text-gray-500">
+              <ExerciseVideoFrame bleed className="flex items-center justify-center bg-gray-100 text-sm text-gray-500">
                 No video for this exercise
-              </div>
+              </ExerciseVideoFrame>
             )}
 
             <div>

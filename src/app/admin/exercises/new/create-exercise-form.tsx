@@ -14,6 +14,7 @@ import {
 } from "@/components/admin/multi-select-search-chips";
 import { ExerciseMediaPickerModal } from "@/components/admin/exercise-media-picker-modal";
 import { VideoUrlPreview } from "@/components/media/video-url-preview";
+import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 
 type LocationOption = { id: string; name: string; slug: string };
 
@@ -471,14 +472,16 @@ export function CreateExerciseForm({
               </p>
 
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                <div className="flex min-h-[11rem] w-full shrink-0 items-stretch justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 sm:min-h-[12rem] sm:w-72">
-                  {videoUrl.trim() ? (
-                    <VideoUrlPreview url={videoUrl} label="Demo video preview" />
-                  ) : (
-                    <div className="flex h-full min-h-[10rem] w-full items-center justify-center">
-                      <Video className="h-12 w-12 text-gray-300" aria-hidden />
-                    </div>
-                  )}
+                <div className="flex w-full shrink-0 flex-col items-stretch sm:max-w-md md:max-w-lg">
+                  <ExerciseVideoFrame className="border border-gray-200 bg-gray-50">
+                    {videoUrl.trim() ? (
+                      <VideoUrlPreview url={videoUrl} label="Demo video preview" fit="cover" />
+                    ) : (
+                      <div className="flex h-full min-h-[10rem] w-full items-center justify-center">
+                        <Video className="h-12 w-12 text-gray-300" aria-hidden />
+                      </div>
+                    )}
+                  </ExerciseVideoFrame>
                 </div>
                 <div className="min-w-0 flex-1 space-y-3">
                   <button

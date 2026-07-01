@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, Shield } from "lucide-react";
 import { formatDateOfBirth } from "@/lib/member/date-of-birth";
+import { UserDetailModal } from "./user-detail-modal";
 
 export type AdminUserRow = {
   id: string;
@@ -43,6 +44,7 @@ function matchesQuery(row: AdminUserRow, q: string): boolean {
 
 export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
   const [query, setQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
 
   const filtered = useMemo(
     () => rows.filter((r) => matchesQuery(r, query.trim())),
@@ -101,7 +103,19 @@ export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
                   const img = user.profileImageUrl?.trim();
                   const label = user.fullName?.trim() || user.email || "Unknown";
                   return (
-                    <tr key={user.id} className="transition-colors hover:bg-gray-50/50">
+                    <tr
+                      key={user.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedUser(user)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedUser(user);
+                        }
+                      }}
+                      className="cursor-pointer transition-colors hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black"
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {img ? (
@@ -178,6 +192,10 @@ export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
           </div>
         )}
       </div>
+
+      {selectedUser && (
+        <UserDetailModal user={selectedUser} onClose={() => setSelectedUser(null)} />
+      )}
     </>
   );
 }
