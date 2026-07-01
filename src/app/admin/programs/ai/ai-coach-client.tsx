@@ -152,7 +152,10 @@ function formatProposalExerciseMeta(ex: WorkoutProposalExercise): string {
   return [
     ex.sets != null && ex.reps != null && `${ex.sets}×${ex.reps}`,
     ex.duration_minutes != null && `${ex.duration_minutes} min`,
-    `${ex.rest_after_seconds}s rest`,
+    ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
+      ? `${ex.rest_between_sets_seconds}s between sets`
+      : null,
+    ex.rest_after_seconds > 0 ? `${ex.rest_after_seconds}s rest` : null,
   ]
     .filter(Boolean)
     .join(", ");

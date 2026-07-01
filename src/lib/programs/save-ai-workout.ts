@@ -1,13 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkoutProposal } from "./ai-coach-gemini";
+import { aiExerciseToProgramPayload } from "./normalize-ai-exercise-prescription";
 import { insertProgramCurriculum, type ProgramExercisePayload } from "./program-curriculum";
 import { slugifyTitle, uniqueProgramSlug } from "./program-slug";
 
 function estimateTotalMinutes(proposal: WorkoutProposal): number {
   let total = 0;
-  for (const ex of proposal.exercises) {
-    if (ex.duration_minutes) total += ex.duration_minutes;
-    if (ex.rest_after_seconds) total += ex.rest_after_seconds / 60;
+  for (let i = 0; i < proposal.exercises.length; i++) {
+    const ex = proposal.exercises[i]!;
+    const payload = aiExerciseToProgramPayload(
+      { ...ex, choice_group: ex.choice_group ?? null },
+      { isLastInSession: i === proposal.exercises.length - 1 }
+    );
+    if (payload.duration_seconds) total += payload.duration_seconds / 60;
+    if (payload.rest_after_seconds) total += payload.rest_after_seconds / 60;
+    if (payload.rest_between_sets_seconds && payload.sets && payload.sets > 1) {
+      total += ((payload.rest_between_sets_seconds * (payload.sets - 1)) / 60);
+    }
   }
   return Math.ceil(total) || 15;
 }
@@ -89,18 +98,12 @@ export async function saveAiWorkoutProgram(
 
   const programId = program.id as string;
 
-  const exerciseRows: ProgramExercisePayload[] = proposal.exercises.map((ex) => ({
-    exercise_id: ex.exercise_id,
-    duration_minutes: null,
-    duration_seconds: ex.duration_minutes ? Math.ceil(ex.duration_minutes * 60) : null,
-    sets: ex.sets ? Math.ceil(ex.sets) : null,
-    reps: ex.reps ? Math.ceil(ex.reps) : null,
-    rest_between_sets_seconds: null,
-    rest_after_seconds: Math.ceil(ex.rest_after_seconds ?? 0),
-    session_phase: ex.phase,
-    choice_group: ex.choice_group ?? null,
-    note: null,
-  }));
+  const exerciseRows: ProgramExercisePayload[] = proposal.exercises.map((ex, index) =>
+    aiExerciseToProgramPayload(
+      { ...ex, choice_group: ex.choice_group ?? null },
+      { isLastInSession: index === proposal.exercises.length - 1 }
+    )
+  );
 
   try {
     await insertProgramCurriculum(

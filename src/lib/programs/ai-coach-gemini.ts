@@ -14,6 +14,7 @@ import {
   parseSessionPhase,
   type SessionPhase,
 } from "@/lib/programs/session-phase";
+import { normalizeAiExerciseRest } from "@/lib/programs/normalize-ai-exercise-prescription";
 import type { ProgramCatalogForAI } from "./programs-catalog";
 
 export type ChatHistoryMessage = {
@@ -29,6 +30,7 @@ export type WorkoutProposalExercise = {
   duration_minutes?: number;
   sets?: number;
   reps?: number;
+  rest_between_sets_seconds?: number;
   rest_after_seconds: number;
 };
 
@@ -163,10 +165,19 @@ const TOOLS: FunctionDeclaration[] = [
                 type: SchemaType.STRING,
                 description: "UUID from the exercise catalog — copy exactly from [uuid] in catalog",
               },
-              duration_minutes: { type: SchemaType.NUMBER },
-              sets: { type: SchemaType.NUMBER },
-              reps: { type: SchemaType.NUMBER },
-              rest_after_seconds: { type: SchemaType.NUMBER },
+              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes (mobility, holds, intervals)" },
+              sets: { type: SchemaType.NUMBER, description: "Sets or timed rounds" },
+              reps: { type: SchemaType.NUMBER, description: "Reps per set (sets/reps mode)" },
+              rest_between_sets_seconds: {
+                type: SchemaType.NUMBER,
+                description:
+                  "Rest between sets/rounds. Required when duration_minutes AND sets >= 2 (timed intervals). Typical 20–45s.",
+              },
+              rest_after_seconds: {
+                type: SchemaType.NUMBER,
+                description:
+                  "Rest before the next exercise. Required on every exercise except the last in a session. Typical 20s warmup, 30–60s main, 15s cooldown.",
+              },
               phase: {
                 type: SchemaType.STRING,
                 description: "warmup, main, or cooldown — every exercise must have a phase",
@@ -206,10 +217,19 @@ const TOOLS: FunctionDeclaration[] = [
                 type: SchemaType.STRING,
                 description: "UUID from the exercise catalog — copy exactly from [uuid] in catalog",
               },
-              duration_minutes: { type: SchemaType.NUMBER },
-              sets: { type: SchemaType.NUMBER },
-              reps: { type: SchemaType.NUMBER },
-              rest_after_seconds: { type: SchemaType.NUMBER },
+              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes (mobility, holds, intervals)" },
+              sets: { type: SchemaType.NUMBER, description: "Sets or timed rounds" },
+              reps: { type: SchemaType.NUMBER, description: "Reps per set (sets/reps mode)" },
+              rest_between_sets_seconds: {
+                type: SchemaType.NUMBER,
+                description:
+                  "Rest between sets/rounds. Required when duration_minutes AND sets >= 2 (timed intervals). Typical 20–45s.",
+              },
+              rest_after_seconds: {
+                type: SchemaType.NUMBER,
+                description:
+                  "Rest before the next exercise. Required on every exercise except the last in a session. Typical 20s warmup, 30–60s main, 15s cooldown.",
+              },
               phase: {
                 type: SchemaType.STRING,
                 description: "warmup, main, or cooldown — every exercise must have a phase",
@@ -251,6 +271,11 @@ function parseOptionalPositiveInt(v: unknown): number | null {
   return null;
 }
 
+function parseNonNegInt(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) return Math.ceil(v);
+  return null;
+}
+
 function parseExerciseList(
   rawList: unknown,
   catalogById: Map<string, string>
@@ -268,10 +293,8 @@ function parseExerciseList(
     if (!catalogById.has(exercise_id) || seenIds.has(exercise_id)) continue;
     seenIds.add(exercise_id);
 
-    const rest =
-      typeof ex.rest_after_seconds === "number" && Number.isFinite(ex.rest_after_seconds)
-        ? Math.max(0, Math.ceil(ex.rest_after_seconds))
-        : 0;
+    const restAfter = parseNonNegInt(ex.rest_after_seconds);
+    const restBetween = parseNonNegInt(ex.rest_between_sets_seconds);
 
     exercises.push({
       exercise_id,
@@ -284,11 +307,12 @@ function parseExerciseList(
           : undefined,
       sets: typeof ex.sets === "number" && Number.isFinite(ex.sets) ? Math.ceil(ex.sets) : undefined,
       reps: typeof ex.reps === "number" && Number.isFinite(ex.reps) ? Math.ceil(ex.reps) : undefined,
-      rest_after_seconds: rest,
+      rest_between_sets_seconds: restBetween ?? undefined,
+      rest_after_seconds: restAfter ?? 0,
     });
   }
 
-  return exercises;
+  return normalizeAiExerciseRest(exercises);
 }
 
 function parseWorkoutProposal(
@@ -525,7 +549,7 @@ export async function chatWithAiCoach(params: {
     let history = initialHistory;
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
-      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase and rest_after_seconds on each.`,
+      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
       `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs warmup, main (include rotation or anti-rotation), and cooldown.`,
       `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
     ];

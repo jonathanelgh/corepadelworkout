@@ -912,7 +912,7 @@ export function formatGenerationCoachBrief(
 ## GENERATION — call ${toolName} now
 - Use consultation values above for duration, frequency, location_slug, equipment, and movement limits.
 - Copy exercise_id UUIDs exactly from the catalog (square brackets). Do not invent IDs.
-- Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds.
+- Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds (between exercises; omit or 0 on the last exercise). Use rest_between_sets_seconds when prescribing timed intervals (duration + sets >= 2).
 ${
   isProgram
     ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block.`

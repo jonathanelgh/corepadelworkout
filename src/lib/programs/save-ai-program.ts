@@ -10,6 +10,7 @@ import {
   buildTrainingPlanTrack,
   normalizeTrainingPlanSessionNames,
 } from "./training-plan-curriculum";
+import { aiExerciseToProgramPayload } from "./normalize-ai-exercise-prescription";
 import { slugifyTitle, uniqueProgramSlug } from "./program-slug";
 
 async function resolveLocationId(supabase: SupabaseClient, slug?: string): Promise<string> {
@@ -27,9 +28,17 @@ async function resolveLocationId(supabase: SupabaseClient, slug?: string): Promi
 
 function estimateSessionMinutes(session: ProgramProposal["sessions"][number]): number {
   let total = 0;
-  for (const ex of session.exercises) {
-    if (ex.duration_minutes) total += ex.duration_minutes;
-    if (ex.rest_after_seconds) total += ex.rest_after_seconds / 60;
+  for (let i = 0; i < session.exercises.length; i++) {
+    const ex = session.exercises[i]!;
+    const payload = aiExerciseToProgramPayload(
+      { ...ex, choice_group: ex.choice_group ?? null },
+      { isLastInSession: i === session.exercises.length - 1 }
+    );
+    if (payload.duration_seconds) total += payload.duration_seconds / 60;
+    if (payload.rest_after_seconds) total += payload.rest_after_seconds / 60;
+    if (payload.rest_between_sets_seconds && payload.sets && payload.sets > 1) {
+      total += ((payload.rest_between_sets_seconds * (payload.sets - 1)) / 60);
+    }
   }
   return Math.ceil(total) || 15;
 }
@@ -37,18 +46,12 @@ function estimateSessionMinutes(session: ProgramProposal["sessions"][number]): n
 function toExercisePayload(
   exercises: ProgramProposal["sessions"][number]["exercises"]
 ): ProgramExercisePayload[] {
-  return exercises.map((ex) => ({
-    exercise_id: ex.exercise_id,
-    duration_minutes: null,
-    duration_seconds: ex.duration_minutes ? Math.ceil(ex.duration_minutes * 60) : null,
-    sets: ex.sets ? Math.ceil(ex.sets) : null,
-    reps: ex.reps ? Math.ceil(ex.reps) : null,
-    rest_between_sets_seconds: null,
-    rest_after_seconds: Math.ceil(ex.rest_after_seconds ?? 0),
-    session_phase: ex.phase,
-    choice_group: ex.choice_group ?? null,
-    note: null,
-  }));
+  return exercises.map((ex, index) =>
+    aiExerciseToProgramPayload(
+      { ...ex, choice_group: ex.choice_group ?? null },
+      { isLastInSession: index === exercises.length - 1 }
+    )
+  );
 }
 
 export type SaveAiProgramResult = {

@@ -62,7 +62,8 @@ Tool selection (CRITICAL):
 - For generate_workout and generate_program, use ONLY exercises from the exercise catalog below. Every exercise_id MUST be copied exactly from a catalog line (the UUID in square brackets).
 - REQUIRED: Every workout/session MUST include at least one rotational or anti-rotational exercise (catalog move: tag contains Rotation, Anti-rotation, or Rotational transfer). Place it in the main block unless it fits warm-up mobility.
 - Do NOT invent exercises, IDs, or names not in the catalog.
-- Each exercise must include exercise_id and rest_after_seconds (required).
+- Each exercise must include exercise_id and rest_after_seconds (required except last exercise in a session).
+- Prescription rest rules: sets+reps → rest_after_seconds between exercises (30–60s main). Timed work (duration_minutes) → rest_after_seconds between exercises (20–45s). Timed sets (duration_minutes + sets >= 2) → rest_between_sets_seconds between rounds AND rest_after_seconds before the next exercise.
 - Be concise and practical for padel athletes.
 
 Published programs catalog (id must be copied exactly):

@@ -165,6 +165,7 @@ export function ensureGeminiDraftRotation(
         sets: ex.sets ?? undefined,
         reps: ex.reps ?? undefined,
         rest_after_seconds: ex.rest_after_seconds ?? 0,
+        rest_between_sets_seconds: ex.rest_between_sets_seconds ?? undefined,
       }));
 
       const result = ensureListHasRotation(proposalExercises, catalog, { locationIds });
@@ -177,7 +178,7 @@ export function ensureGeminiDraftRotation(
         duration_minutes: ex.duration_minutes ?? null,
         sets: ex.sets ?? null,
         reps: ex.reps ?? null,
-        rest_between_sets_seconds: null,
+        rest_between_sets_seconds: ex.rest_between_sets_seconds ?? null,
         rest_after_seconds: ex.rest_after_seconds,
       }));
 
