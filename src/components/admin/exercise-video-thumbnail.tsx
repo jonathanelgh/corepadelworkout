@@ -13,10 +13,18 @@ type Props = {
   title: string;
   imageUrl?: string | null;
   videoUrl?: string | null;
+  /** Smaller preview for dense tables (default is card/list layout). */
+  compact?: boolean;
   className?: string;
 };
 
-export function ExerciseVideoThumbnail({ title, imageUrl, videoUrl, className = "" }: Props) {
+export function ExerciseVideoThumbnail({
+  title,
+  imageUrl,
+  videoUrl,
+  compact = false,
+  className = "",
+}: Props) {
   const trimmedVideo = videoUrl?.trim() ?? "";
   const thumbnail = useMemo(
     () => resolveExerciseThumbnailUrl(imageUrl, trimmedVideo || null),
@@ -49,6 +57,9 @@ export function ExerciseVideoThumbnail({ title, imageUrl, videoUrl, className = 
   if (!thumbnail && !player) return null;
 
   const canPlay = Boolean(player);
+  const sizeClass = compact ? "w-14" : "w-28";
+  const playButtonClass = compact ? "h-6 w-6" : "h-9 w-9";
+  const playIconClass = compact ? "h-3 w-3" : "h-4 w-4";
 
   const preview = (
     <div className="relative h-full w-full bg-gray-100">
@@ -62,8 +73,10 @@ export function ExerciseVideoThumbnail({ title, imageUrl, videoUrl, className = 
       )}
       {canPlay ? (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 transition group-hover:bg-black/35">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white shadow-lg">
-            <Play className="h-4 w-4 fill-current" aria-hidden />
+          <span
+            className={`flex items-center justify-center rounded-full bg-black/70 text-white shadow-lg ${playButtonClass}`}
+          >
+            <Play className={`fill-current ${playIconClass}`} aria-hidden />
           </span>
         </span>
       ) : null}
@@ -76,14 +89,14 @@ export function ExerciseVideoThumbnail({ title, imageUrl, videoUrl, className = 
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`group relative aspect-square w-28 shrink-0 overflow-hidden rounded-lg border border-gray-200 shadow-sm transition hover:border-gray-300 hover:shadow ${className}`}
+          className={`group relative aspect-square shrink-0 overflow-hidden rounded-lg border border-gray-200 shadow-sm transition hover:border-gray-300 hover:shadow ${sizeClass} ${className}`}
           aria-label={`Play video: ${title}`}
         >
           {preview}
         </button>
       ) : (
         <div
-          className={`relative aspect-square w-28 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 ${className}`}
+          className={`relative aspect-square shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 ${sizeClass} ${className}`}
           aria-hidden
         >
           {preview}

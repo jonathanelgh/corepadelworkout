@@ -59,6 +59,7 @@ export function EditExerciseForm({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("basic");
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>(initial.locationIds);
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>(initial.equipmentIds);
@@ -98,6 +99,7 @@ export function EditExerciseForm({
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setSaved(false);
     setPending(true);
     const form = e.currentTarget;
 
@@ -128,7 +130,7 @@ export function EditExerciseForm({
       if ("error" in result) {
         setError(result.error);
       } else {
-        router.push("/admin/exercises");
+        setSaved(true);
         router.refresh();
       }
     } catch (err) {
@@ -232,6 +234,11 @@ export function EditExerciseForm({
             {locationsError && (
               <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 Could not load locations: {locationsError}
+              </div>
+            )}
+            {saved && (
+              <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                Changes saved.
               </div>
             )}
             {error && (

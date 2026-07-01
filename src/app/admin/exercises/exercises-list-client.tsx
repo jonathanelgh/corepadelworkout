@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, X } from "lucide-react";
+import { ExerciseVideoThumbnail } from "@/components/admin/exercise-video-thumbnail";
 import { ExerciseRowActions } from "./exercise-row-actions";
 import type { ExerciseListFilters, ExerciseListItem } from "./types";
 
@@ -221,12 +222,12 @@ export function ExercisesListClient({
           <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50 text-gray-500">
+                <th className="w-20 px-6 py-4 font-medium">Video</th>
                 <th className="px-6 py-4 font-medium">Exercise</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Level</th>
                 <th className="px-6 py-4 font-medium">Location</th>
                 <th className="px-6 py-4 font-medium">Gear</th>
-                <th className="px-6 py-4 font-medium">Media</th>
                 <th className="px-6 py-4 font-medium">Created</th>
                 <th className="px-6 py-4 text-right font-medium">Actions</th>
               </tr>
@@ -254,8 +255,6 @@ export function ExercisesListClient({
                 </tr>
               ) : (
                 filtered.map((ex) => {
-                  const hasVideo = Boolean(ex.video_url?.trim());
-                  const hasImage = Boolean(ex.image_url?.trim());
                   const created = new Date(ex.created_at).toLocaleDateString(undefined, {
                     year: "numeric",
                     month: "short",
@@ -263,6 +262,18 @@ export function ExercisesListClient({
                   });
                   return (
                     <tr key={ex.id} className="transition-colors hover:bg-gray-50/50">
+                      <td className="px-6 py-4">
+                        {!ex.video_url?.trim() && !ex.image_url?.trim() ? (
+                          <span className="text-gray-400">—</span>
+                        ) : (
+                          <ExerciseVideoThumbnail
+                            title={ex.title}
+                            imageUrl={ex.image_url}
+                            videoUrl={ex.video_url}
+                            compact
+                          />
+                        )}
+                      </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{ex.title}</div>
                         {ex.description && (
@@ -321,21 +332,6 @@ export function ExercisesListClient({
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <div className="flex gap-2">
-                          {hasVideo && (
-                            <span className="rounded-md border border-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
-                              Video
-                            </span>
-                          )}
-                          {hasImage && (
-                            <span className="rounded-md border border-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
-                              Image
-                            </span>
-                          )}
-                          {!hasVideo && !hasImage && <span className="text-gray-400">—</span>}
-                        </div>
                       </td>
                       <td className="px-6 py-4 text-gray-500">{created}</td>
                       <td className="px-6 py-4 text-right">
