@@ -26,9 +26,10 @@ import {
   Zap,
 } from "lucide-react";
 import type { OnboardingEnvironment, OnboardingGoal, OnboardingLevel, PainKey } from "@/lib/member/onboarding";
+import { parseDateOfBirthParts } from "@/lib/member/date-of-birth";
 import { completeOnboarding } from "./actions";
 
-const STEPS = 6;
+const STEPS = 7;
 
 const LEVELS: {
   id: OnboardingLevel;
@@ -167,6 +168,9 @@ export function OnboardingFlow({
   const [step, setStep] = useState(0);
   const [showPrivacyNote, setShowPrivacyNote] = useState(true);
   const [name, setName] = useState(initialName);
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
   const [level, setLevel] = useState<OnboardingLevel | null>(null);
   const [pains, setPains] = useState<PainKey[]>([]);
   const [goal, setGoal] = useState<OnboardingGoal | null>(null);
@@ -197,6 +201,14 @@ export function OnboardingFlow({
     });
   }, []);
 
+  const birthDateValid = useMemo(() => {
+    const day = Number.parseInt(birthDay, 10);
+    const month = Number.parseInt(birthMonth, 10);
+    const year = Number.parseInt(birthYear, 10);
+    if (!birthDay.trim() || !birthMonth.trim() || !birthYear.trim()) return false;
+    return parseDateOfBirthParts(day, month, year).ok;
+  }, [birthDay, birthMonth, birthYear]);
+
   const canContinue = useMemo(() => {
     switch (step) {
       case 0:
@@ -204,17 +216,19 @@ export function OnboardingFlow({
       case 1:
         return name.trim().length >= 1;
       case 2:
-        return level !== null;
+        return birthDateValid;
       case 3:
-        return pains.length >= 1;
+        return level !== null;
       case 4:
-        return goal !== null;
+        return pains.length >= 1;
       case 5:
+        return goal !== null;
+      case 6:
         return environments.length > 0;
       default:
         return false;
     }
-  }, [step, name, level, pains, goal, environments]);
+  }, [step, name, birthDateValid, level, pains, goal, environments]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -230,12 +244,15 @@ export function OnboardingFlow({
   }, [canContinue, step, submitting]);
 
   async function handleFinish() {
-    if (!level || !goal || environments.length === 0 || pains.length === 0) return;
+    if (!level || !goal || environments.length === 0 || pains.length === 0 || !birthDateValid) return;
     setSubmitting(true);
     setError(null);
 
     const res = await completeOnboarding({
       displayName: name.trim(),
+      birthDay: Number.parseInt(birthDay, 10),
+      birthMonth: Number.parseInt(birthMonth, 10),
+      birthYear: Number.parseInt(birthYear, 10),
       level,
       pains,
       goal,
@@ -341,6 +358,59 @@ export function OnboardingFlow({
           {step === 2 && (
             <>
               <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
+                When were you born? 🎂
+              </h2>
+              <p className="mt-2 text-base text-zinc-600">
+                We use this to tailor training intensity and show your age in your profile. Your date is kept private.
+              </p>
+              <div className="mt-8 grid grid-cols-3 gap-3">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Day</span>
+                  <input
+                    autoFocus
+                    inputMode="numeric"
+                    value={birthDay}
+                    onChange={(e) => setBirthDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    placeholder="DD"
+                    maxLength={2}
+                    className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 py-4 text-center text-lg text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#ccff00]/90"
+                    aria-label="Day of birth"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Month</span>
+                  <input
+                    inputMode="numeric"
+                    value={birthMonth}
+                    onChange={(e) => setBirthMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    placeholder="MM"
+                    maxLength={2}
+                    className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 py-4 text-center text-lg text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#ccff00]/90"
+                    aria-label="Month of birth"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-zinc-700">Year</span>
+                  <input
+                    inputMode="numeric"
+                    value={birthYear}
+                    onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="YYYY"
+                    maxLength={4}
+                    className="w-full rounded-2xl border-2 border-zinc-300 bg-white px-4 py-4 text-center text-lg text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[#ccff00]/90"
+                    aria-label="Year of birth"
+                  />
+                </label>
+              </div>
+              {birthDay && birthMonth && birthYear.length === 4 && !birthDateValid && (
+                <p className="mt-3 text-sm text-red-600">Enter a valid date of birth.</p>
+              )}
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
                 Quick level check — where are you at? 📈
               </h2>
               <p className="mt-2 text-base text-zinc-600">
@@ -379,7 +449,7 @@ export function OnboardingFlow({
             </>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <>
               <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
                 Any &ldquo;padel pains&rdquo; right now? 🩹
@@ -412,7 +482,7 @@ export function OnboardingFlow({
             </>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <>
               <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
                 What do you want most right now? 🎯
@@ -453,7 +523,7 @@ export function OnboardingFlow({
             </>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <>
               <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
                 Where do you usually train? 🏟️

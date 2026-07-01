@@ -2,8 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
-import { loadProgramProgress } from "@/lib/programs/program-progress";
+import { loadProgramProgress, playHrefForSession } from "@/lib/programs/program-progress";
 import { programCatalogHref } from "@/lib/programs/program-routes";
+import { fetchProgramSessionsForProgram } from "@/lib/programs/program-sessions";
 import { ActiveProgramHub } from "@/components/programs/active-program-hub";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +67,19 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   };
 
   const programFormat = parseProgramFormat(program.program_format);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("training_environment, training_environments")
+    .eq("id", user.id)
+    .maybeSingle();
+
   if (!usesProgramProgress(programFormat)) {
+    const { sessions } = await fetchProgramSessionsForProgram(supabase, program.id, profile);
+    const first = sessions[0];
+    if (first) {
+      redirect(playHrefForSession(slug, first.id));
+    }
     redirect(programCatalogHref(slug));
   }
 
@@ -75,12 +88,6 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   if (!hasAccess) {
     redirect(`${programCatalogHref(slug)}?upgrade=1`);
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("training_environment, training_environments")
-    .eq("id", user.id)
-    .maybeSingle();
 
   const progress = await loadProgramProgress(
     supabase,

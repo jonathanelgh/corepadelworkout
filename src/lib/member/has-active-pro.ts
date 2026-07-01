@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getIsAdminUser } from "@/utils/supabase/is-admin";
 
 type SubRow = {
   status: string;
@@ -15,6 +16,8 @@ function planGrantsAll(sub: SubRow): boolean {
 
 /** True when user has an active/trialing subscription whose plan grants all programs (e.g. Pro). */
 export async function getHasActivePro(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  if (await getIsAdminUser(supabase, userId)) return true;
+
   const { data, error } = await supabase
     .from("customer_subscriptions")
     .select("status, current_period_end, subscription_plans!inner ( grants_all_programs )")

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getIsAdminUser } from "@/utils/supabase/is-admin";
 
 export type MemberSubscriptionStatus = {
   hasActivePro: boolean;
@@ -25,10 +26,23 @@ function planMeta(sub: SubRow): { name: string; grantsAll: boolean } | null {
   return { name: row.name, grantsAll: Boolean(row.grants_all_programs) };
 }
 
+const ADMIN_PRO_STATUS: MemberSubscriptionStatus = {
+  hasActivePro: true,
+  planName: "Admin",
+  status: "active",
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  hasStripeCustomer: false,
+};
+
 export async function loadMemberSubscriptionStatus(
   supabase: SupabaseClient,
   userId: string
 ): Promise<MemberSubscriptionStatus> {
+  if (await getIsAdminUser(supabase, userId)) {
+    return ADMIN_PRO_STATUS;
+  }
+
   const { data, error } = await supabase
     .from("customer_subscriptions")
     .select(

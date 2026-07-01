@@ -19,6 +19,7 @@ export function SubscriptionSettings({
   billingSuccess?: boolean;
 }) {
   const { hasActivePro, planName, status, currentPeriodEnd, cancelAtPeriodEnd } = subscription;
+  const isAdminPro = planName === "Admin";
 
   return (
     <div className="space-y-4">
@@ -45,9 +46,11 @@ export function SubscriptionSettings({
               <>
                 <p className="font-semibold text-zinc-900">{planName ?? "Pro"} — active</p>
                 <p className="mt-1 text-sm text-zinc-600">
-                  {cancelAtPeriodEnd
-                    ? `Access until ${formatDate(currentPeriodEnd)} (canceled, won’t renew)`
-                    : `Renews on ${formatDate(currentPeriodEnd)}`}
+                  {isAdminPro
+                    ? "Full Pro access included with your admin account."
+                    : cancelAtPeriodEnd
+                      ? `Access until ${formatDate(currentPeriodEnd)} (canceled, won’t renew)`
+                      : `Renews on ${formatDate(currentPeriodEnd)}`}
                 </p>
                 {status && status !== "active" && (
                   <p className="mt-1 text-xs text-amber-700">Status: {status}</p>
@@ -78,15 +81,15 @@ export function SubscriptionSettings({
         </ul>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          {hasActivePro ? (
+          {hasActivePro && !isAdminPro ? (
             <ManageSubscriptionButton className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800">
               Manage subscription
             </ManageSubscriptionButton>
-          ) : (
+          ) : !hasActivePro ? (
             <SubscribeButton className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800">
               Subscribe to Pro
             </SubscribeButton>
-          )}
+          ) : null}
           <Link
             href="/member/exercises"
             className="rounded-xl border border-zinc-200 px-5 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"

@@ -74,7 +74,10 @@ export async function startProgramTraining(
     revalidatePath(`/programs/${slug}`);
     revalidatePath(`/programs/${slug}/training`);
     revalidatePath("/member");
-    return { ok: true, playHref: programTrainingHref(slug) };
+    const playHref = usesProgramProgress(programFormat)
+      ? programTrainingHref(slug)
+      : playHrefForSession(slug, session.id);
+    return { ok: true, playHref };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not start program." };
   }

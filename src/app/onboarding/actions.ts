@@ -12,9 +12,13 @@ import {
   isPainKey,
   normalizePainSelection,
 } from "@/lib/member/onboarding";
+import { parseDateOfBirthParts } from "@/lib/member/date-of-birth";
 
 export type OnboardingPayload = {
   displayName: string;
+  birthDay: number;
+  birthMonth: number;
+  birthYear: number;
   level: OnboardingLevel;
   pains: PainKey[];
   goal: OnboardingGoal;
@@ -29,6 +33,11 @@ export async function completeOnboarding(
   const name = payload.displayName.trim();
   if (name.length < 1 || name.length > 80) {
     return { ok: false, message: "Please enter your name (1–80 characters)." };
+  }
+
+  const birth = parseDateOfBirthParts(payload.birthDay, payload.birthMonth, payload.birthYear);
+  if (!birth.ok) {
+    return { ok: false, message: birth.message };
   }
 
   if (!(payload.level in LEVEL_TO_PADEL_SLUG)) {
@@ -85,6 +94,7 @@ export async function completeOnboarding(
     .from("profiles")
     .update({
       full_name: name,
+      date_of_birth: birth.date,
       padel_level_id: levelRow.id,
       padel_pains: pains,
       primary_goal: payload.goal,

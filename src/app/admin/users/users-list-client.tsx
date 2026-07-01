@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, Shield } from "lucide-react";
+import { formatDateOfBirth } from "@/lib/member/date-of-birth";
 
 export type AdminUserRow = {
   id: string;
@@ -10,6 +11,8 @@ export type AdminUserRow = {
   profileImageUrl: string | null;
   createdAt: string;
   onboardingCompletedAt: string | null;
+  dateOfBirth: string | null;
+  age: number | null;
   padelLevelName: string | null;
   isAdmin: boolean;
   accessLabel: string;
@@ -68,6 +71,7 @@ export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50 text-gray-500">
                 <th className="px-6 py-4 font-medium">User</th>
+                <th className="px-6 py-4 font-medium">Age</th>
                 <th className="px-6 py-4 font-medium">Padel level</th>
                 <th className="px-6 py-4 font-medium whitespace-nowrap">Joined</th>
                 <th className="px-6 py-4 font-medium">Onboarding</th>
@@ -78,7 +82,7 @@ export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-16 text-center text-gray-500">
                     {rows.length === 0 ? (
                       <p>No user profiles yet.</p>
                     ) : (
@@ -119,6 +123,15 @@ export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
                             )}
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600 tabular-nums">
+                        {user.age != null ? (
+                          <span title={user.dateOfBirth ? formatDateOfBirth(user.dateOfBirth) : undefined}>
+                            {user.age}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
                         {user.padelLevelName ?? "—"}

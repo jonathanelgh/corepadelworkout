@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { redirect } from "next/navigation";
+import { ageFromDateOfBirth } from "@/lib/member/date-of-birth";
 import { UsersListClient, type AdminUserRow } from "./users-list-client";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +81,7 @@ export default async function AdminUsersPage() {
         profile_image_url,
         created_at,
         onboarding_completed_at,
+        date_of_birth,
         padel_levels ( name )
       `
       )
@@ -111,6 +113,7 @@ export default async function AdminUsersPage() {
 
   const rows: AdminUserRow[] = (profilesRes.data ?? []).map((p) => {
     const id = p.id as string;
+    const dateOfBirth = (p.date_of_birth as string | null) ?? null;
     return {
       id,
       email: (p.email as string | null) ?? null,
@@ -118,6 +121,8 @@ export default async function AdminUsersPage() {
       profileImageUrl: (p.profile_image_url as string | null) ?? null,
       createdAt: p.created_at as string,
       onboardingCompletedAt: (p.onboarding_completed_at as string | null) ?? null,
+      dateOfBirth,
+      age: dateOfBirth ? ageFromDateOfBirth(dateOfBirth) : null,
       padelLevelName: firstPadelLevelName(p.padel_levels as PadelLevelRel),
       isAdmin: adminIds.has(id),
       accessLabel: accessLabel(id, subByUser, enrollCountByUser.get(id) ?? 0),

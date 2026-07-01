@@ -1,19 +1,20 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
-import { sendLoginMagicLink } from "./actions";
+import { sendLoginMagicLink, signInWithPassword } from "./actions";
 
 type View = "login" | "forgot" | "forgot-sent" | "magic-sent";
 
 function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const emailRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("login");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -21,11 +22,47 @@ function LoginForm() {
   const authError = searchParams.get("error");
   const nextPath = searchParams.get("next") ?? "";
 
-  async function onSubmitMagicLink() {
+  function emailFromLoginField(): string {
+    return (emailRef.current?.value ?? email).trim();
+  }
+
+  async function onSubmitPassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError(null);
     setPending(true);
+
+    const formData = new FormData(e.currentTarget);
+    const submittedEmail = String(formData.get("email") ?? "").trim();
+    const submittedPassword = String(formData.get("password") ?? "");
+
+    const result = await signInWithPassword({
+      email: submittedEmail,
+      password: submittedPassword,
+      next: nextPath || null,
+    });
+
+    setPending(false);
+
+    if ("error" in result) {
+      setError(result.error);
+      return;
+    }
+
+    router.push(result.redirectTo);
+    router.refresh();
+  }
+
+  async function onSubmitMagicLink() {
+    setError(null);
+    const emailValue = emailFromLoginField();
+    if (!emailValue) {
+      setError("Enter your email address.");
+      return;
+    }
+    setEmail(emailValue);
+    setPending(true);
     const result = await sendLoginMagicLink({
-      email: email.trim(),
+      email: emailValue,
       next: searchParams.get("next"),
       origin: window.location.origin,
     });
@@ -113,20 +150,19 @@ function LoginForm() {
               )}
 
               {view === "login" && (
-                <form action="/auth/login" method="post" className="space-y-4">
-                  <input type="hidden" name="next" value={nextPath} />
+                <form onSubmit={(e) => void onSubmitPassword(e)} className="space-y-4">
                   <div>
                     <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-white/85">
                       Email
                     </label>
                     <input
+                      ref={emailRef}
                       id="email"
                       name="email"
                       type="email"
                       autoComplete="email"
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      defaultValue={email}
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-[#ccff00]/60 focus:bg-black/40 focus:ring-2 focus:ring-[#ccff00]/25"
                       placeholder="you@club.com"
                     />
@@ -140,6 +176,7 @@ function LoginForm() {
                         type="button"
                         onClick={() => {
                           setError(null);
+                          setEmail(emailFromLoginField());
                           setView("forgot");
                         }}
                         className="text-xs font-medium text-[#ccff00] hover:text-[#b3e600]"
@@ -153,17 +190,16 @@ function LoginForm() {
                       type="password"
                       autoComplete="current-password"
                       required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-[#ccff00]/60 focus:bg-black/40 focus:ring-2 focus:ring-[#ccff00]/25"
                       placeholder="••••••••"
                     />
                   </div>
                   <button
                     type="submit"
+                    disabled={pending}
                     className="w-full rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-60"
                   >
-                    Sign in
+                    {pending ? "Signing in…" : "Sign in"}
                   </button>
                   <div className="relative py-2">
                     <div className="absolute inset-0 flex items-center" aria-hidden>
@@ -173,7 +209,7 @@ function LoginForm() {
                   </div>
                   <button
                     type="button"
-                    disabled={pending || !email.trim()}
+                    disabled={pending}
                     onClick={() => void onSubmitMagicLink()}
                     className="w-full rounded-xl border border-white/20 bg-white/5 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-60"
                   >
