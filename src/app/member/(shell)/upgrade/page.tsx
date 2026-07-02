@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getMemberShellContext } from "@/lib/member/member-shell-context";
 import { loadMemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
 import { MemberAppShell } from "@/components/member/member-app-shell";
+import { PromoDiscountBanner } from "@/components/billing/promo-discount-banner";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 import { proMonthlyPriceLabel } from "@/lib/billing/format-subscription-price";
 import { ManageSubscriptionButton } from "@/components/billing/manage-subscription-button";
@@ -59,6 +60,8 @@ export default async function MemberUpgradePage({
             One subscription for paid programs, the exercise library, and AI Coach.
           </p>
         </div>
+
+        <PromoDiscountBanner />
 
         {sp.canceled === "1" && (
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">

@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EARLY_ACCESS_OFFER, EARLY_ACCESS_PRO_MONTHS, EARLY_ACCESS_TOKEN_PARAM } from "@/lib/pre-launch/early-access";
+import { PROMO_QUERY_PARAM, normalizePromoCode } from "@/lib/billing/promo-cookie";
 import { signUpWithPassword } from "./actions";
 
 function SignUpForm() {
@@ -14,6 +15,7 @@ function SignUpForm() {
       ? searchParams.get(EARLY_ACCESS_TOKEN_PARAM)?.trim() || null
       : null;
   const hasEarlyAccess = Boolean(earlyAccessToken);
+  const promoCode = normalizePromoCode(searchParams.get(PROMO_QUERY_PARAM));
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -85,6 +87,13 @@ function SignUpForm() {
                     : "Sign up with your name, email, and password. You'll personalize your plan next."}
               </p>
             </div>
+
+            {promoCode && !verifySent && (
+              <div className="mb-4 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                Promo <strong className="text-white">{promoCode}</strong> saved — it will be applied when you
+                subscribe to Pro.
+              </div>
+            )}
 
             {hasEarlyAccess && !verifySent && (
               <div className="mb-4 rounded-2xl border border-[#ccff00]/30 bg-[#ccff00]/10 px-4 py-3 text-sm text-[#e8ff99]">

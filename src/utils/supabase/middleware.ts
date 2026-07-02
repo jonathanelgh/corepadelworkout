@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { attachPromoCookieFromRequest } from '@/lib/billing/promo-cookie'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -39,7 +40,7 @@ export async function updateSession(request: NextRequest) {
     supabaseResponse.cookies.getAll().forEach(({ name, value }) => {
       res.cookies.set(name, value)
     })
-    return res
+    return attachPromoCookieFromRequest(request, res)
   }
 
   const path = request.nextUrl.pathname
@@ -94,5 +95,5 @@ export async function updateSession(request: NextRequest) {
     return withSessionCookies(NextResponse.redirect(new URL(target, request.url)))
   }
 
-  return supabaseResponse
+  return attachPromoCookieFromRequest(request, supabaseResponse)
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Crown, Check } from "lucide-react";
 import type { MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
+import { PromoDiscountBanner } from "@/components/billing/promo-discount-banner";
 import { ManageSubscriptionButton } from "@/components/billing/manage-subscription-button";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 
@@ -35,6 +36,8 @@ export function SubscriptionSettings({
           Thanks — your subscription is being activated. It may take a moment to appear here.
         </div>
       )}
+
+      {!hasActivePro && <PromoDiscountBanner />}
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex items-start gap-3">
