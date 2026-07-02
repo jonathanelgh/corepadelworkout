@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStoredPromoCode } from "@/lib/billing/promo-cookie";
+import { getStoredPromoCode } from "@/lib/billing/promo-cookie-server";
 import { createClient } from "@/utils/supabase/server";
 import { getSiteUrl, getStripeProPriceId, PRO_PLAN_SLUG } from "@/lib/stripe/config";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customer";

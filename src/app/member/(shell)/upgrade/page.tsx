@@ -4,7 +4,8 @@ import { createClient } from "@/utils/supabase/server";
 import { getMemberShellContext } from "@/lib/member/member-shell-context";
 import { loadMemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
 import { MemberAppShell } from "@/components/member/member-app-shell";
-import { PromoDiscountBanner } from "@/components/billing/promo-discount-banner";
+import { PromoDiscountBannerView } from "@/components/billing/promo-discount-banner";
+import { getStoredPromoCode } from "@/lib/billing/promo-cookie-server";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 import { proMonthlyPriceLabel } from "@/lib/billing/format-subscription-price";
 import { ManageSubscriptionButton } from "@/components/billing/manage-subscription-button";
@@ -47,6 +48,7 @@ export default async function MemberUpgradePage({
     .maybeSingle();
 
   const priceLabel = proMonthlyPriceLabel(plan);
+  const storedPromoCode = await getStoredPromoCode();
 
   return (
     <MemberAppShell userEmail={userEmail} profile={profile}>
@@ -61,7 +63,7 @@ export default async function MemberUpgradePage({
           </p>
         </div>
 
-        <PromoDiscountBanner />
+        {storedPromoCode && <PromoDiscountBannerView promoCode={storedPromoCode} />}
 
         {sp.canceled === "1" && (
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">

@@ -11,10 +11,12 @@ export function MemberProfileTab({
   profile,
   subscription,
   billingSuccess,
+  promoCode,
 }: {
   profile: MemberHubProfile;
   subscription: MemberSubscriptionStatus;
   billingSuccess?: boolean;
+  promoCode?: string | null;
 }) {
   const [editOpen, setEditOpen] = useState(false);
 
@@ -31,7 +33,11 @@ export function MemberProfileTab({
 
   return (
     <div className="mx-auto max-w-lg space-y-8">
-      <SubscriptionSettings subscription={subscription} billingSuccess={billingSuccess} />
+      <SubscriptionSettings
+        subscription={subscription}
+        billingSuccess={billingSuccess}
+        promoCode={promoCode}
+      />
 
       <div>
         <h2 className="text-lg font-semibold text-zinc-900">Profile</h2>

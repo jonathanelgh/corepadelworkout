@@ -1,5 +1,4 @@
 import type { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 export const PROMO_QUERY_PARAM = "promo";
 export const PROMO_COOKIE_NAME = "cpw_promo";
@@ -32,9 +31,4 @@ export function attachPromoCookieFromRequest(
   if (!code) return response;
   response.cookies.set(PROMO_COOKIE_NAME, code, getPromoCookieOptions());
   return response;
-}
-
-export async function getStoredPromoCode(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return normalizePromoCode(cookieStore.get(PROMO_COOKIE_NAME)?.value);
 }

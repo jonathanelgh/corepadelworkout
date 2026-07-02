@@ -104,6 +104,23 @@ function parseLocationAnswer(
   return undefined;
 }
 
+function isMidConsultationFlow(
+  history: ChatHistoryMessage[],
+  userMessage: string,
+  equipmentLibrary: string[] = []
+): boolean {
+  const lastAssistant = lastAssistantText(history);
+  if (!lastAssistant?.includes("?")) return false;
+
+  const partialState: ConsultationState = { homeEquipment: [] };
+  applyConsultationAnswersFromHistory(history, userMessage, partialState, equipmentLibrary);
+  if (!consultationHasProgress(partialState)) return false;
+
+  const userTexts = allUserTexts(history, userMessage);
+  const isProgram = coachWantsProgram(userTexts);
+  return nextConsultationQuestion(partialState, isProgram, equipmentLibrary) !== null;
+}
+
 function findConsultationStartIndex(
   userTexts: string[],
   history: ChatHistoryMessage[],
@@ -112,7 +129,7 @@ function findConsultationStartIndex(
   for (let i = 0; i < userTexts.length; i++) {
     if (coachShouldCreateNew(userTexts[i]!)) return i;
   }
-  if (userTexts.length > 0 && shouldRunConsultation(history, latestUserMessage)) {
+  if (userTexts.length > 0 && isMidConsultationFlow(history, latestUserMessage)) {
     return 0;
   }
   return -1;
@@ -822,17 +839,9 @@ export function shouldRunConsultation(
   if (coachShouldRecommendCatalogOnly(userMessage)) return false;
 
   const userTexts = allUserTexts(history, userMessage);
-  const isProgram = coachWantsProgram(userTexts);
-  const state = buildConsultationState(history, userMessage, []);
-  const next = nextConsultationQuestion(state, isProgram, []);
+  if (userTexts.some((t) => coachShouldCreateNew(t))) return true;
 
-  if (next === null) return false;
-
-  const hadCreateIntent = userTexts.some((t) => coachShouldCreateNew(t));
-  const lastAssistant = lastAssistantText(history);
-  const midFlow = lastAssistant?.includes("?") === true && consultationHasProgress(state);
-
-  return hadCreateIntent || midFlow;
+  return isMidConsultationFlow(history, userMessage);
 }
 
 export function formatConsultationBrief(state: ConsultationState, isProgram: boolean): string {

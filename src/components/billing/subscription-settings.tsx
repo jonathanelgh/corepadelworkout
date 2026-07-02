@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Crown, Check } from "lucide-react";
 import type { MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
-import { PromoDiscountBanner } from "@/components/billing/promo-discount-banner";
+import { PromoDiscountBannerView } from "@/components/billing/promo-discount-banner";
 import { ManageSubscriptionButton } from "@/components/billing/manage-subscription-button";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 
@@ -15,9 +15,11 @@ function formatDate(iso: string | null): string {
 export function SubscriptionSettings({
   subscription,
   billingSuccess,
+  promoCode,
 }: {
   subscription: MemberSubscriptionStatus;
   billingSuccess?: boolean;
+  promoCode?: string | null;
 }) {
   const { hasActivePro, planName, status, currentPeriodEnd, cancelAtPeriodEnd } = subscription;
   const isAdminPro = planName === "Admin";
@@ -37,7 +39,7 @@ export function SubscriptionSettings({
         </div>
       )}
 
-      {!hasActivePro && <PromoDiscountBanner />}
+      {!hasActivePro && promoCode && <PromoDiscountBannerView promoCode={promoCode} />}
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex items-start gap-3">

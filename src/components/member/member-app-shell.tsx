@@ -52,6 +52,7 @@ export function MemberAppShell({
   hubData,
   initialTab = "home",
   billingSuccess,
+  promoCode,
 }: {
   userEmail: string | null;
   profile: Profile;
@@ -59,6 +60,7 @@ export function MemberAppShell({
   hubData?: MemberHubData;
   initialTab?: MemberTab;
   billingSuccess?: boolean;
+  promoCode?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -285,6 +287,7 @@ export function MemberAppShell({
                 profile={hubData.profileDetails}
                 subscription={hubData.subscription}
                 billingSuccess={billingSuccess}
+                promoCode={promoCode}
               />
             </div>
           </>

@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { loadMemberHubData } from "@/lib/member/load-member-hub-data";
 import { getMemberShellContext } from "@/lib/member/member-shell-context";
 import { tabFromSearchParam } from "@/lib/member/member-tabs";
+import { getStoredPromoCode } from "@/lib/billing/promo-cookie-server";
 import { MemberHubLoader } from "@/components/member/member-hub-loader";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function MemberHubPage({ searchParams }: { searchParams: Pa
   const hubData = await loadMemberHubData(supabase, user.id, userEmail);
   const initialTab = tabFromSearchParam(sp.tab);
   const billingSuccess = sp.billing === "success";
+  const promoCode = await getStoredPromoCode();
 
   return (
     <MemberHubLoader
@@ -29,6 +31,7 @@ export default async function MemberHubPage({ searchParams }: { searchParams: Pa
       userEmail={userEmail}
       profile={profile}
       billingSuccess={billingSuccess}
+      promoCode={promoCode}
     />
   );
 }
