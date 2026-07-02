@@ -1,5 +1,9 @@
 import type { ChatHistoryMessage } from "@/lib/programs/ai-coach-gemini";
-import { coachShouldCreateNew, coachShouldRecommendCatalogOnly } from "@/lib/programs/coach-intent";
+import {
+  coachShouldCreateNew,
+  coachShouldRecommendCatalogOnly,
+  isQuickSingleWorkoutRequest,
+} from "@/lib/programs/coach-intent";
 
 export type MovementScreen = {
   squat: boolean;
@@ -70,6 +74,8 @@ export function lastAssistantText(history: ChatHistoryMessage[]): string | null 
 }
 
 export function coachWantsProgram(userTexts: string[]): boolean {
+  if (userTexts.some((t) => isQuickSingleWorkoutRequest(t))) return false;
+
   const combined = userTexts.join(" ").toLowerCase();
   if (/\b\d+\s*(-|\s)?week/.test(combined)) return true;
   if (/\b(program|mesocycle|block)\b/.test(combined)) return true;
@@ -332,8 +338,46 @@ function parseLocation(texts: string[]): ConsultationState["locationSlug"] | und
   const combined = texts.join(" ").toLowerCase();
   if (/\b(at\s+)?home\b|\bhome\s+(workout|program|training)\b/.test(combined)) return "home";
   if (/\bgym\b/.test(combined)) return "gym";
-  if (/\b(court|club|on[- ]court|at the court)\b/.test(combined)) return "at-the-court";
+  if (/\b(court|club|on[- ]court|at the court|for the court)\b/.test(combined)) return "at-the-court";
   return undefined;
+}
+
+function seedConsultationFromTexts(
+  state: ConsultationState,
+  texts: string[],
+  equipmentLibrary: string[],
+  locations: ConsultationLocationOption[]
+): void {
+  const location = parseLocation(texts);
+  if (location) state.locationSlug = location;
+
+  const minutes = parseExplicitMinutes(texts);
+  if (minutes != null) state.minutes = minutes;
+
+  const weeks = parseExplicitWeeks(texts);
+  if (weeks != null) state.durationWeeks = weeks;
+
+  const sessions = parseExplicitSessionsPerWeek(texts);
+  if (sessions != null) state.sessionsPerWeek = sessions;
+
+  if (state.locationSlug === "home") {
+    const equipment = parseHomeEquipment(texts, equipmentLibrary);
+    if (equipment.length > 0) state.homeEquipment = equipment;
+  }
+
+  if (!state.movementScreen) {
+    for (const text of texts) {
+      const screen = parseMovementScreen([text], null);
+      if (screen) {
+        state.movementScreen = screen;
+        break;
+      }
+    }
+  }
+
+  if (state.minutes == null && texts.some((t) => isQuickSingleWorkoutRequest(t))) {
+    state.minutes = 10;
+  }
 }
 
 function parseGoal(texts: string[]): string | undefined {
@@ -685,6 +729,7 @@ export function buildConsultationState(
 
   const consultationTexts = userTexts.slice(startIdx);
   state.goal = consultationTexts[0]!;
+  seedConsultationFromTexts(state, consultationTexts, equipmentLibrary, locations);
 
   for (let i = 1; i < consultationTexts.length; i++) {
     const isProgram = coachWantsProgram(userTexts.slice(0, startIdx + i + 1));
