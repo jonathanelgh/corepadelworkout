@@ -70,8 +70,20 @@ function exercisesForLocation(
   if (!locationSlug) return exercises;
   const loc = locations.find((l) => l.slug === locationSlug);
   if (!loc) return exercises;
-  const filtered = exercises.filter((e) => e.locationIds.includes(loc.id));
-  return filtered.length > 0 ? filtered : exercises;
+
+  const atLocation = exercises.filter((e) => e.locationIds.includes(loc.id));
+  if (atLocation.length > 0) return atLocation;
+
+  if (locationSlug === "at-the-court") {
+    const courtPortable = exercises.filter(
+      (e) =>
+        e.locationSlugs.includes("at-the-court") ||
+        (e.locationSlugs.includes("home") && e.equipment.length === 0)
+    );
+    if (courtPortable.length > 0) return courtPortable;
+  }
+
+  return atLocation;
 }
 
 export type MemberCoachInitialData = {
@@ -100,7 +112,7 @@ export type SendMemberCoachMessageResult =
       introText: string;
       programs: ProgramCatalogRow[];
     }
-  | { type: "workout_proposal"; proposal: WorkoutProposal }
+  | { type: "workout_proposal"; proposal: WorkoutProposal; locationSlug?: string }
   | { error: string };
 
 export async function sendMemberCoachMessage(input: {
@@ -312,7 +324,11 @@ export async function sendMemberCoachMessage(input: {
 
     if (result.name === "generate_workout") {
       const { proposal } = ensureWorkoutProposalRotation(result.args, publishedExercises);
-      return { type: "workout_proposal", proposal };
+      return {
+        type: "workout_proposal",
+        proposal,
+        locationSlug: consultation.locationSlug,
+      };
     }
 
     return { error: "Unexpected coach response. Try again." };
@@ -326,7 +342,8 @@ export type SaveMemberCoachWorkoutResult =
   | { error: string };
 
 export async function saveMemberCoachWorkout(
-  proposal: WorkoutProposal
+  proposal: WorkoutProposal,
+  options?: { locationSlug?: string }
 ): Promise<SaveMemberCoachWorkoutResult> {
   const auth = await requireProMember();
   if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
@@ -342,6 +359,7 @@ export async function saveMemberCoachWorkout(
       status: "published",
       allowedExerciseIds,
       createdByUserId: auth.user.id,
+      locationSlug: options?.locationSlug,
     });
 
     const { sessions } = await fetchProgramSessionsForProgram(auth.supabase, saved.programId);

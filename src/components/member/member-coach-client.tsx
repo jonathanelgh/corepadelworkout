@@ -34,6 +34,7 @@ type ChatMessage = {
     programs: ProgramCatalogRow[];
   };
   workoutProposal?: WorkoutProposal;
+  workoutLocationSlug?: string;
   proposalSaved?: boolean;
   savedPlayHref?: string;
 };
@@ -296,15 +297,24 @@ export function MemberCoachClient({
     } else {
       setMessages((prev) => [
         ...prev,
-        { id: assistantId, role: "assistant", workoutProposal: res.proposal },
+        {
+          id: assistantId,
+          role: "assistant",
+          workoutProposal: res.proposal,
+          workoutLocationSlug: res.locationSlug,
+        },
       ]);
     }
   }
 
-  async function handleSaveWorkout(proposalMsgId: string, proposal: WorkoutProposal) {
+  async function handleSaveWorkout(
+    proposalMsgId: string,
+    proposal: WorkoutProposal,
+    locationSlug?: string
+  ) {
     setSavingProposalId(proposalMsgId);
     setError(null);
-    const res = await saveMemberCoachWorkout(proposal);
+    const res = await saveMemberCoachWorkout(proposal, { locationSlug });
     setSavingProposalId(null);
     if ("error" in res) {
       setError(res.error);
@@ -425,7 +435,7 @@ export function MemberCoachClient({
                     <button
                       type="button"
                       disabled={savingProposalId === m.id}
-                      onClick={() => void handleSaveWorkout(m.id, m.workoutProposal!)}
+                      onClick={() => void handleSaveWorkout(m.id, m.workoutProposal!, m.workoutLocationSlug)}
                       className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
                     >
                       {savingProposalId === m.id ? (

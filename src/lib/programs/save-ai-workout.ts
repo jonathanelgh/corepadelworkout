@@ -21,14 +21,14 @@ function estimateTotalMinutes(proposal: WorkoutProposal): number {
   return Math.ceil(total) || 15;
 }
 
-async function resolveHomeLocationId(supabase: SupabaseClient): Promise<string> {
+async function resolveLocationId(supabase: SupabaseClient, slug: string): Promise<string> {
   const { data, error } = await supabase
     .from("locations")
     .select("id")
-    .eq("slug", "home")
+    .eq("slug", slug)
     .maybeSingle();
   if (error || !data?.id) {
-    throw new Error("Home location not found in database.");
+    throw new Error(`Location "${slug}" not found in database.`);
   }
   return data.id as string;
 }
@@ -49,6 +49,7 @@ export async function saveAiWorkoutProgram(
     status?: "draft" | "published";
     allowedExerciseIds?: Set<string>;
     createdByUserId?: string | null;
+    locationSlug?: string;
   }
 ): Promise<SaveAiWorkoutResult> {
   const status = options?.status ?? "draft";
@@ -78,7 +79,8 @@ export async function saveAiWorkoutProgram(
   }
 
   const totalMinutes = estimateTotalMinutes(proposal);
-  const homeLocationId = await resolveHomeLocationId(supabase);
+  const locationSlug = options?.locationSlug?.trim() || "home";
+  const locationId = await resolveLocationId(supabase, locationSlug);
   const slug = await uniqueProgramSlug(supabase, slugifyTitle(proposal.title));
 
   const { data: program, error: programErr } = await supabase
@@ -98,6 +100,11 @@ export async function saveAiWorkoutProgram(
     .single();
 
   if (programErr || !program) {
+    if (programErr?.message?.includes("created_by_user_id")) {
+      throw new Error(
+        "Saving member workouts requires a database update. Run supabase db push or contact support."
+      );
+    }
     throw new Error(programErr?.message ?? "Could not create program.");
   }
 
@@ -116,7 +123,7 @@ export async function saveAiWorkoutProgram(
       programId,
       [
         {
-          location_id: homeLocationId,
+          location_id: locationId,
           sessions: [
             {
               name: proposal.title.trim() || "Workout",

@@ -99,7 +99,7 @@ function parseLocationAnswer(
     const court = locations.find((l) => l.slug === "at-the-court");
     if (court) return "at-the-court";
   }
-  if (/^(gym|at the gym)$/.test(t)) {
+  if (/^(gym|at the gym|fitness|in the fitness|at the fitness)$/.test(t)) {
     const gym = locations.find((l) => l.slug === "gym");
     if (gym) return "gym";
   }
@@ -206,6 +206,25 @@ function applyConsultationAnswer(
   }
 }
 
+function trainingLocationAck(
+  slug: ConsultationState["locationSlug"],
+  locations: ConsultationLocationOption[]
+): string | null {
+  if (!slug) return null;
+  switch (slug) {
+    case "gym":
+      return "Training at **the gym**.";
+    case "at-the-court":
+      return "Training at **the court**.";
+    case "home":
+      return "Training at **home**.";
+    default: {
+      const loc = locations.find((l) => l.slug === slug);
+      return loc ? `Training location: **${loc.name}**.` : null;
+    }
+  }
+}
+
 function consultationAckBeforeTopic(
   state: ConsultationState,
   topic: ConsultationTopic,
@@ -214,16 +233,13 @@ function consultationAckBeforeTopic(
   switch (topic) {
     case "location":
       return "Sounds good.";
-    case "equipment": {
-      const loc = locations.find((l) => l.slug === state.locationSlug);
-      return loc ? `Training at **${loc.name}**.` : null;
-    }
+    case "equipment":
+      return trainingLocationAck(state.locationSlug, locations);
     case "movement": {
       if (state.homeEquipment.length > 0) {
         return `Equipment: ${state.homeEquipment.join(", ")}.`;
       }
-      const loc = locations.find((l) => l.slug === state.locationSlug);
-      return loc ? `Training at **${loc.name}**.` : null;
+      return trainingLocationAck(state.locationSlug, locations);
     }
     case "weeks":
       return "Got it on movement limits.";
@@ -327,19 +343,72 @@ export function buildConsultationResponseText(
   return ack ? `${ack}\n\n${question}` : question;
 }
 
-/** @deprecated Inferring location from goal text skips the location step — use parseLocationAnswer. */
+function isCourtGoalPhrase(text: string): boolean {
+  return (
+    /\b(faster|quicker|better|stronger|improve|speed|agility|performance|mobility|endurance|explosive|power)\s+(on|at)\s+(the\s+)?court\b/i.test(
+      text
+    ) || /\bon[- ]court\s+(speed|performance|agility|movement|fitness)\b/i.test(text)
+  );
+}
+
+/** Infer training venue from natural language; prefers explicit "train at/in …" over goal phrases. */
+function parseTrainingLocationFromText(text: string): ConsultationState["locationSlug"] | undefined {
+  const t = text.toLowerCase();
+
+  if (
+    /\b(?:train(?:ing)?|work(?:ing)?\s*out|sessions?|every\s+train(?:ing)?)\s+(?:at|in)\s+(?:the\s+)?(?:gym|fitness(?:\s+(?:centre|center|room))?)\b/.test(
+      t
+    ) ||
+    /\b(?:train(?:ing)?|work(?:ing)?\s*out|sessions?)\s+in\s+(?:the\s+)?fitness\b/.test(t)
+  ) {
+    return "gym";
+  }
+  if (/\b(?:at|in)\s+(?:the\s+)?fitness\b/.test(t) && /\b(train|workout|session|program|day)/.test(t)) {
+    return "gym";
+  }
+  if (/\b(?:at|in)\s+(?:the\s+)?gym\b/.test(t)) return "gym";
+
+  if (/\b(?:train(?:ing)?|work(?:ing)?\s*out|sessions?)\s+(?:at\s+)?home\b/.test(t)) return "home";
+  if (/\bhome\s+workout\b/.test(t) || /\bat\s+home\b/.test(t)) return "home";
+
+  if (
+    /\b(?:train(?:ing)?|work(?:ing)?\s*out|sessions?|warm[- ]?up)\s+(?:at|on)\s+(?:the\s+)?(?:court|club)\b/.test(
+      t
+    )
+  ) {
+    return "at-the-court";
+  }
+  if (
+    /\b(?:warm[- ]?up|activation|drill|session)\s+(?:at|on|for)\s+(?:the\s+)?court\b/.test(t) ||
+    (/\bfor\s+the\s+court\b/.test(t) &&
+      /\b(?:warm[- ]?up|before\s+(?:a\s+)?match|pre[- ]?match)\b/.test(t))
+  ) {
+    return "at-the-court";
+  }
+
+  if (!isCourtGoalPhrase(t)) {
+    if (/\b(?:at|on)\s+the\s+court\b/.test(t) && /\b(?:train|workout|session|warm)\b/.test(t)) {
+      return "at-the-court";
+    }
+  }
+
+  return undefined;
+}
+
 function parseLocation(texts: string[]): ConsultationState["locationSlug"] | undefined {
   for (const m of texts) {
     const t = m.trim().toLowerCase();
     if (/^(home|at home)$/i.test(t)) return "home";
-    if (/^(gym|at the gym)$/i.test(t)) return "gym";
+    if (/^(gym|at the gym|fitness|in the fitness|at the fitness)$/i.test(t)) return "gym";
     if (/^(court|at the court|club)$/i.test(t)) return "at-the-court";
   }
-  const combined = texts.join(" ").toLowerCase();
-  if (/\b(at\s+)?home\b|\bhome\s+(workout|program|training)\b/.test(combined)) return "home";
-  if (/\bgym\b/.test(combined)) return "gym";
-  if (/\b(court|club|on[- ]court|at the court|for the court)\b/.test(combined)) return "at-the-court";
-  return undefined;
+
+  for (const m of texts) {
+    const fromMsg = parseTrainingLocationFromText(m);
+    if (fromMsg) return fromMsg;
+  }
+
+  return parseTrainingLocationFromText(texts.join(" "));
 }
 
 function seedConsultationFromTexts(
@@ -393,10 +462,15 @@ function parseGoal(texts: string[]): string | undefined {
 
 function parseExplicitWeeks(texts: string[]): number | undefined {
   for (const m of texts) {
-    const match = m.match(/\b(\d{1,2})\s*(-|\s)?weeks?\b/i);
+    let match = m.match(/\b(\d{1,2})\s*(-|\s)?weeks?\b/i);
     if (match) {
       const n = Number.parseInt(match[1]!, 10);
       if (n > 0 && n <= 52) return n;
+    }
+    match = m.match(/\b(\d{1,3})\s*(-|\s)?days?\s+program\b/i);
+    if (match) {
+      const days = Number.parseInt(match[1]!, 10);
+      if (days > 0 && days <= 365) return Math.max(1, Math.ceil(days / 7));
     }
   }
   return undefined;
@@ -414,7 +488,7 @@ function parseWeeksAnswer(text: string): number | undefined {
 
 function parseExplicitSessionsPerWeek(texts: string[]): number | undefined {
   for (const m of texts) {
-    let match = m.match(/\b(\d{1,2})\s*sessions?\s*(per|\/)\s*week\b/i);
+    let match = m.match(/\b(\d{1,2})\s*(?:sessions?|days?)\s*(per|\/)\s*week\b/i);
     if (match) {
       const n = Number.parseInt(match[1]!, 10);
       if (n > 0 && n <= 14) return n;
@@ -961,6 +1035,7 @@ export function formatGenerationCoachBrief(
   toolName: "generate_program" | "generate_workout" | "recommend_programs"
 ): string {
   const base = formatConsultationBrief(state, isProgram);
+  const quickWorkout = Boolean(state.goal && isQuickSingleWorkoutRequest(state.goal));
 
   if (toolName === "recommend_programs") {
     return `${base}
@@ -969,6 +1044,21 @@ export function formatGenerationCoachBrief(
 - Pick 1–5 published programs from the catalog that best match the athlete's goal, level, and schedule.
 - Use program IDs from the catalog JSON only — never invent IDs.
 - Write a short, personal intro_text before the recommendations.`;
+  }
+
+  if (quickWorkout && toolName === "generate_workout") {
+    const minutes = state.minutes ?? 10;
+    const court = state.locationSlug === "at-the-court";
+    return `${base}
+
+## GENERATION — call generate_workout now (pre-match / quick session)
+- Athlete request: **${state.goal}**
+- This is a **~${minutes}-minute ${court ? "on-court pre-match warm-up" : "single session"}** — NOT a gym strength workout or multi-week plan.
+- Use **only** exercises from the filtered catalog for their location. ${court ? "**No dumbbells, barbells, or gym machines** unless explicitly tagged for at-the-court." : "Match equipment to their location."}
+- Structure: **mostly warmup** (dynamic mobility, activation, footwork). Keep **main** to 2–4 short moves max. Optional **cooldown** (1–2 stretches).
+- Prefer **timed drills** (30–60s) over heavy sets×reps. Total time including rests must fit ~${minutes} minutes.
+- Title and description must match a pre-match / warm-up (not "strength session" or "hypertrophy").
+- Copy exercise_id UUIDs exactly from the catalog. Include rotation or anti-rotation in main if possible.`;
   }
 
   return `${base}
