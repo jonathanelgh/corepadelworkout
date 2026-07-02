@@ -5,7 +5,13 @@ import { Crown } from "lucide-react";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 import { MemberCoachClient } from "@/components/member/member-coach-client";
 
-export function MemberCustomTab({ hasActivePro }: { hasActivePro: boolean }) {
+export function MemberCustomTab({
+  hasActivePro,
+  mobileFullscreen = false,
+}: {
+  hasActivePro: boolean;
+  mobileFullscreen?: boolean;
+}) {
   if (!hasActivePro) {
     return (
       <div className="mx-auto max-w-lg space-y-6">
@@ -36,14 +42,18 @@ export function MemberCustomTab({ hasActivePro }: { hasActivePro: boolean }) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div>
+    <div
+      className={`mx-auto max-w-2xl space-y-4 ${
+        mobileFullscreen ? "max-md:flex max-md:h-full max-md:max-w-none max-md:flex-col max-md:space-y-0" : ""
+      }`}
+    >
+      <div className={mobileFullscreen ? "max-md:hidden" : ""}>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Coach</h1>
         <p className="mt-1 text-sm text-zinc-600">
           Chat about padel fitness, your training log, or get a custom workout built for you.
         </p>
       </div>
-      <MemberCoachClient hasActivePro={hasActivePro} />
+      <MemberCoachClient hasActivePro={hasActivePro} mobileFullscreen={mobileFullscreen} />
     </div>
   );
 }

@@ -192,7 +192,13 @@ function toGeminiHistory(messages: ChatMessage[]): ChatHistoryMessage[] {
   return out;
 }
 
-export function MemberCoachClient({ hasActivePro }: { hasActivePro: boolean }) {
+export function MemberCoachClient({
+  hasActivePro,
+  mobileFullscreen = false,
+}: {
+  hasActivePro: boolean;
+  mobileFullscreen?: boolean;
+}) {
   const [catalog, setCatalog] = useState<ProgramCatalogRow[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(hasActivePro);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -318,8 +324,18 @@ export function MemberCoachClient({ hasActivePro }: { hasActivePro: boolean }) {
   }
 
   return (
-    <div className="mx-auto flex h-[min(72vh,720px)] max-w-2xl flex-col rounded-2xl border border-zinc-200 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
+    <div
+      className={`flex flex-col bg-white md:mx-auto md:h-[min(72vh,720px)] md:max-w-2xl md:rounded-2xl md:border md:border-zinc-200 md:shadow-sm ${
+        mobileFullscreen
+          ? "max-md:h-full max-md:min-h-0 max-md:flex-1"
+          : "mx-auto h-[min(72vh,720px)] max-w-2xl rounded-2xl border border-zinc-200 shadow-sm"
+      }`}
+    >
+      <div
+        className={`flex items-center gap-2 border-b border-zinc-100 px-4 py-3 ${
+          mobileFullscreen ? "max-md:hidden" : ""
+        }`}
+      >
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
           <Sparkles className="h-4 w-4" />
         </span>
@@ -452,7 +468,7 @@ export function MemberCoachClient({ hasActivePro }: { hasActivePro: boolean }) {
       </div>
 
       {messages.length <= 2 && !pending && (
-        <div className="flex flex-wrap gap-2 border-t border-zinc-100 px-4 py-2">
+        <div className="flex shrink-0 flex-wrap gap-2 border-t border-zinc-100 px-4 py-2">
           {SUGGESTED_PROMPTS.map((prompt) => (
             <button
               key={prompt}
@@ -467,11 +483,14 @@ export function MemberCoachClient({ hasActivePro }: { hasActivePro: boolean }) {
       )}
 
       {error && (
-        <p className="border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">{error}</p>
+        <p className="shrink-0 border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">{error}</p>
       )}
 
       <form
-        className="flex gap-2 border-t border-zinc-100 p-3"
+        className={`flex shrink-0 gap-2 border-t border-zinc-200 bg-white p-3 ${
+          mobileFullscreen ? "max-md:shadow-[0_-4px_16px_rgba(0,0,0,0.06)]" : ""
+        }`}
+        style={{ paddingBottom: mobileFullscreen ? "max(0.75rem, env(safe-area-inset-bottom))" : undefined }}
         onSubmit={(e) => {
           e.preventDefault();
           void handleSend();

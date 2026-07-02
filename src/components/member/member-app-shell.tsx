@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   BookOpen,
   Dumbbell,
   Home,
@@ -68,6 +69,7 @@ export function MemberAppShell({
 
   const displayName = profile?.full_name?.trim() || userEmail?.split("@")[0] || "Member";
   const uploaded = profile?.profile_image_url?.trim();
+  const isCoachTab = Boolean(isHub && tab === "custom" && hubData?.hasActivePro);
 
   function selectTab(next: MemberTab) {
     if (isHub) {
@@ -96,13 +98,39 @@ export function MemberAppShell({
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-zinc-50 text-zinc-900">
-      <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-6 md:px-12">
+    <div
+      className={`flex min-h-dvh flex-col bg-zinc-50 text-zinc-900 ${
+        isCoachTab ? "max-md:h-dvh max-md:overflow-hidden" : ""
+      }`}
+    >
+      <header className="sticky top-0 z-40 shrink-0 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
+        <div className="relative mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-4 md:px-12">
+          {isCoachTab && (
+            <div className="absolute inset-x-4 flex items-center justify-between md:hidden">
+              <button
+                type="button"
+                onClick={() => selectTab("home")}
+                className="flex items-center gap-1.5 rounded-lg py-2 text-sm font-medium text-zinc-700 transition hover:text-zinc-900"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                Back
+              </button>
+              <div className="pointer-events-none absolute inset-x-0 flex justify-center">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <span className="text-sm font-semibold text-zinc-900">AI Coach</span>
+                </div>
+              </div>
+              <div className="w-18" aria-hidden />
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => selectTab("home")}
-            className="shrink-0 font-bold tracking-tight text-zinc-900"
+            className={`shrink-0 font-bold tracking-tight text-zinc-900 ${isCoachTab ? "hidden md:block" : ""}`}
           >
             CORE<span className="text-emerald-600">PADEL</span>
             <span className="ml-2 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
@@ -136,7 +164,7 @@ export function MemberAppShell({
             </Link>
           </nav>
 
-          <div className="relative shrink-0">
+          <div className={`relative shrink-0 ${isCoachTab ? "max-md:hidden" : ""}`}>
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
@@ -213,7 +241,13 @@ export function MemberAppShell({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-8 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-12 md:pb-8">
+      <main
+        className={`mx-auto flex w-full max-w-[1400px] flex-1 flex-col min-h-0 ${
+          isCoachTab
+            ? "max-md:overflow-hidden max-md:px-0 max-md:py-0 max-md:pb-0 md:px-12 md:py-8 md:pb-8"
+            : "px-6 py-8 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-12 md:pb-8"
+        }`}
+      >
         {isHub && hubData ? (
           <>
             <div style={panelStyle(tab === "home")} aria-hidden={tab !== "home"}>
@@ -239,8 +273,12 @@ export function MemberAppShell({
                 loadErrorMy={hubData.workoutsErrorMy}
               />
             </div>
-            <div style={panelStyle(tab === "custom")} aria-hidden={tab !== "custom"}>
-              <MemberCustomTab hasActivePro={hubData.hasActivePro} />
+            <div
+              style={panelStyle(tab === "custom")}
+              aria-hidden={tab !== "custom"}
+              className={isCoachTab ? "max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col" : undefined}
+            >
+              <MemberCustomTab hasActivePro={hubData.hasActivePro} mobileFullscreen={isCoachTab} />
             </div>
             <div style={panelStyle(tab === "profile")} aria-hidden={tab !== "profile"}>
               <MemberProfileTab
@@ -256,7 +294,9 @@ export function MemberAppShell({
       </main>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200/80 bg-white/95 backdrop-blur-md md:hidden"
+        className={`fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200/80 bg-white/95 backdrop-blur-md md:hidden ${
+          isCoachTab ? "max-md:hidden" : ""
+        }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Member mobile"
       >
