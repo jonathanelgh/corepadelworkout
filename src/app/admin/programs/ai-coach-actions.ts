@@ -19,7 +19,8 @@ import { formatExerciseCatalogForPrompt, loadProgramAiContext, type ExerciseCata
 import {
   listMembersForAiPicker,
   loadProfileAiContext,
-  userContextBlock,
+  buildAdminAiAthleteContext,
+  isOnboardingLevel,
   type MemberPickerOption,
 } from "@/lib/programs/profile-ai-context";
 import { coachShouldCreateNew, coachShouldRecommendCatalogOnly } from "@/lib/programs/coach-intent";
@@ -111,6 +112,8 @@ export async function sendAiCoachMessage(input: {
   userMessage: string;
   programsCatalog: ProgramCatalogRow[];
   targetUserId?: string | null;
+  /** Admin override for workout structure level; omit to use member onboarding when personalized. */
+  trainingLevel?: string | null;
 }): Promise<SendAiCoachMessageResult> {
   const auth = await requireAdmin();
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
@@ -196,6 +199,7 @@ export async function sendAiCoachMessage(input: {
     const profileContext = input.targetUserId
       ? await loadProfileAiContext(auth.supabase, input.targetUserId)
       : null;
+    const adminTrainingLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
     const consultationBrief = inCreateFlow
       ? formatConsultationGuide(consultation, isProgram, equipmentLibrary)
       : undefined;
@@ -205,10 +209,11 @@ export async function sendAiCoachMessage(input: {
       exerciseCatalog,
       catalogById,
       systemPromptTemplate,
-      userContextBlock: userContextBlock(profileContext),
+      userContextBlock: buildAdminAiAthleteContext(profileContext, adminTrainingLevel),
       creationOnly: inCreateFlow,
       consultationBrief,
       toolsEnabled: !inCreateFlow || consultationComplete,
+      audience: "admin" as const,
     };
 
     const toolName = isProgram ? "generate_program" : "generate_workout";

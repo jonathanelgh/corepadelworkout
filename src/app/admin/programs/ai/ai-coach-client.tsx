@@ -13,7 +13,10 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { ProgramCatalogRow } from "@/lib/programs/programs-catalog";
-import type { MemberPickerOption } from "@/lib/programs/profile-ai-context";
+import {
+  TRAINING_LEVEL_OPTIONS,
+  type MemberPickerOption,
+} from "@/lib/programs/profile-ai-context";
 import type { ChatHistoryMessage, ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
 import type { ConsultationPrompt } from "@/lib/programs/coach-consultation";
 import {
@@ -259,6 +262,7 @@ export function AiCoachClient({
 }) {
   const [catalog] = useState(initialCatalog);
   const [targetUserId, setTargetUserId] = useState("");
+  const [trainingLevel, setTrainingLevel] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -332,6 +336,7 @@ export function AiCoachClient({
       userMessage: text,
       programsCatalog: catalog,
       targetUserId: targetUserId || null,
+      trainingLevel: trainingLevel || null,
     });
     setPending(false);
 
@@ -514,6 +519,24 @@ export function AiCoachClient({
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-gray-500 whitespace-nowrap">Training level</span>
+            <select
+              value={trainingLevel}
+              onChange={(e) => setTrainingLevel(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+              title="Override workout structure level for generated programs and workouts"
+            >
+              <option value="">
+                {targetUserId ? "Auto — from member onboarding" : "Auto — not set"}
+              </option>
+              {TRAINING_LEVEL_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-sm">
             <span className="text-gray-500 whitespace-nowrap">Personalize for</span>
             <select

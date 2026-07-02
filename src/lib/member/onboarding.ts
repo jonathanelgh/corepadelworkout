@@ -17,6 +17,15 @@ export function levelFromPadelSlug(slug: string | null | undefined): OnboardingL
   return PADEL_SLUG_TO_LEVEL[slug] ?? null;
 }
 
+/** Maps onboarding padel_levels.slug to workout-structure tier (beginner | intermediate | advanced). */
+export function workoutStructureLevelFromPadelSlug(
+  slug: string | null | undefined
+): OnboardingLevel | null {
+  if (!slug) return null;
+  if (slug === "padel-pro") return "advanced";
+  return levelFromPadelSlug(slug);
+}
+
 export const ONBOARDING_GOAL_SLUGS = [
   "power",
   "speed",

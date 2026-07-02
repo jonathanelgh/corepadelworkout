@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PRIMARY_GOAL_LABELS, isOnboardingGoal } from "@/lib/member/onboarding";
+import {
+  PRIMARY_GOAL_LABELS,
+  isOnboardingGoal,
+  workoutStructureLevelFromPadelSlug,
+  type OnboardingLevel,
+} from "@/lib/member/onboarding";
 
 const ENV_LABELS: Record<string, string> = {
   gym: "At the gym",
@@ -42,22 +47,85 @@ function trainingEnvironmentLabel(
   return `${labels.join(", ")} (choose exercises and equipment appropriate for this setting)`;
 }
 
+const STRUCTURE_LEVEL_LABELS: Record<OnboardingLevel, string> = {
+  beginner: "Beginner",
+  intermediate: "Intermediate",
+  advanced: "Advanced",
+};
+
+export const TRAINING_LEVEL_OPTIONS: { id: OnboardingLevel; label: string }[] = [
+  { id: "beginner", label: "Beginner" },
+  { id: "intermediate", label: "Intermediate" },
+  { id: "advanced", label: "Advanced" },
+];
+
+export function isOnboardingLevel(v: string | null | undefined): v is OnboardingLevel {
+  return v === "beginner" || v === "intermediate" || v === "advanced";
+}
+
+export function formatWorkoutStructureLevelContext(
+  level: OnboardingLevel,
+  source: "onboarding" | "admin"
+): string {
+  const label = STRUCTURE_LEVEL_LABELS[level];
+  const prefix =
+    source === "admin"
+      ? `Training level (admin): ${level}`
+      : `Onboarding level: ${level}`;
+  return `${prefix} — use Mandatory workout structure — ${label.toUpperCase()} and the matching level engine from Core Padel methodology`;
+}
+
+function stripStructureLevelLines(text: string): string {
+  return text
+    .split("\n")
+    .filter(
+      (line) =>
+        !line.startsWith("Onboarding level:") && !line.startsWith("Training level (admin):")
+    )
+    .join("\n")
+    .trim();
+}
+
+/** Admin AI coach: optional level override; auto uses member onboarding when profile is present. */
+export function buildAdminAiAthleteContext(
+  profileContext: string | null | undefined,
+  adminTrainingLevel: OnboardingLevel | null | undefined
+): string {
+  let profile = profileContext?.trim() ?? "";
+
+  if (adminTrainingLevel) {
+    profile = stripStructureLevelLines(profile);
+    const levelLine = formatWorkoutStructureLevelContext(adminTrainingLevel, "admin");
+    profile = profile ? `${profile}\n${levelLine}` : levelLine;
+  }
+
+  return userContextBlock(profile || null);
+}
+
+/** Member AI coach: always uses the signed-in user's onboarding level from their profile. */
+export function buildMemberAiAthleteContext(profileContext: string | null | undefined): string {
+  return userContextBlock(profileContext);
+}
+
 export function formatProfileForAiContext(profile: {
   full_name: string | null;
   gender: string | null;
   birth_date: string | null;
-  padel_levels?: { name: string } | { name: string }[] | null;
+  padel_levels?: { name: string; slug?: string } | { name: string; slug?: string }[] | null;
   padel_pains: string[] | null;
   primary_goal: string | null;
   training_environment: string | null;
   training_environments: string[] | null;
 }): string {
   const levelRel = profile.padel_levels;
-  const levelName = Array.isArray(levelRel)
-    ? levelRel[0]?.name
-    : levelRel && typeof levelRel === "object" && "name" in levelRel
-      ? (levelRel as { name: string }).name
-      : null;
+  const levelRow = Array.isArray(levelRel) ? levelRel[0] : levelRel;
+  const levelName =
+    levelRow && typeof levelRow === "object" && "name" in levelRow ? levelRow.name : null;
+  const levelSlug =
+    levelRow && typeof levelRow === "object" && "slug" in levelRow
+      ? (levelRow.slug as string | undefined)
+      : undefined;
+  const structureLevel = workoutStructureLevelFromPadelSlug(levelSlug);
 
   const pains =
     profile.padel_pains && profile.padel_pains.length > 0
@@ -81,6 +149,9 @@ export function formatProfileForAiContext(profile: {
   const year = birthYear(profile.birth_date);
   if (year) lines.push(`Birth Year: ${year}`);
   if (levelName) lines.push(`Padel Level: ${levelName}`);
+  if (structureLevel) {
+    lines.push(formatWorkoutStructureLevelContext(structureLevel, "onboarding"));
+  }
   lines.push(`Current Pains/Injuries: ${pains}`);
   if (goal) lines.push(`Goals: ${goal}`);
   if (env) lines.push(`Preferred Workout Environment: ${env}`);
@@ -103,7 +174,7 @@ export async function loadProfileAiContext(
       primary_goal,
       training_environment,
       training_environments,
-      padel_levels ( name )
+      padel_levels ( name, slug )
     `
     )
     .eq("id", userId)
@@ -115,7 +186,10 @@ export async function loadProfileAiContext(
     full_name: data.full_name as string | null,
     gender: data.gender as string | null,
     birth_date: data.birth_date as string | null,
-    padel_levels: data.padel_levels as { name: string } | { name: string }[] | null,
+    padel_levels: data.padel_levels as
+      | { name: string; slug?: string }
+      | { name: string; slug?: string }[]
+      | null,
     padel_pains: (data.padel_pains as string[] | null) ?? null,
     primary_goal: data.primary_goal as string | null,
     training_environment: data.training_environment as string | null,

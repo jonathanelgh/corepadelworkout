@@ -32,6 +32,7 @@ export type WorkoutProposalExercise = {
   reps?: number;
   rest_between_sets_seconds?: number;
   rest_after_seconds: number;
+  note?: string;
 };
 
 export type WorkoutProposal = {
@@ -69,6 +70,8 @@ export type AiCoachChatResult =
   | { type: "functionCall"; name: "generate_workout"; args: WorkoutProposal }
   | { type: "functionCall"; name: "generate_program"; args: ProgramProposal };
 
+export type AiCoachToolName = "recommend_programs" | "generate_workout" | "generate_program";
+
 function buildSystemInstruction(
   template: string,
   params: {
@@ -76,12 +79,14 @@ function buildSystemInstruction(
     exerciseCatalog: string;
     exerciseCount: number;
     userContextBlock: string;
+    extraTemplateVars?: Record<string, string>;
   },
   options?: {
     creationOnly?: boolean;
     consultationBrief?: string;
     toolsEnabled?: boolean;
     omitProgramsCatalog?: boolean;
+    audience?: "admin" | "member";
   }
 ): string {
   const catalogJson = options?.omitProgramsCatalog
@@ -94,6 +99,9 @@ function buildSystemInstruction(
     exercise_catalog: params.exerciseCatalog,
     exercise_count: String(params.exerciseCount),
     exercise_titles: "",
+    training_context_block: "",
+    methodology_block: "",
+    ...params.extraTemplateVars,
   });
 
   if (options?.consultationBrief?.trim()) {
@@ -101,21 +109,22 @@ function buildSystemInstruction(
   }
 
   if (options?.creationOnly) {
+    const who = options.audience === "member" ? "The athlete" : "The admin";
     if (options.toolsEnabled === false) {
       out += `
 
 ## Consultation phase — text only
-The admin wants a new program or workout. Gather missing details with one short question per turn.
-Tools are OFF this turn — reply with plain text only. Do not call generate_program, generate_workout, or recommend_programs.
+${who} wants a new workout or program ideas. Gather missing details with one short question per turn.
+Tools are OFF this turn — reply with plain text only. Do not call generate_workout or recommend_programs${options.audience === "admin" ? " or generate_program" : ""}.
 1–2 short sentences + one question. No praise filler, no repeating their brief back, never expose consultation_state.`;
     } else {
       out += `
 
 ## CRITICAL — this message is a creation request
-The admin asked you to build something new. Use generate_program or generate_workout.
-Do NOT use recommend_programs — even if similar published programs exist in the catalog.
+${who} asked you to build or find something. Use generate_workout for a custom session${options.audience === "member" ? " or recommend_programs for multi-week library programs" : " or generate_program for a multi-week plan"}.
+${options.audience === "admin" ? "Do NOT use recommend_programs when building something new." : "Do NOT invent multi-week programs — use recommend_programs for structured plans from the catalog."}
 When the consultation block says CONSULTATION COMPLETE, you MUST call the tool in this turn — never reply with prose only.
-During consultation: 1–2 short sentences + one question. No praise filler, no repeating their brief back, never expose consultation_state.`;
+During consultation: 1–2 short sentences + one question. No praise filler, never expose consultation_state.`;
     }
   }
 
@@ -187,6 +196,11 @@ const TOOLS: FunctionDeclaration[] = [
                 description:
                   "Optional. Same value on 2–3 warmup or cooldown exercises = athlete picks one alternative.",
               },
+              note: {
+                type: SchemaType.STRING,
+                description:
+                  "Optional coach note shown during the workout (e.g. increase load 5–10%, perform on both sides).",
+              },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
           },
@@ -238,6 +252,11 @@ const TOOLS: FunctionDeclaration[] = [
                 type: SchemaType.STRING,
                 description:
                   "Optional. Same value on 2–3 warmup or cooldown exercises = athlete picks one alternative.",
+              },
+              note: {
+                type: SchemaType.STRING,
+                description:
+                  "Optional coach note shown during the workout (e.g. increase load 5–10%, perform on both sides).",
               },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
@@ -301,6 +320,7 @@ function parseExerciseList(
       title: catalogById.get(exercise_id)!,
       phase: parseSessionPhase(ex.phase),
       choice_group: parseChoiceGroup(ex.choice_group) ?? undefined,
+      note: typeof ex.note === "string" && ex.note.trim() ? ex.note.trim() : undefined,
       duration_minutes:
         typeof ex.duration_minutes === "number" && Number.isFinite(ex.duration_minutes)
           ? Math.ceil(ex.duration_minutes)
@@ -408,12 +428,15 @@ export async function chatWithAiCoach(params: {
   catalogById: Map<string, string>;
   systemPromptTemplate: string;
   userContextBlock: string;
+  extraTemplateVars?: Record<string, string>;
   creationOnly?: boolean;
   consultationBrief?: string;
   /** When false, model replies with text only (consultation Q&A). Default true. */
   toolsEnabled?: boolean;
   /** Force a single tool call (generation after consultation). */
-  forcedTool?: "generate_program" | "generate_workout";
+  forcedTool?: AiCoachToolName;
+  audience?: "admin" | "member";
+  allowedTools?: AiCoachToolName[];
 }): Promise<AiCoachChatResult> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
@@ -426,6 +449,10 @@ export async function chatWithAiCoach(params: {
   }
 
   const toolsEnabled = params.toolsEnabled !== false;
+  const allowedToolSet = new Set<AiCoachToolName>(
+    params.allowedTools ?? ["generate_program", "generate_workout", "recommend_programs"]
+  );
+  const filteredTools = TOOLS.filter((t) => allowedToolSet.has(t.name as AiCoachToolName));
 
   function emptyResponseError(response: GenerateContentResponse): Error {
     const candidate = response.candidates?.[0];
@@ -444,8 +471,8 @@ export async function chatWithAiCoach(params: {
 
   const activeTools =
     params.forcedTool != null
-      ? TOOLS.filter((t) => t.name === params.forcedTool)
-      : TOOLS;
+      ? filteredTools.filter((t) => t.name === params.forcedTool)
+      : filteredTools;
 
   async function runTurn(
     creationOnly: boolean,
@@ -462,12 +489,14 @@ export async function chatWithAiCoach(params: {
           exerciseCatalog: params.exerciseCatalog,
           exerciseCount: params.catalogById.size,
           userContextBlock: params.userContextBlock,
+          extraTemplateVars: params.extraTemplateVars,
         },
         {
           creationOnly,
           consultationBrief: params.consultationBrief,
           toolsEnabled: turnToolsEnabled,
           omitProgramsCatalog: params.forcedTool != null,
+          audience: params.audience,
         }
       ),
       ...(turnToolsEnabled

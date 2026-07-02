@@ -31,7 +31,7 @@ function estimateSessionMinutes(session: ProgramProposal["sessions"][number]): n
   for (let i = 0; i < session.exercises.length; i++) {
     const ex = session.exercises[i]!;
     const payload = aiExerciseToProgramPayload(
-      { ...ex, choice_group: ex.choice_group ?? null },
+      { ...ex, choice_group: ex.choice_group ?? null, note: ex.note ?? null },
       { isLastInSession: i === session.exercises.length - 1 }
     );
     if (payload.duration_seconds) total += payload.duration_seconds / 60;
@@ -48,7 +48,7 @@ function toExercisePayload(
 ): ProgramExercisePayload[] {
   return exercises.map((ex, index) =>
     aiExerciseToProgramPayload(
-      { ...ex, choice_group: ex.choice_group ?? null },
+      { ...ex, choice_group: ex.choice_group ?? null, note: ex.note ?? null },
       { isLastInSession: index === exercises.length - 1 }
     )
   );

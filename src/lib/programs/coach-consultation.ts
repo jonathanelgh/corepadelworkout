@@ -904,9 +904,19 @@ export function formatConsultationBrief(state: ConsultationState, isProgram: boo
 export function formatGenerationCoachBrief(
   state: ConsultationState,
   isProgram: boolean,
-  toolName: "generate_program" | "generate_workout"
+  toolName: "generate_program" | "generate_workout" | "recommend_programs"
 ): string {
   const base = formatConsultationBrief(state, isProgram);
+
+  if (toolName === "recommend_programs") {
+    return `${base}
+
+## RECOMMEND — call recommend_programs now
+- Pick 1–5 published programs from the catalog that best match the athlete's goal, level, and schedule.
+- Use program IDs from the catalog JSON only — never invent IDs.
+- Write a short, personal intro_text before the recommendations.`;
+  }
+
   return `${base}
 
 ## GENERATION — call ${toolName} now

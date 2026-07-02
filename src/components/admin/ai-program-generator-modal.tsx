@@ -7,6 +7,7 @@ import { Loader2, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { generateAiProgram } from "@/app/admin/programs/ai-program-actions";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import type { MemberPickerOption } from "@/lib/programs/profile-ai-context";
+import { TRAINING_LEVEL_OPTIONS } from "@/lib/programs/profile-ai-context";
 
 type LocationOption = { id: string; name: string; slug: string };
 
@@ -37,6 +38,7 @@ export function AiProgramGeneratorModal({
   const [sessionsPerWeek, setSessionsPerWeek] = useState("");
   const [minutesPerSession, setMinutesPerSession] = useState("");
   const [targetUserId, setTargetUserId] = useState("");
+  const [trainingLevel, setTrainingLevel] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +54,7 @@ export function AiProgramGeneratorModal({
     setMinutesPerSession("");
     setLocationIds(locations.length > 0 ? [locations[0]!.id] : []);
     setTargetUserId("");
+    setTrainingLevel("");
   }, [open, locations]);
 
   useEffect(() => {
@@ -86,6 +89,7 @@ export function AiProgramGeneratorModal({
       sessionsPerWeek: sessionsPerWeek.trim() ? Number.parseInt(sessionsPerWeek, 10) : null,
       minutesPerSession: minutesPerSession.trim() ? Number.parseInt(minutesPerSession, 10) : null,
       targetUserId: targetUserId || null,
+      trainingLevel: trainingLevel || null,
     });
     setPending(false);
 
@@ -169,6 +173,31 @@ export function AiProgramGeneratorModal({
               </p>
             </div>
           )}
+
+          <div>
+            <label htmlFor="ai-training-level" className="block text-sm font-medium text-gray-700 mb-1.5">
+              Training level
+            </label>
+            <select
+              id="ai-training-level"
+              value={trainingLevel}
+              onChange={(e) => setTrainingLevel(e.target.value)}
+              disabled={pending}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black disabled:opacity-60"
+            >
+              <option value="">
+                {targetUserId ? "Auto — from member onboarding" : "Auto — not set"}
+              </option>
+              {TRAINING_LEVEL_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-gray-500">
+              Sets which mandatory workout structure (beginner / intermediate / advanced) the AI applies.
+            </p>
+          </div>
 
           <div>
             <label htmlFor="ai-program-brief" className="block text-sm font-medium text-gray-700 mb-1.5">

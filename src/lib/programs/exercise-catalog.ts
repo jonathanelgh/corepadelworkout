@@ -20,6 +20,7 @@ export type ExerciseCatalogEntry = {
   bodyRegions: string[];
   bodyParts: string[];
   equipment: string[];
+  bothSides: boolean;
 };
 
 export type ProgramAiContext = {
@@ -57,6 +58,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         exercise_level_id,
         status,
         program_prescription_mode,
+        both_sides,
         ${EXERCISE_LOCATIONS_SELECT},
         exercise_equipment ( equipment_id, sort_order )
       `
@@ -128,6 +130,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
         location_id: row.location_id as string,
         exercise_level_id: (row.exercise_level_id as string | null) ?? null,
         program_prescription_mode: (row.program_prescription_mode as string | null) ?? "all",
+        both_sides: (row.both_sides as boolean | null) ?? false,
         exercise_locations: row.exercise_locations as
           | {
               location_id: string;
@@ -175,6 +178,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
       bodyRegions: item.bodyRegionIds.map((id) => bodyRegionName.get(id)).filter(Boolean) as string[],
       bodyParts: item.bodyPartIds.map((id) => bodyPartName.get(id)).filter(Boolean) as string[],
       equipment: item.equipmentIds.map((id) => equipmentName.get(id)).filter(Boolean) as string[],
+      bothSides: item.bothSides,
     };
   });
 
@@ -210,6 +214,7 @@ export function formatExerciseCatalogForPrompt(entries: ExerciseCatalogEntry[]):
   return entries
     .map((e) => {
       const tags = [
+        e.bothSides ? "both_sides" : null,
         e.programPrescriptionMode !== "all" ? `prescription:${e.programPrescriptionMode}` : null,
         e.levelName ? `level:${e.levelName}` : null,
         e.categoryTypes.length ? `types:${e.categoryTypes.join("/")}` : null,

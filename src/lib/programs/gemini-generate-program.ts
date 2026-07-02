@@ -60,6 +60,8 @@ export type AiProgramGenerateRequest = {
   difficultyLevelId?: string | null;
   /** When set, member profile is injected into the prompt for personalization. */
   targetUserId?: string | null;
+  /** Admin override for workout structure level. */
+  trainingLevel?: string | null;
 };
 
 export const AI_PROGRAM_RESPONSE_SCHEMA = `{

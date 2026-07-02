@@ -9,7 +9,7 @@ function estimateTotalMinutes(proposal: WorkoutProposal): number {
   for (let i = 0; i < proposal.exercises.length; i++) {
     const ex = proposal.exercises[i]!;
     const payload = aiExerciseToProgramPayload(
-      { ...ex, choice_group: ex.choice_group ?? null },
+      { ...ex, choice_group: ex.choice_group ?? null, note: ex.note ?? null },
       { isLastInSession: i === proposal.exercises.length - 1 }
     );
     if (payload.duration_seconds) total += payload.duration_seconds / 60;
@@ -45,7 +45,11 @@ export type SaveAiWorkoutResult = {
 export async function saveAiWorkoutProgram(
   supabase: SupabaseClient,
   proposal: WorkoutProposal,
-  options?: { status?: "draft" | "published"; allowedExerciseIds?: Set<string> }
+  options?: {
+    status?: "draft" | "published";
+    allowedExerciseIds?: Set<string>;
+    createdByUserId?: string | null;
+  }
 ): Promise<SaveAiWorkoutResult> {
   const status = options?.status ?? "draft";
 
@@ -88,6 +92,7 @@ export async function saveAiWorkoutProgram(
       minutes_per_session: totalMinutes,
       sessions_per_week: null,
       duration_weeks: null,
+      ...(options?.createdByUserId ? { created_by_user_id: options.createdByUserId } : {}),
     })
     .select("id, slug, title")
     .single();
@@ -100,7 +105,7 @@ export async function saveAiWorkoutProgram(
 
   const exerciseRows: ProgramExercisePayload[] = proposal.exercises.map((ex, index) =>
     aiExerciseToProgramPayload(
-      { ...ex, choice_group: ex.choice_group ?? null },
+      { ...ex, choice_group: ex.choice_group ?? null, note: ex.note ?? null },
       { isLastInSession: index === proposal.exercises.length - 1 }
     )
   );
