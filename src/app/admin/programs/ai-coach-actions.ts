@@ -43,6 +43,10 @@ import {
   ensureProgramProposalRotation,
   ensureWorkoutProposalRotation,
 } from "@/lib/programs/ensure-rotational-exercise";
+import {
+  ensureProgramProposalStructure,
+  ensureWorkoutProposalStructure,
+} from "@/lib/programs/ensure-session-structure";
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
 import { saveAiProgram } from "@/lib/programs/save-ai-program";
 import { generateProgramCoverImage } from "@/lib/programs/generate-program-cover";
@@ -306,17 +310,28 @@ export async function sendAiCoachMessage(input: {
     }
 
     if (result.name === "generate_workout") {
-      const { proposal, warnings: rotationWarnings } = ensureWorkoutProposalRotation(
+      const { proposal: rotated, warnings: rotationWarnings } = ensureWorkoutProposalRotation(
         result.args,
         publishedExercises
       );
-      if (rotationWarnings.length > 0) {
-        console.info("[ai-coach] rotation enforcement:", rotationWarnings.join(" "));
+      const { proposal, warnings: structureWarnings } = ensureWorkoutProposalStructure(
+        rotated,
+        publishedExercises,
+        {
+          locationSlug:
+            consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
+              ? consultation.locationSlug
+              : undefined,
+        }
+      );
+      const allWarnings = [...rotationWarnings, ...structureWarnings];
+      if (allWarnings.length > 0) {
+        console.info("[ai-coach] workout enforcement:", allWarnings.join(" "));
       }
       return { type: "workout_proposal", proposal };
     }
 
-    const { proposal, warnings: rotationWarnings } = ensureProgramProposalRotation(
+    const { proposal: rotated, warnings: rotationWarnings } = ensureProgramProposalRotation(
       {
         ...result.args,
         duration_weeks: consultation.durationWeeks ?? result.args.duration_weeks,
@@ -329,8 +344,13 @@ export async function sendAiCoachMessage(input: {
       },
       publishedExercises
     );
-    if (rotationWarnings.length > 0) {
-      console.info("[ai-coach] rotation enforcement:", rotationWarnings.join(" "));
+    const { proposal, warnings: structureWarnings } = ensureProgramProposalStructure(
+      rotated,
+      publishedExercises
+    );
+    const allWarnings = [...rotationWarnings, ...structureWarnings];
+    if (allWarnings.length > 0) {
+      console.info("[ai-coach] program enforcement:", allWarnings.join(" "));
     }
     return { type: "program_proposal", proposal };
   } catch (e) {
@@ -375,7 +395,8 @@ export async function saveAiCoachProgram(
     const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
     const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
 
-    const { proposal: fixed } = ensureProgramProposalRotation(proposal, publishedExercises);
+    const { proposal: rotated } = ensureProgramProposalRotation(proposal, publishedExercises);
+    const { proposal: fixed } = ensureProgramProposalStructure(rotated, publishedExercises);
 
     const saved = await saveAiProgram(auth.supabase, fixed, {
       status: options?.publish ? "published" : "draft",
@@ -428,7 +449,8 @@ export async function saveAiCoachWorkout(
     const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
     const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
 
-    const { proposal: fixed } = ensureWorkoutProposalRotation(proposal, publishedExercises);
+    const { proposal: rotated } = ensureWorkoutProposalRotation(proposal, publishedExercises);
+    const { proposal: fixed } = ensureWorkoutProposalStructure(rotated, publishedExercises);
 
     const saved = await saveAiWorkoutProgram(auth.supabase, fixed, {
       status: options?.publish ? "published" : "draft",

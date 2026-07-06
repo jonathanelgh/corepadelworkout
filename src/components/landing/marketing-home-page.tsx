@@ -310,9 +310,6 @@ export function MarketingHomePage({
               >
                 Get Started Now
               </Link>
-              <Link href="/free-warmup" className="bg-white text-black px-8 py-3.5 rounded-full font-semibold hover:bg-gray-100 transition-colors">
-                Free 15-Min Pre-Match Warmup
-              </Link>
             </div>
           </div>
         </div>

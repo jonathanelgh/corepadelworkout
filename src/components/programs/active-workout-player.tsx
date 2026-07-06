@@ -17,7 +17,7 @@ import {
 } from "@/lib/programs/program-exercises";
 import { resolveExerciseVideoSource } from "@/lib/programs/exercise-video-url";
 import { useProgramWorkoutMusic } from "@/lib/programs/program-workout-music";
-import { playExerciseEndBeeps, playExerciseStartBeeps, prepareWorkoutAudio } from "@/lib/programs/workout-beeps";
+import { playExerciseEndBeeps, playExerciseStartBeeps, playRestEndingCue, playWorkEndingCue, prepareWorkoutAudio } from "@/lib/programs/workout-beeps";
 import {
   defaultChoiceSelections,
   listChoiceGroups,
@@ -36,6 +36,17 @@ type Phase = "work" | "setRest" | "rest";
 
 /** Seconds to preview the first exercise before the work timer starts. */
 const FIRST_EXERCISE_PREP_SECONDS = 5;
+
+function workPeriodFollowedByRest(
+  ex: ProgramExerciseItem,
+  set: number,
+  isLastExercise: boolean
+): boolean {
+  if (hasTimedSets(ex) && set < setsCount(ex)) {
+    return hasRestBetweenSets(ex) && restBetweenSetsSeconds(ex) > 0;
+  }
+  return !isLastExercise && restDurationSeconds(ex) > 0;
+}
 
 const IFRAME_ALLOW =
   "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
@@ -155,6 +166,10 @@ export function ActiveWorkoutPlayer({
   const [prepCountdown, setPrepCountdown] = useState<number | null>(null);
   const [completionLogged, setCompletionLogged] = useState(false);
   const [startLogged, setStartLogged] = useState(false);
+
+  const restCuePlayedRef = useRef(false);
+  const workCuePlayedRef = useRef(false);
+  const prepCuePlayedRef = useRef(false);
 
   const choiceGroups = useMemo(() => listChoiceGroups(exercises), [exercises]);
   const [choiceSelections, setChoiceSelections] = useState<Record<string, string>>(() =>
@@ -283,6 +298,48 @@ export function ActiveWorkoutPlayer({
   }, [prepCountdown, beginWorkForCurrent]);
 
   useEffect(() => {
+    if (phase === "setRest" || phase === "rest") {
+      restCuePlayedRef.current = false;
+    }
+    if (phase === "work") {
+      workCuePlayedRef.current = false;
+    }
+  }, [phase, currentIndex, currentSet]);
+
+  useEffect(() => {
+    if (!workoutStarted || prepCountdown !== 3 || prepCuePlayedRef.current) return;
+    prepCuePlayedRef.current = true;
+    playRestEndingCue();
+  }, [workoutStarted, prepCountdown]);
+
+  useEffect(() => {
+    if (!workoutStarted || !currentIsTimed || inPrep || !isRunning) return;
+    if (phase !== "work" || !current) return;
+    if (secondsLeft !== 3 || workCuePlayedRef.current) return;
+    if (!workPeriodFollowedByRest(current, currentSet, isLast)) return;
+    workCuePlayedRef.current = true;
+    playWorkEndingCue();
+  }, [
+    workoutStarted,
+    currentIsTimed,
+    inPrep,
+    isRunning,
+    phase,
+    secondsLeft,
+    current,
+    currentSet,
+    isLast,
+  ]);
+
+  useEffect(() => {
+    if (!workoutStarted || !currentIsTimed || inPrep || !isRunning) return;
+    if (phase !== "setRest" && phase !== "rest") return;
+    if (secondsLeft !== 3 || restCuePlayedRef.current) return;
+    restCuePlayedRef.current = true;
+    playRestEndingCue();
+  }, [workoutStarted, currentIsTimed, inPrep, isRunning, phase, secondsLeft]);
+
+  useEffect(() => {
     if (!workoutStarted || !currentIsTimed || inPrep) return;
     if (secondsLeft !== 0) return;
 
@@ -328,6 +385,9 @@ export function ActiveWorkoutPlayer({
   function startWorkout() {
     if (len === 0) return;
     prepareWorkoutAudio();
+    prepCuePlayedRef.current = false;
+    restCuePlayedRef.current = false;
+    workCuePlayedRef.current = false;
     setWorkoutStarted(true);
     setPhase("work");
     setPrepCountdown(FIRST_EXERCISE_PREP_SECONDS);
@@ -380,7 +440,7 @@ export function ActiveWorkoutPlayer({
   }
 
   return (
-    <div className="relative min-h-dvh bg-zinc-950 text-white">
+    <div className="relative flex min-h-dvh flex-col bg-zinc-950 text-white">
       {!workoutStarted && (
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -390,7 +450,7 @@ export function ActiveWorkoutPlayer({
       )}
       {!workoutStarted && <div className="absolute inset-0 bg-black/55" aria-hidden />}
 
-      <header className="relative z-30 flex items-center justify-between px-4 py-3">
+      <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-3">
         <BackButton
           fallbackHref={detailHref}
           ariaLabel="Go back"
@@ -488,70 +548,98 @@ export function ActiveWorkoutPlayer({
           </button>
         </div>
       ) : (
-        <>
-          {showPhaseBanner && current && (
-            <div className="relative z-20 mx-auto max-w-3xl px-4 pt-2 text-center">
-              <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
-                {SESSION_PHASE_LABELS[current.sessionPhase]}
-              </p>
-            </div>
-          )}
-          <ExerciseVideoFrame className="relative z-10">
-            <WorkoutVideo
-              url={displayVideoUrl}
-              playing={!workoutFinished && (inPrep || isRunning)}
-              onReady={() => setVideoReady(true)}
-            />
-            <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
-            {inPrep && current && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 px-6 text-center backdrop-blur-[2px]">
-                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready</p>
-                <p className="mt-2 text-2xl font-semibold">{current.title}</p>
-                <p className="mt-2 text-sm text-white/80">
-                  {exerciseMeta(current)}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-28">
+            {showPhaseBanner && current && (
+              <div className="relative z-20 mx-auto max-w-3xl px-4 pt-2 text-center">
+                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+                  {SESSION_PHASE_LABELS[current.sessionPhase]}
                 </p>
-                {current.bothSides && (
-                  <div className="mt-3">
-                    <BothSidesChip variant="dark" />
-                  </div>
-                )}
-                {current.note?.trim() && (
-                  <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
-                    {current.note.trim()}
+              </div>
+            )}
+            <ExerciseVideoFrame className="relative z-10">
+              <WorkoutVideo
+                url={displayVideoUrl}
+                playing={!workoutFinished && (inPrep || isRunning)}
+                onReady={() => setVideoReady(true)}
+              />
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
+              {inPrep && current && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 px-6 text-center backdrop-blur-[2px]">
+                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready</p>
+                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
+                  <p className="mt-2 text-sm text-white/80">
+                    {exerciseMeta(current)}
                   </p>
-                )}
-                <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{prepCountdown}</p>
-                <p className="mt-2 text-sm text-white/60">Starting in…</p>
-              </div>
-            )}
-            {inExerciseRest && next && (
-              <div className="absolute inset-x-0 bottom-6 px-6 text-center">
-                <p className="text-xs font-bold tracking-wider text-white/70 uppercase">Get ready for</p>
-                <p className="mt-1 text-lg font-semibold">{next.title}</p>
-              </div>
-            )}
-            {inSetRest && current && (
-              <div className="absolute inset-x-0 bottom-6 px-6 text-center">
-                <p className="text-xs font-bold tracking-wider text-white/70 uppercase">Rest between sets</p>
-                <p className="mt-1 text-lg font-semibold">{current.title}</p>
-              </div>
-            )}
-          </ExerciseVideoFrame>
+                  {current.bothSides && (
+                    <div className="mt-3">
+                      <BothSidesChip variant="dark" />
+                    </div>
+                  )}
+                  {current.note?.trim() && (
+                    <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
+                      {current.note.trim()}
+                    </p>
+                  )}
+                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{prepCountdown}</p>
+                  <p className="mt-2 text-sm text-white/60">Starting in…</p>
+                </div>
+              )}
+              {inExerciseRest && next && secondsLeft != null && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 px-6 text-center backdrop-blur-[2px]">
+                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready for</p>
+                  <p className="mt-2 text-2xl font-semibold">{next.title}</p>
+                  <p className="mt-2 text-sm text-white/80">{exerciseMeta(next)}</p>
+                  {next.bothSides && (
+                    <div className="mt-3">
+                      <BothSidesChip variant="dark" />
+                    </div>
+                  )}
+                  {next.note?.trim() && (
+                    <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
+                      {next.note.trim()}
+                    </p>
+                  )}
+                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                  <p className="mt-2 text-sm text-white/60">Rest</p>
+                </div>
+              )}
+              {inSetRest && current && secondsLeft != null && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 px-6 text-center backdrop-blur-[2px]">
+                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Rest between sets</p>
+                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
+                  <p className="mt-2 text-sm text-white/80">
+                    Set {currentSet} of {totalSets} · {exerciseMeta(current)}
+                  </p>
+                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                  <p className="mt-2 text-sm text-white/60">Next set starting soon</p>
+                </div>
+              )}
+              {phase === "work" && !inPrep && currentIsTimed && secondsLeft != null && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-6 text-center">
+                  <p className="font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                  {showSetProgress && current && (
+                    <p className="mt-1 text-sm text-white/70">
+                      Set {currentSet} of {totalSets}
+                    </p>
+                  )}
+                </div>
+              )}
+            </ExerciseVideoFrame>
 
-          {inPrep && (
-            <div className="relative z-20 mx-auto max-w-lg px-6 py-6 text-center">
-              <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
-                Exercise 1 of {len}
-              </p>
-              <p className="mt-2 text-sm text-white/60">
-                Watch the demo above — your timer starts when the countdown ends.
-              </p>
-            </div>
-          )}
+            {inPrep && (
+              <div className="relative z-20 mx-auto max-w-lg px-6 py-6 text-center">
+                <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
+                  Exercise 1 of {len}
+                </p>
+                <p className="mt-2 text-sm text-white/60">
+                  Watch the demo above — your timer starts when the countdown ends.
+                </p>
+              </div>
+            )}
 
-          {!inPrep && (
-            <>
-              <div className="relative z-20 mx-auto max-w-lg px-6 py-6">
+            {!inPrep && (
+              <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
                 <div className="mb-4 flex gap-1">
                   {exercises.map((_, i) => (
                     <div
@@ -570,23 +658,20 @@ export function ActiveWorkoutPlayer({
                         ? `Set ${currentSet} of ${totalSets} · exercise ${currentIndex + 1} of ${len}`
                         : `Exercise ${currentIndex + 1} of ${len}`}
                 </p>
-                <h2 className="mt-1 text-2xl font-semibold">
-                  {inExerciseRest && next ? next.title : current?.title}
-                </h2>
-                {displayExercise?.bothSides && (
+                {!inRest && (
+                  <h2 className="mt-1 text-2xl font-semibold">{current?.title}</h2>
+                )}
+                {!inRest && displayExercise?.bothSides && (
                   <div className="mt-2">
                     <BothSidesChip variant="dark" />
                   </div>
                 )}
-                {displayNote && (
+                {!inRest && displayNote && (
                   <p className="mt-3 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-sm leading-relaxed text-white/90">
                     {displayNote}
                   </p>
                 )}
 
-                {currentIsTimed && secondsLeft != null && (
-                  <p className="mt-3 font-mono text-5xl font-semibold tabular-nums">{secondsLeft}</p>
-                )}
                 {currentIsTimed && showSetProgress && phase === "work" && current && (
                   <p className="mt-2 text-sm text-white/60">
                     {exerciseMeta(current)}
@@ -602,41 +687,43 @@ export function ActiveWorkoutPlayer({
                   <p className="mt-2 text-sm text-white/60">Tap Next when you finish this exercise.</p>
                 )}
               </div>
+            )}
+          </div>
 
-              <nav
-                className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-black/80 px-4 py-4 backdrop-blur-md"
-                style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}
-              >
-                <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    disabled={currentIndex <= 0}
-                    className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold disabled:opacity-30"
-                  >
-                    Prev
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsRunning((r) => !r)}
-                    className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black"
-                    aria-label={isRunning ? "Pause" : "Play"}
-                  >
-                    {isRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={goNext}
-                    className="inline-flex items-center gap-1 rounded-xl bg-[#ccff00] px-4 py-3 text-sm font-semibold text-black"
-                  >
-                    {!currentIsTimed && isLast ? "Finish" : "Next"}
-                    <SkipForward className="h-4 w-4" />
-                  </button>
-                </div>
-              </nav>
-            </>
+          {!inPrep && (
+            <nav
+              className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/80 px-4 py-4 backdrop-blur-md"
+              style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}
+            >
+              <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={goPrev}
+                  disabled={currentIndex <= 0}
+                  className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold disabled:opacity-30"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsRunning((r) => !r)}
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black"
+                  aria-label={isRunning ? "Pause" : "Play"}
+                >
+                  {isRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="inline-flex items-center gap-1 rounded-xl bg-[#ccff00] px-4 py-3 text-sm font-semibold text-black"
+                >
+                  {!currentIsTimed && isLast ? "Finish" : "Next"}
+                  <SkipForward className="h-4 w-4" />
+                </button>
+              </div>
+            </nav>
           )}
-        </>
+        </div>
       )}
 
       {workoutFinished && (

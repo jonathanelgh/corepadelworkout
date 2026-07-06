@@ -18,6 +18,7 @@ export type GeminiProgramExercise = {
   exercise_id: string;
   phase: SessionPhase;
   choice_group: string | null;
+  duration_seconds: number | null;
   duration_minutes: number | null;
   sets: number | null;
   reps: number | null;
@@ -87,7 +88,8 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
               "exercise_id": "string (UUID from catalog ONLY)",
               "phase": "warmup | main | cooldown",
               "choice_group": "string | null (same group = pick-one alternative in warm-up/cool-down)",
-              "duration_minutes": "number | null",
+              "duration_seconds": "number | null (REQUIRED for warmup: always 60)",
+              "duration_minutes": "number | null (main/cool-down timed work — not for warm-up)",
               "sets": "number | null",
               "reps": "number | null",
               "rest_between_sets_seconds": "number | null",
@@ -118,6 +120,7 @@ function parseExerciseRow(row: unknown): GeminiProgramExercise | null {
     exercise_id,
     phase: parseSessionPhase(r.phase),
     choice_group: parseChoiceGroup(r.choice_group),
+    duration_seconds: parseOptionalInt(r.duration_seconds),
     duration_minutes: parseOptionalInt(r.duration_minutes),
     sets: parseOptionalInt(r.sets),
     reps: parseOptionalInt(r.reps),

@@ -122,7 +122,10 @@ export function mapGeminiDraftToForm(
 
     let trackSessions = tr.sessions;
     if (targetSessionCount != null && targetSessionCount > 1) {
-      const expanded = expandSessionsToTarget(trackSessions, targetSessionCount);
+      const expanded = expandSessionsToTarget(trackSessions, targetSessionCount, {
+        sessionsPerWeek: sessionsPerWeek ?? trackSessions.length,
+        applyWeeklyProgression: (durationWeeks ?? 1) > 1,
+      });
       trackSessions = expanded.sessions.map((s) => ({
         name: s.name,
         description: s.description ?? null,
@@ -150,22 +153,30 @@ export function mapGeminiDraftToForm(
         if (seenInSession.has(ex.exercise_id)) continue;
         seenInSession.add(ex.exercise_id);
 
+        const workSeconds =
+          ex.duration_seconds != null && ex.duration_seconds > 0
+            ? ex.duration_seconds
+            : ex.duration_minutes != null && ex.duration_minutes > 0
+              ? ex.duration_minutes * 60
+              : null;
         const inferred = inferExercisePrescriptionType({
-            durationSeconds: null,
-            durationMinutes: ex.duration_minutes,
-            sets: ex.sets,
-            restBetweenSetsSeconds: ex.rest_between_sets_seconds,
-          });
+          durationSeconds: workSeconds,
+          durationMinutes:
+            workSeconds != null ? Math.ceil(workSeconds / 60) : ex.duration_minutes,
+          sets: ex.sets,
+          restBetweenSetsSeconds: ex.rest_between_sets_seconds,
+        });
         const catalogEntry = ctx.exercises.find((e) => e.id === ex.exercise_id);
         const mode = catalogEntry?.programPrescriptionMode ?? "all";
+        const hasSeconds = ex.duration_seconds != null && ex.duration_seconds > 0;
 
         exercises.push({
           exerciseId: ex.exercise_id,
           sessionPhase: ex.phase,
           choiceGroup: ex.choice_group ?? "",
           prescriptionType: clampProgramPrescriptionType(mode, inferred),
-          durationValue: intToField(ex.duration_minutes),
-          durationUnit: "min",
+          durationValue: hasSeconds ? String(ex.duration_seconds) : intToField(ex.duration_minutes),
+          durationUnit: hasSeconds ? "sec" : "min",
           sets: intToField(ex.sets),
           reps: intToField(ex.reps),
           restBetweenSetsSeconds: intToField(ex.rest_between_sets_seconds),

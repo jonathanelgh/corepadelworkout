@@ -90,7 +90,14 @@ export async function saveAiProgram(
     throw new Error("Program has no sessions.");
   }
 
-  const { sessions: expandedSessions } = expandSessionsToTarget(proposal.sessions, targetSessionCount);
+  const { sessions: expandedSessions, warnings: expandWarnings } = expandSessionsToTarget(
+    proposal.sessions,
+    targetSessionCount,
+    { sessionsPerWeek, applyWeeklyProgression: durationWeeks > 1 }
+  );
+  if (expandWarnings.length > 0) {
+    console.info("[save-ai-program]", expandWarnings.join(" "));
+  }
 
   const locationId = await resolveLocationId(supabase, proposal.location_slug);
   const slug = await uniqueProgramSlug(supabase, slugifyTitle(proposal.title));

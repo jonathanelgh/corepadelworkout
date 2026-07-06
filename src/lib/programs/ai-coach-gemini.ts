@@ -8,8 +8,10 @@ import {
 } from "@google/generative-ai";
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
+import { AI_COACH_METHODOLOGY_BLOCK } from "@/lib/programs/ai-coach-methodology";
+import { AI_COACH_WEEKLY_PROGRESSION_BLOCK } from "@/lib/programs/apply-weekly-progression";
+import { AI_COACH_WARMUP_RULES_BLOCK } from "@/lib/programs/warmup-prescription";
 import {
-  normalizeExercisePhases,
   parseChoiceGroup,
   parseSessionPhase,
   type SessionPhase,
@@ -27,6 +29,8 @@ export type WorkoutProposalExercise = {
   title: string;
   phase: SessionPhase;
   choice_group?: string;
+  /** Timed work in seconds (preferred for warm-up — always 60s). */
+  duration_seconds?: number;
   duration_minutes?: number;
   sets?: number;
   reps?: number;
@@ -108,6 +112,16 @@ function buildSystemInstruction(
     out += `\n\n${options.consultationBrief.trim()}`;
   }
 
+  if (!out.includes("Core Padel methodology")) {
+    out += `\n\n${AI_COACH_METHODOLOGY_BLOCK}`;
+  }
+  if (!out.includes("Warm-up prescription (mandatory")) {
+    out += `\n\n${AI_COACH_WARMUP_RULES_BLOCK}`;
+  }
+  if (!out.includes("Weekly progression (automatic on save)")) {
+    out += `\n\n${AI_COACH_WEEKLY_PROGRESSION_BLOCK}`;
+  }
+
   if (options?.creationOnly) {
     const who = options.audience === "member" ? "The athlete" : "The admin";
     if (options.toolsEnabled === false) {
@@ -174,7 +188,11 @@ const TOOLS: FunctionDeclaration[] = [
                 type: SchemaType.STRING,
                 description: "UUID from the exercise catalog — copy exactly from [uuid] in catalog",
               },
-              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes (mobility, holds, intervals)" },
+              duration_seconds: {
+                type: SchemaType.NUMBER,
+                description: `Timed work in seconds. REQUIRED for warmup phase: always ${60} (60 seconds).`,
+              },
+              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes for main/cool-down (not warm-up — use duration_seconds there)" },
               sets: { type: SchemaType.NUMBER, description: "Sets or timed rounds" },
               reps: { type: SchemaType.NUMBER, description: "Reps per set (sets/reps mode)" },
               rest_between_sets_seconds: {
@@ -231,7 +249,11 @@ const TOOLS: FunctionDeclaration[] = [
                 type: SchemaType.STRING,
                 description: "UUID from the exercise catalog — copy exactly from [uuid] in catalog",
               },
-              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes (mobility, holds, intervals)" },
+              duration_seconds: {
+                type: SchemaType.NUMBER,
+                description: `Timed work in seconds. REQUIRED for warmup phase: always ${60} (60 seconds).`,
+              },
+              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes for main/cool-down (not warm-up — use duration_seconds there)" },
               sets: { type: SchemaType.NUMBER, description: "Sets or timed rounds" },
               reps: { type: SchemaType.NUMBER, description: "Reps per set (sets/reps mode)" },
               rest_between_sets_seconds: {
@@ -321,6 +343,10 @@ function parseExerciseList(
       phase: parseSessionPhase(ex.phase),
       choice_group: parseChoiceGroup(ex.choice_group) ?? undefined,
       note: typeof ex.note === "string" && ex.note.trim() ? ex.note.trim() : undefined,
+      duration_seconds:
+        typeof ex.duration_seconds === "number" && Number.isFinite(ex.duration_seconds)
+          ? Math.ceil(ex.duration_seconds)
+          : undefined,
       duration_minutes:
         typeof ex.duration_minutes === "number" && Number.isFinite(ex.duration_minutes)
           ? Math.ceil(ex.duration_minutes)
@@ -345,7 +371,7 @@ function parseWorkoutProposal(
 
   const exercises = parseExerciseList(args.exercises, catalogById);
   if (exercises.length === 0) return null;
-  return { title, description, exercises: normalizeExercisePhases(exercises) };
+  return { title, description, exercises };
 }
 
 function parseProgramProposal(
@@ -376,7 +402,7 @@ function parseProgramProposal(
           typeof row.duration_minutes === "number" && Number.isFinite(row.duration_minutes)
             ? Math.ceil(row.duration_minutes)
             : undefined,
-        exercises: normalizeExercisePhases(exercises),
+        exercises,
       });
     }
   }
@@ -579,7 +605,7 @@ export async function chatWithAiCoach(params: {
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
       `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
-      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs warmup, main (include rotation or anti-rotation), and cooldown.`,
+      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs at least 4 warmup exercises (duration_seconds: 60 each), main (include rotation or anti-rotation), and cooldown.`,
       `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
     ];
 

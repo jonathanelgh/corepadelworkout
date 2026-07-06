@@ -1,4 +1,6 @@
 /** Core Padel S&C methodology appended to the AI Coach system prompt. */
+import { AI_COACH_WARMUP_RULES_BLOCK } from "@/lib/programs/warmup-prescription";
+
 export const AI_COACH_METHODOLOGY_BLOCK = `
 ## Core Padel methodology (internal — apply when generating workouts/programs)
 
@@ -87,4 +89,6 @@ Every workout must follow this order:
 
 - When prescribing progressive overload week-to-week, include a coach **note** on relevant strength exercises telling the athlete to increase load by **5–10%** when they can complete all prescribed sets and reps with good form.
 - For catalog exercises tagged **both_sides**: add a coach **note** that the exercise is performed on both sides, and **adapt** duration, sets, reps, or timed sets so total work accounts for both sides (e.g. timed hold per side, or sets × 2 when appropriate).
-- Use the per-exercise **note** field on generate_workout and generate_program exercises for these coach cues.`.trim();
+- Use the per-exercise **note** field on generate_workout and generate_program exercises for these coach cues.
+
+${AI_COACH_WARMUP_RULES_BLOCK}`.trim();

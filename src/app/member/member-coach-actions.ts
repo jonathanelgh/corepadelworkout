@@ -42,6 +42,7 @@ import {
   type ConsultationPrompt,
 } from "@/lib/programs/coach-consultation";
 import { ensureWorkoutProposalRotation } from "@/lib/programs/ensure-rotational-exercise";
+import { ensureWorkoutProposalStructure } from "@/lib/programs/ensure-session-structure";
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
 import { fetchProgramSessionsForProgram } from "@/lib/programs/program-sessions";
 import { playHrefForSession } from "@/lib/programs/program-progress";
@@ -323,7 +324,13 @@ export async function sendMemberCoachMessage(input: {
     }
 
     if (result.name === "generate_workout") {
-      const { proposal } = ensureWorkoutProposalRotation(result.args, publishedExercises);
+      const { proposal: rotated } = ensureWorkoutProposalRotation(result.args, publishedExercises);
+      const { proposal } = ensureWorkoutProposalStructure(rotated, publishedExercises, {
+        locationSlug:
+          consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
+            ? consultation.locationSlug
+            : undefined,
+      });
       return {
         type: "workout_proposal",
         proposal,
@@ -353,7 +360,10 @@ export async function saveMemberCoachWorkout(
     const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
     const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
 
-    const { proposal: fixed } = ensureWorkoutProposalRotation(proposal, publishedExercises);
+    const { proposal: rotated } = ensureWorkoutProposalRotation(proposal, publishedExercises);
+    const { proposal: fixed } = ensureWorkoutProposalStructure(rotated, publishedExercises, {
+      locationSlug: options?.locationSlug,
+    });
 
     const saved = await saveAiWorkoutProgram(auth.supabase, fixed, {
       status: "published",

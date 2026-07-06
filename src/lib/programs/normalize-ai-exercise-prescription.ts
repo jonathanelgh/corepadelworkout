@@ -4,9 +4,11 @@ import {
   type ExercisePrescriptionType,
 } from "@/lib/programs/program-exercises";
 import { parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
+import { WARMUP_DURATION_SECONDS } from "@/lib/programs/warmup-prescription";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
+  duration_seconds?: number | null;
   duration_minutes?: number | null;
   sets?: number | null;
   reps?: number | null;
@@ -20,9 +22,13 @@ function parseNonNegInt(v: unknown): number | null {
 }
 
 export function inferAiPrescriptionType(ex: AiExerciseFields): ExercisePrescriptionType {
-  const durationMinutes =
-    ex.duration_minutes != null && ex.duration_minutes > 0 ? Math.ceil(ex.duration_minutes) : null;
-  const durationSeconds = durationMinutes != null ? durationMinutes * 60 : null;
+  const durationSeconds =
+    ex.duration_seconds != null && ex.duration_seconds > 0
+      ? Math.ceil(ex.duration_seconds)
+      : ex.duration_minutes != null && ex.duration_minutes > 0
+        ? Math.ceil(ex.duration_minutes) * 60
+        : null;
+  const durationMinutes = durationSeconds != null ? Math.ceil(durationSeconds / 60) : null;
   return inferExercisePrescriptionType({
     durationSeconds,
     durationMinutes,
@@ -73,15 +79,23 @@ export function aiExerciseToProgramPayload(
   },
   opts: { isLastInSession: boolean }
 ): ProgramExercisePayload {
-  const durationMinutes =
-    ex.duration_minutes != null && ex.duration_minutes > 0 ? Math.ceil(ex.duration_minutes) : null;
+  let durationSeconds =
+    ex.duration_seconds != null && ex.duration_seconds > 0
+      ? Math.ceil(ex.duration_seconds)
+      : ex.duration_minutes != null && ex.duration_minutes > 0
+        ? Math.ceil(ex.duration_minutes) * 60
+        : null;
+
+  if (ex.phase === "warmup" && (durationSeconds == null || durationSeconds <= 0)) {
+    durationSeconds = WARMUP_DURATION_SECONDS;
+  }
 
   return {
     exercise_id: ex.exercise_id,
     duration_minutes: null,
-    duration_seconds: durationMinutes != null ? durationMinutes * 60 : null,
-    sets: ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null,
-    reps: ex.reps != null && ex.reps > 0 ? Math.ceil(ex.reps) : null,
+    duration_seconds: durationSeconds,
+    sets: ex.phase === "warmup" ? null : ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null,
+    reps: ex.phase === "warmup" ? null : ex.reps != null && ex.reps > 0 ? Math.ceil(ex.reps) : null,
     rest_between_sets_seconds: defaultRestBetweenSetsSeconds(ex),
     rest_after_seconds: defaultRestAfterSeconds(ex, opts),
     session_phase: ex.phase,
@@ -111,15 +125,18 @@ export type StoredProgramExerciseFields = {
 };
 
 export function storedExerciseToAiFields(ex: StoredProgramExerciseFields): AiExerciseFields {
-  const durationMinutes =
-    ex.duration_minutes != null && ex.duration_minutes > 0
-      ? Math.ceil(ex.duration_minutes)
-      : ex.duration_seconds != null && ex.duration_seconds > 0
-        ? Math.ceil(ex.duration_seconds / 60)
+  const durationSeconds =
+    ex.duration_seconds != null && ex.duration_seconds > 0
+      ? Math.ceil(ex.duration_seconds)
+      : ex.duration_minutes != null && ex.duration_minutes > 0
+        ? Math.ceil(ex.duration_minutes) * 60
         : null;
+  const durationMinutes =
+    durationSeconds != null ? Math.ceil(durationSeconds / 60) : null;
 
   return {
     phase: parseSessionPhase(ex.session_phase),
+    duration_seconds: durationSeconds,
     duration_minutes: durationMinutes,
     sets: ex.sets,
     reps: ex.reps,

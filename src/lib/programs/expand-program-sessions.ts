@@ -1,3 +1,8 @@
+import {
+  applyWeeklyProgressionToExercise,
+  type ProgressableExercise,
+} from "@/lib/programs/apply-weekly-progression";
+
 export type ExpandableSession<T> = {
   name: string;
   description?: string | null;
@@ -5,35 +10,71 @@ export type ExpandableSession<T> = {
   exercises: T[];
 };
 
-/** Repeat a weekly session template until the target count is reached. */
-export function expandSessionsToTarget<T>(
+export type ExpandSessionsOptions = {
+  /** Sessions per training week (defaults to template count). */
+  sessionsPerWeek?: number;
+  /** Apply reps/sets/load progression when repeating templates across weeks. Default true. */
+  applyWeeklyProgression?: boolean;
+};
+
+/**
+ * Build a full multi-week schedule from week-1 session templates.
+ * Uses the first `sessionsPerWeek` entries as the repeating template and applies weekly progression.
+ */
+export function expandSessionsToTarget<T extends ProgressableExercise>(
   sessions: ExpandableSession<T>[],
-  targetCount: number
+  targetCount: number,
+  options?: ExpandSessionsOptions
 ): { sessions: ExpandableSession<T>[]; warnings: string[] } {
-  if (targetCount <= 0 || sessions.length === 0 || sessions.length >= targetCount) {
+  if (targetCount <= 0 || sessions.length === 0) {
     return { sessions, warnings: [] };
   }
 
-  const warnings = [
-    `AI returned ${sessions.length} session(s) but ${targetCount} were required — repeated the weekly template to fill the schedule.`,
-  ];
-  const template = sessions;
+  const sessionsPerWeek = Math.max(1, options?.sessionsPerWeek ?? sessions.length);
+  const applyProgression = options?.applyWeeklyProgression !== false;
+  const warnings: string[] = [];
+
+  const template = sessions.slice(0, Math.min(sessionsPerWeek, sessions.length));
+  if (template.length === 0) {
+    return { sessions, warnings: [] };
+  }
+
+  if (sessions.length > template.length) {
+    warnings.push(
+      `Used the first ${template.length} session(s) as the week-1 template; extra AI sessions were ignored.`
+    );
+  }
+
+  const needsRepeat = targetCount > template.length;
+  if (needsRepeat) {
+    warnings.push(
+      `Built ${targetCount} sessions from the week-1 template with automatic weekly progression.`
+    );
+  }
+
   const out: ExpandableSession<T>[] = [];
 
   for (let i = 0; i < targetCount; i++) {
     const src = template[i % template.length]!;
-    const cycle = Math.floor(i / template.length) + 1;
+    const weekIndex = Math.floor(i / sessionsPerWeek);
+    const dayInWeek = (i % sessionsPerWeek) + 1;
+    const weekNumber = weekIndex + 1;
+
     const name =
-      i < template.length
+      targetCount <= sessionsPerWeek && i < template.length
         ? src.name
-        : template.length === 1
-          ? `Day ${i + 1}`
-          : `${src.name} — Week ${cycle}`;
+        : `Week ${weekNumber} — Day ${dayInWeek}`;
+
     out.push({
       name,
       description: src.description,
       duration_minutes: src.duration_minutes,
-      exercises: src.exercises.map((ex) => ({ ...ex })),
+      exercises: src.exercises.map((ex) => {
+        const copy = { ...ex };
+        return applyProgression
+          ? applyWeeklyProgressionToExercise(copy, weekIndex)
+          : copy;
+      }),
     });
   }
 

@@ -1056,7 +1056,7 @@ export function formatGenerationCoachBrief(
 - This is a **~${minutes}-minute ${court ? "on-court pre-match warm-up" : "single session"}** — NOT a gym strength workout or multi-week plan.
 - Use **only** exercises from the filtered catalog for their location. ${court ? "**No dumbbells, barbells, or gym machines** unless explicitly tagged for at-the-court." : "Match equipment to their location."}
 - Structure: **mostly warmup** (dynamic mobility, activation, footwork). Keep **main** to 2–4 short moves max. Optional **cooldown** (1–2 stretches).
-- Prefer **timed drills** (30–60s) over heavy sets×reps. Total time including rests must fit ~${minutes} minutes.
+- Prefer **timed drills** (duration_seconds: 60 per warm-up move) over heavy sets×reps. Total time including rests must fit ~${minutes} minutes.
 - Title and description must match a pre-match / warm-up (not "strength session" or "hypertrophy").
 - Copy exercise_id UUIDs exactly from the catalog. Include rotation or anti-rotation in main if possible.`;
   }
@@ -1066,10 +1066,12 @@ export function formatGenerationCoachBrief(
 ## GENERATION — call ${toolName} now
 - Use consultation values above for duration, frequency, location_slug, equipment, and movement limits.
 - Copy exercise_id UUIDs exactly from the catalog (square brackets). Do not invent IDs.
-- Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds (between exercises; omit or 0 on the last exercise). Use rest_between_sets_seconds when prescribing timed intervals (duration + sets >= 2).
+- **Warm-up (mandatory every session):** at least 4 exercises with phase=warmup before main work. Each warm-up exercise: duration_seconds=60, rest_after_seconds=20. No sets/reps or duration_minutes on warm-up.
+- Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds (between exercises; omit or 0 on the last exercise). Use rest_between_sets_seconds when prescribing timed intervals in main/cool-down (duration + sets >= 2).
 ${
   isProgram
-    ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block.`
+    ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block. Each template day must include the full warm-up block.
+- Week-1 templates only: the app repeats them for the full block and auto-applies weekly progression (+reps, +sets, load/time notes) — do not duplicate sessions for each week in sessions[].`
     : `- Target ~${state.minutes ?? 30} minutes for this single workout.`
 }
 - Include at least one rotational or anti-rotational exercise in the main block.`;
