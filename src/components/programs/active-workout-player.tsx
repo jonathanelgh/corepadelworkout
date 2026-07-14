@@ -15,6 +15,12 @@ import {
   setsCount,
   workDurationSeconds,
 } from "@/lib/programs/program-exercises";
+import {
+  expandWorkoutPlaybackPlaylist,
+  isBilateralPlaybackStep,
+  workoutSideLabel,
+  type WorkoutPlaybackStep,
+} from "@/lib/programs/expand-workout-playlist";
 import { resolveExerciseVideoSource } from "@/lib/programs/exercise-video-url";
 import { useProgramWorkoutMusic } from "@/lib/programs/program-workout-music";
 import { playExerciseEndBeeps, playExerciseStartBeeps, playRestEndingCue, playWorkEndingCue, prepareWorkoutAudio } from "@/lib/programs/workout-beeps";
@@ -38,14 +44,17 @@ type Phase = "work" | "setRest" | "rest";
 const FIRST_EXERCISE_PREP_SECONDS = 5;
 
 function workPeriodFollowedByRest(
-  ex: ProgramExerciseItem,
+  step: WorkoutPlaybackStep,
   set: number,
-  isLastExercise: boolean
+  isLastStep: boolean
 ): boolean {
-  if (hasTimedSets(ex) && set < setsCount(ex)) {
-    return hasRestBetweenSets(ex) && restBetweenSetsSeconds(ex) > 0;
+  if (isBilateralPlaybackStep(step)) {
+    return step.postWorkRestSeconds > 0;
   }
-  return !isLastExercise && restDurationSeconds(ex) > 0;
+  if (hasTimedSets(step) && set < setsCount(step)) {
+    return hasRestBetweenSets(step) && restBetweenSetsSeconds(step) > 0;
+  }
+  return !isLastStep && restDurationSeconds(step) > 0;
 }
 
 const IFRAME_ALLOW =
@@ -185,12 +194,17 @@ export function ActiveWorkoutPlayer({
     [exercises, choiceSelections]
   );
 
-  const len = resolvedExercises.length;
-  const current = len > 0 ? resolvedExercises[Math.min(currentIndex, len - 1)] : null;
+  const playbackSteps = useMemo(
+    () => expandWorkoutPlaybackPlaylist(resolvedExercises),
+    [resolvedExercises]
+  );
+
+  const len = playbackSteps.length;
+  const current = len > 0 ? playbackSteps[Math.min(currentIndex, len - 1)] : null;
   const next =
-    len > 0 && currentIndex < len - 1 ? resolvedExercises[currentIndex + 1] : null;
+    len > 0 && currentIndex < len - 1 ? playbackSteps[currentIndex + 1] : null;
   const previousPhase =
-    currentIndex > 0 ? resolvedExercises[currentIndex - 1]?.sessionPhase : null;
+    currentIndex > 0 ? playbackSteps[currentIndex - 1]?.sessionPhase : null;
   const showPhaseBanner =
     workoutStarted &&
     current != null &&
@@ -203,10 +217,31 @@ export function ActiveWorkoutPlayer({
   const inSetRest = workoutStarted && !inPrep && currentIsTimed && phase === "setRest";
   const inExerciseRest = workoutStarted && !inPrep && currentIsTimed && phase === "rest";
   const inRest = inSetRest || inExerciseRest;
-  const totalSets = current ? setsCount(current) : 1;
-  const showSetProgress = currentIsTimed && current != null && hasTimedSets(current);
+  const totalSets = current
+    ? isBilateralPlaybackStep(current)
+      ? current.playbackSetsTotal
+      : setsCount(current)
+    : 1;
+  const currentSetNumber = current
+    ? isBilateralPlaybackStep(current)
+      ? current.playbackSet
+      : currentSet
+    : 1;
+  const showSetProgress =
+    currentIsTimed &&
+    current != null &&
+    (isBilateralPlaybackStep(current)
+      ? current.playbackSetsTotal > 1
+      : hasTimedSets(current));
 
-  const displayVideoUrl = inExerciseRest ? (next?.video_url ?? null) : (current?.video_url ?? null);
+  const displayVideoUrl =
+    inExerciseRest ||
+    (inSetRest &&
+      current != null &&
+      isBilateralPlaybackStep(current) &&
+      current.postWorkRestKind === "side_switch")
+      ? (next?.video_url ?? null)
+      : (current?.video_url ?? null);
   const cover = coverImageUrl?.trim() || COVER_FALLBACK;
 
   useProgramWorkoutMusic(songUrl, {
@@ -235,8 +270,8 @@ export function ActiveWorkoutPlayer({
 
   const beginWorkForCurrent = useCallback(
     (index: number) => {
-      const ex = resolvedExercises[index]!;
-      setCurrentSet(1);
+      const ex = playbackSteps[index]!;
+      setCurrentSet(isBilateralPlaybackStep(ex) ? ex.playbackSet : 1);
       setPhase("work");
       if (exerciseUsesTimedPlayback(ex)) {
         playExerciseStartBeeps();
@@ -245,7 +280,7 @@ export function ActiveWorkoutPlayer({
         setSecondsLeft(null);
       }
     },
-    [resolvedExercises]
+    [playbackSteps]
   );
 
   const advanceExercise = useCallback(() => {
@@ -263,6 +298,16 @@ export function ActiveWorkoutPlayer({
 
   const finishWorkPhase = useCallback(() => {
     if (!current) return;
+    if (isBilateralPlaybackStep(current)) {
+      if (current.postWorkRestSeconds > 0) {
+        const kind = current.postWorkRestKind;
+        setPhase(kind === "between_exercises" ? "rest" : "setRest");
+        setSecondsLeft(current.postWorkRestSeconds);
+        return;
+      }
+      advanceExercise();
+      return;
+    }
     if (hasTimedSets(current) && currentSet < setsCount(current)) {
       const between = hasRestBetweenSets(current) ? restBetweenSetsSeconds(current) : 0;
       if (between > 0) {
@@ -350,6 +395,10 @@ export function ActiveWorkoutPlayer({
     }
 
     if (phase === "setRest") {
+      if (current && isBilateralPlaybackStep(current)) {
+        advanceExercise();
+        return;
+      }
       playExerciseStartBeeps();
       setCurrentSet((s) => s + 1);
       setPhase("work");
@@ -416,6 +465,10 @@ export function ActiveWorkoutPlayer({
       return;
     }
     if (phase === "setRest") {
+      if (current && isBilateralPlaybackStep(current)) {
+        advanceExercise();
+        return;
+      }
       playExerciseStartBeeps();
       setCurrentSet((s) => s + 1);
       setPhase("work");
@@ -425,8 +478,23 @@ export function ActiveWorkoutPlayer({
     finishWorkPhase();
   }
 
-  const displayExercise = inExerciseRest && next ? next : current;
+  const displayExercise =
+    inExerciseRest && next
+      ? next
+      : inSetRest && next && current && isBilateralPlaybackStep(current)
+        ? next
+        : current;
   const displayNote = displayExercise?.note?.trim() || null;
+  const sideSwitchRest =
+    inSetRest &&
+    current != null &&
+    isBilateralPlaybackStep(current) &&
+    current.postWorkRestKind === "side_switch";
+  const bilateralRoundRest =
+    inSetRest &&
+    current != null &&
+    isBilateralPlaybackStep(current) &&
+    current.postWorkRestKind === "between_sets";
 
   if (len === 0) {
     return (
@@ -527,11 +595,11 @@ export function ActiveWorkoutPlayer({
 
           <div className="mt-8 rounded-2xl border border-white/15 bg-black/40 p-5 backdrop-blur-md">
             <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Up first</p>
-            <p className="mt-2 text-xl font-semibold">{resolvedExercises[0]?.title}</p>
+            <p className="mt-2 text-xl font-semibold">{playbackSteps[0]?.title}</p>
             <p className="mt-1 text-sm text-white/70">
-              {resolvedExercises[0] ? exerciseMeta(resolvedExercises[0]) : ""}
+              {playbackSteps[0] ? exerciseMeta(playbackSteps[0]) : ""}
             </p>
-            {resolvedExercises[0]?.bothSides && (
+            {playbackSteps[0]?.bothSides && (
               <div className="mt-3">
                 <BothSidesChip variant="dark" />
               </div>
@@ -571,10 +639,15 @@ export function ActiveWorkoutPlayer({
                   <p className="mt-2 text-sm text-white/80">
                     {exerciseMeta(current)}
                   </p>
-                  {current.bothSides && (
+                  {current.bothSides && !current.workoutSide && (
                     <div className="mt-3">
                       <BothSidesChip variant="dark" />
                     </div>
+                  )}
+                  {current.workoutSide && (
+                    <p className="mt-3 text-sm font-semibold text-[#ccff00]">
+                      {workoutSideLabel(current.workoutSide)}
+                    </p>
                   )}
                   {current.note?.trim() && (
                     <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
@@ -586,11 +659,16 @@ export function ActiveWorkoutPlayer({
                 </div>
               )}
               {inExerciseRest && next && secondsLeft != null && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 px-6 text-center backdrop-blur-[2px]">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready for</p>
                   <p className="mt-2 text-2xl font-semibold">{next.title}</p>
                   <p className="mt-2 text-sm text-white/80">{exerciseMeta(next)}</p>
-                  {next.bothSides && (
+                  {next.workoutSide && (
+                    <p className="mt-3 text-sm font-semibold text-[#ccff00]">
+                      {workoutSideLabel(next.workoutSide)}
+                    </p>
+                  )}
+                  {next.bothSides && !next.workoutSide && (
                     <div className="mt-3">
                       <BothSidesChip variant="dark" />
                     </div>
@@ -604,12 +682,34 @@ export function ActiveWorkoutPlayer({
                   <p className="mt-2 text-sm text-white/60">Rest</p>
                 </div>
               )}
-              {inSetRest && current && secondsLeft != null && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 px-6 text-center backdrop-blur-[2px]">
+              {inSetRest && current && secondsLeft != null && sideSwitchRest && next && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
+                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Switch sides</p>
+                  <p className="mt-2 text-2xl font-semibold">{next.title}</p>
+                  <p className="mt-2 text-sm font-semibold text-[#ccff00]">
+                    {next.workoutSide ? workoutSideLabel(next.workoutSide) : exerciseMeta(next)}
+                  </p>
+                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                  <p className="mt-2 text-sm text-white/60">Rest</p>
+                </div>
+              )}
+              {inSetRest && current && secondsLeft != null && bilateralRoundRest && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
+                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Rest between rounds</p>
+                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
+                  <p className="mt-2 text-sm text-white/80">
+                    Round {current.playbackSet} of {current.playbackSetsTotal} complete
+                  </p>
+                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                  <p className="mt-2 text-sm text-white/60">Next round starting soon</p>
+                </div>
+              )}
+              {inSetRest && current && secondsLeft != null && !sideSwitchRest && !bilateralRoundRest && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Rest between sets</p>
                   <p className="mt-2 text-2xl font-semibold">{current.title}</p>
                   <p className="mt-2 text-sm text-white/80">
-                    Set {currentSet} of {totalSets} · {exerciseMeta(current)}
+                    Set {currentSetNumber} of {totalSets} · {exerciseMeta(current)}
                   </p>
                   <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
                   <p className="mt-2 text-sm text-white/60">Next set starting soon</p>
@@ -618,9 +718,14 @@ export function ActiveWorkoutPlayer({
               {phase === "work" && !inPrep && currentIsTimed && secondsLeft != null && (
                 <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-6 text-center">
                   <p className="font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                  {current?.workoutSide && (
+                    <p className="mt-1 text-sm font-semibold text-[#ccff00]">
+                      {workoutSideLabel(current.workoutSide)}
+                    </p>
+                  )}
                   {showSetProgress && current && (
                     <p className="mt-1 text-sm text-white/70">
-                      Set {currentSet} of {totalSets}
+                      Round {currentSetNumber} of {totalSets}
                     </p>
                   )}
                 </div>
@@ -641,7 +746,7 @@ export function ActiveWorkoutPlayer({
             {!inPrep && (
               <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
                 <div className="mb-4 flex gap-1">
-                  {exercises.map((_, i) => (
+                  {playbackSteps.map((_, i) => (
                     <div
                       key={i}
                       className={`h-1 flex-1 rounded-full ${i <= currentIndex ? "bg-[#ccff00]" : "bg-white/20"}`}
@@ -650,18 +755,27 @@ export function ActiveWorkoutPlayer({
                 </div>
 
                 <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
-                  {inSetRest
-                    ? `Rest · set ${currentSet} of ${totalSets}`
-                    : inExerciseRest
-                      ? "Rest"
-                      : showSetProgress
-                        ? `Set ${currentSet} of ${totalSets} · exercise ${currentIndex + 1} of ${len}`
-                        : `Exercise ${currentIndex + 1} of ${len}`}
+                  {sideSwitchRest
+                    ? "Switch sides"
+                    : bilateralRoundRest
+                      ? `Rest · round ${currentSetNumber} of ${totalSets}`
+                      : inSetRest
+                        ? `Rest · set ${currentSetNumber} of ${totalSets}`
+                        : inExerciseRest
+                          ? "Rest"
+                          : showSetProgress
+                            ? `Round ${currentSetNumber} of ${totalSets} · step ${currentIndex + 1} of ${len}`
+                            : `Step ${currentIndex + 1} of ${len}`}
                 </p>
                 {!inRest && (
                   <h2 className="mt-1 text-2xl font-semibold">{current?.title}</h2>
                 )}
-                {!inRest && displayExercise?.bothSides && (
+                {!inRest && current?.workoutSide && (
+                  <p className="mt-1 text-sm font-semibold text-[#ccff00]">
+                    {workoutSideLabel(current.workoutSide)}
+                  </p>
+                )}
+                {!inRest && displayExercise?.bothSides && !displayExercise.workoutSide && (
                   <div className="mt-2">
                     <BothSidesChip variant="dark" />
                   </div>

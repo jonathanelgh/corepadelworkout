@@ -46,6 +46,7 @@ import {
 import {
   ensureProgramProposalStructure,
   ensureWorkoutProposalStructure,
+  resolveSessionEnforcementOptions,
 } from "@/lib/programs/ensure-session-structure";
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
 import { saveAiProgram } from "@/lib/programs/save-ai-program";
@@ -192,6 +193,9 @@ export async function sendAiCoachMessage(input: {
         : publishedExercises;
 
     const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
+    const bothSidesByExerciseId = new Map(
+      generationExercises.map((e) => [e.id, e.bothSides])
+    );
     const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
 
     const fullHistory: ChatHistoryMessage[] = [
@@ -204,6 +208,16 @@ export async function sendAiCoachMessage(input: {
       ? await loadProfileAiContext(auth.supabase, input.targetUserId)
       : null;
     const adminTrainingLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
+    const userContextBlock = buildAdminAiAthleteContext(profileContext, adminTrainingLevel);
+    const enforcementOptions = resolveSessionEnforcementOptions({
+      locationSlug:
+        consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
+          ? consultation.locationSlug
+          : undefined,
+      trainingLevel: adminTrainingLevel,
+      athleteContext: userContextBlock,
+      goal: consultation.goal,
+    });
     const consultationBrief = inCreateFlow
       ? formatConsultationGuide(consultation, isProgram, equipmentLibrary)
       : undefined;
@@ -212,8 +226,9 @@ export async function sendAiCoachMessage(input: {
       programsCatalog: catalogForAiPayload(input.programsCatalog),
       exerciseCatalog,
       catalogById,
+      bothSidesByExerciseId,
       systemPromptTemplate,
-      userContextBlock: buildAdminAiAthleteContext(profileContext, adminTrainingLevel),
+      userContextBlock,
       creationOnly: inCreateFlow,
       consultationBrief,
       toolsEnabled: !inCreateFlow || consultationComplete,
@@ -317,12 +332,7 @@ export async function sendAiCoachMessage(input: {
       const { proposal, warnings: structureWarnings } = ensureWorkoutProposalStructure(
         rotated,
         publishedExercises,
-        {
-          locationSlug:
-            consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
-              ? consultation.locationSlug
-              : undefined,
-        }
+        enforcementOptions
       );
       const allWarnings = [...rotationWarnings, ...structureWarnings];
       if (allWarnings.length > 0) {
@@ -346,7 +356,8 @@ export async function sendAiCoachMessage(input: {
     );
     const { proposal, warnings: structureWarnings } = ensureProgramProposalStructure(
       rotated,
-      publishedExercises
+      publishedExercises,
+      enforcementOptions
     );
     const allWarnings = [...rotationWarnings, ...structureWarnings];
     if (allWarnings.length > 0) {

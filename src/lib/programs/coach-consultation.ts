@@ -1066,12 +1066,12 @@ export function formatGenerationCoachBrief(
 ## GENERATION — call ${toolName} now
 - Use consultation values above for duration, frequency, location_slug, equipment, and movement limits.
 - Copy exercise_id UUIDs exactly from the catalog (square brackets). Do not invent IDs.
-- **Warm-up (mandatory every session):** at least 4 exercises with phase=warmup before main work. Each warm-up exercise: duration_seconds=60, rest_after_seconds=20. No sets/reps or duration_minutes on warm-up.
+- **Warm-up (mandatory every session):** at least 5 exercises with phase=warmup before main work. Each warm-up exercise: duration_seconds=60, rest_after_seconds=15. No sets/reps or duration_minutes on warm-up.
 - Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds (between exercises; omit or 0 on the last exercise). Use rest_between_sets_seconds when prescribing timed intervals in main/cool-down (duration + sets >= 2).
 ${
   isProgram
     ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block. Each template day must include the full warm-up block.
-- Week-1 templates only: the app repeats them for the full block and auto-applies weekly progression (+reps, +sets, load/time notes) — do not duplicate sessions for each week in sessions[].`
+- Week-1 templates only: the app repeats them for the full block and auto-applies ~10% weekly progression to reps, timed work, sets, and load_prescription in each week's stored sessions — do not duplicate sessions per week in sessions[].`
     : `- Target ~${state.minutes ?? 30} minutes for this single workout.`
 }
 - Include at least one rotational or anti-rotational exercise in the main block.`;

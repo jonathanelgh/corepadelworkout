@@ -91,6 +91,14 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
   const rest_between_sets_seconds = parseOptionalNonNegIntField(
     row.rest_between_sets_seconds ?? row.restBetweenSetsSeconds
   );
+  const rest_between_sides_seconds = parseOptionalNonNegIntField(
+    row.rest_between_sides_seconds ?? row.restBetweenSidesSeconds
+  );
+  const load_prescription =
+    typeof (row.load_prescription ?? row.loadPrescription) === "string" &&
+    String(row.load_prescription ?? row.loadPrescription).trim().length > 0
+      ? String(row.load_prescription ?? row.loadPrescription).trim()
+      : null;
   const rest_after_seconds = parseOptionalNonNegIntField(
     row.rest_after_seconds ?? row.restAfterSeconds ?? row.pause_seconds
   );
@@ -104,6 +112,8 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
     sets,
     reps,
     rest_between_sets_seconds,
+    rest_between_sides_seconds,
+    load_prescription,
     rest_after_seconds,
     session_phase: parseSessionPhase(row.session_phase ?? row.sessionPhase),
     choice_group: parseChoiceGroup(row.choice_group ?? row.choiceGroup),
@@ -146,6 +156,8 @@ function parseOneSession(o: Record<string, unknown>): SessionPayload {
             sets: null,
             reps: null,
             rest_between_sets_seconds: null,
+            rest_between_sides_seconds: null,
+            load_prescription: null,
             rest_after_seconds: null,
             session_phase: "main",
             choice_group: null,
@@ -517,6 +529,8 @@ type DuplicateDbExerciseRow = {
   sets: number | null;
   reps: number | null;
   rest_between_sets_seconds: number | null;
+  rest_between_sides_seconds: number | null;
+  load_prescription: string | null;
   rest_after_seconds: number | null;
   session_phase: SessionPhase | null;
   choice_group: string | null;
@@ -567,6 +581,8 @@ function dbTracksToDuplicatePayloads(rows: DuplicateDbTrackRow[] | null): TrackP
         sets: e.sets,
         reps: e.reps,
         rest_between_sets_seconds: e.rest_between_sets_seconds,
+        rest_between_sides_seconds: e.rest_between_sides_seconds,
+        load_prescription: e.load_prescription?.trim() || null,
         rest_after_seconds: e.rest_after_seconds,
         session_phase: e.session_phase ?? "main",
         choice_group: e.choice_group?.trim() || null,
@@ -644,6 +660,8 @@ export async function duplicateProgram(formData: FormData) {
           sets,
           reps,
           rest_between_sets_seconds,
+          rest_between_sides_seconds,
+          load_prescription,
           rest_after_seconds,
           session_phase,
           choice_group,

@@ -42,7 +42,7 @@ import {
   type ConsultationPrompt,
 } from "@/lib/programs/coach-consultation";
 import { ensureWorkoutProposalRotation } from "@/lib/programs/ensure-rotational-exercise";
-import { ensureWorkoutProposalStructure } from "@/lib/programs/ensure-session-structure";
+import { ensureWorkoutProposalStructure, resolveSessionEnforcementOptions } from "@/lib/programs/ensure-session-structure";
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
 import { fetchProgramSessionsForProgram } from "@/lib/programs/program-sessions";
 import { playHrefForSession } from "@/lib/programs/program-progress";
@@ -193,6 +193,9 @@ export async function sendMemberCoachMessage(input: {
         : publishedExercises;
 
     const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
+    const bothSidesByExerciseId = new Map(
+      generationExercises.map((e) => [e.id, e.bothSides])
+    );
     const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
 
     const fullHistory: ChatHistoryMessage[] = [
@@ -207,6 +210,14 @@ export async function sendMemberCoachMessage(input: {
 
     const userContextBlock =
       buildMemberAiAthleteContext(profileContext) + memberTrainingContextBlock(trainingContext);
+    const enforcementOptions = resolveSessionEnforcementOptions({
+      locationSlug:
+        consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
+          ? consultation.locationSlug
+          : undefined,
+      athleteContext: userContextBlock,
+      goal: consultation.goal,
+    });
 
     const systemPromptTemplate = await loadAiPrompt(auth.supabase, "ai_member_coach_system");
     const inCreateFlow = wantsWorkoutCreate || wantsRecommend || wantsProgram;
@@ -225,6 +236,7 @@ export async function sendMemberCoachMessage(input: {
       programsCatalog: catalogForAiPayload(input.programsCatalog),
       exerciseCatalog,
       catalogById,
+      bothSidesByExerciseId,
       systemPromptTemplate,
       userContextBlock,
       extraTemplateVars: { methodology_block: AI_COACH_METHODOLOGY_BLOCK },
@@ -325,12 +337,7 @@ export async function sendMemberCoachMessage(input: {
 
     if (result.name === "generate_workout") {
       const { proposal: rotated } = ensureWorkoutProposalRotation(result.args, publishedExercises);
-      const { proposal } = ensureWorkoutProposalStructure(rotated, publishedExercises, {
-        locationSlug:
-          consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
-            ? consultation.locationSlug
-            : undefined,
-      });
+      const { proposal } = ensureWorkoutProposalStructure(rotated, publishedExercises, enforcementOptions);
       return {
         type: "workout_proposal",
         proposal,

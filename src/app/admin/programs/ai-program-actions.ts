@@ -11,7 +11,7 @@ import {
 } from "@/lib/programs/profile-ai-context";
 import { generateProgramWithGemini, type AiProgramGenerateRequest } from "@/lib/programs/gemini-generate-program";
 import { ensureGeminiDraftRotation } from "@/lib/programs/ensure-rotational-exercise";
-import { ensureGeminiDraftStructure } from "@/lib/programs/ensure-session-structure";
+import { ensureGeminiDraftStructure, resolveSessionEnforcementOptions } from "@/lib/programs/ensure-session-structure";
 import { mapGeminiDraftToForm, type AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 
 export type GenerateAiProgramResult =
@@ -49,9 +49,15 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
       ? await loadProfileAiContext(auth.supabase, input.targetUserId)
       : null;
     const adminTrainingLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
+    const userContextBlock = buildAdminAiAthleteContext(profileContext, adminTrainingLevel);
+    const enforcementOptions = resolveSessionEnforcementOptions({
+      trainingLevel: adminTrainingLevel,
+      athleteContext: userContextBlock,
+      goal: input.brief?.trim() || undefined,
+    });
     const geminiDraft = await generateProgramWithGemini(ctx, input, {
       promptTemplate,
-      userContextBlock: buildAdminAiAthleteContext(profileContext, adminTrainingLevel),
+      userContextBlock,
     });
     const { draft: rotationDraft, warnings: rotationWarnings } = ensureGeminiDraftRotation(
       geminiDraft,
@@ -60,7 +66,8 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
     );
     const { draft: structuredDraft, warnings: structureWarnings } = ensureGeminiDraftStructure(
       rotationDraft,
-      ctx.exercises.filter((e) => e.status === "published")
+      ctx.exercises.filter((e) => e.status === "published"),
+      enforcementOptions
     );
     const catalogIds = new Set(ctx.exercises.map((e) => e.id));
     const { draft, warnings } = mapGeminiDraftToForm(structuredDraft, ctx, catalogIds, {

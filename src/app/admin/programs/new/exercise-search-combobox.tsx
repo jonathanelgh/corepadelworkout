@@ -20,6 +20,7 @@ export type ExerciseOption = {
   location_ids: string[];
   status?: "draft" | "published";
   programPrescriptionMode?: ExerciseProgramPrescriptionMode;
+  bothSides?: boolean;
   image_url?: string | null;
   video_url?: string | null;
 };

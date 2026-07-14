@@ -3,6 +3,8 @@ import type { SessionPhase } from "@/lib/programs/session-phase";
 
 export type ExercisePrescriptionType = "sets_reps" | "time" | "timed_intervals";
 
+export const DEFAULT_REST_BETWEEN_SIDES_SECONDS = 15;
+
 export type ProgramExerciseItem = {
   id: string;
   exerciseId: string;
@@ -17,7 +19,9 @@ export type ProgramExerciseItem = {
   sets: number | null;
   reps: number | null;
   restBetweenSetsSeconds: number | null;
+  restBetweenSidesSeconds: number | null;
   restAfterSeconds: number | null;
+  loadPrescription: string | null;
   note: string | null;
 };
 
@@ -37,7 +41,9 @@ type ProgramExerciseNested = {
   sets: number | null;
   reps: number | null;
   rest_between_sets_seconds: number | null;
+  rest_between_sides_seconds: number | null;
   rest_after_seconds: number | null;
+  load_prescription: string | null;
   session_phase: SessionPhase | null;
   choice_group: string | null;
   note: string | null;
@@ -130,6 +136,14 @@ export function restBetweenSetsSeconds(ex: ProgramExerciseItem): number {
   return 0;
 }
 
+export function restBetweenSidesSeconds(ex: ProgramExerciseItem): number {
+  const rest = ex.restBetweenSidesSeconds;
+  if (rest != null && Number.isFinite(rest) && rest > 0) {
+    return Math.min(Math.round(rest), 3600);
+  }
+  return DEFAULT_REST_BETWEEN_SIDES_SECONDS;
+}
+
 export function restDurationSeconds(ex: ProgramExerciseItem): number {
   const rest = ex.restAfterSeconds;
   if (rest != null && Number.isFinite(rest) && rest > 0) {
@@ -148,6 +162,20 @@ export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
   const workSecs = hasExplicitWorkDuration(ex) ? workDurationSeconds(ex) : null;
   const sets = ex.sets;
   const between = restBetweenSetsSeconds(ex);
+  const sideRest = restBetweenSidesSeconds(ex);
+
+  if (ex.bothSides && exerciseUsesTimedPlayback(ex) && workSecs != null) {
+    const rounds = sets != null && sets > 0 ? sets : 1;
+    const parts = [
+      `${formatWorkDurationShort(workSecs)} per side`,
+      `${sideRest}s switch`,
+    ];
+    if (rounds > 1) {
+      parts.push(`${rounds} rounds`);
+      if (between > 0) parts.push(`${between}s between rounds`);
+    }
+    return parts.join(" · ");
+  }
 
   if (type === "timed_intervals" && workSecs != null) {
     const rounds = sets != null && sets > 0 ? sets : 1;
@@ -163,6 +191,9 @@ export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
   }
 
   const parts: string[] = [];
+  if (ex.loadPrescription?.trim()) {
+    parts.push(ex.loadPrescription.trim());
+  }
   if (sets != null && sets > 0 && ex.reps != null && ex.reps > 0) {
     parts.push(`${sets} sets · ${ex.reps} reps`);
   } else if (sets != null && sets > 0) {
@@ -204,7 +235,9 @@ export async function fetchProgramExercises(
           sets,
           reps,
           rest_between_sets_seconds,
+          rest_between_sides_seconds,
           rest_after_seconds,
+          load_prescription,
           session_phase,
           choice_group,
           note,
@@ -259,7 +292,9 @@ export async function fetchProgramExercises(
             sets: pe.sets,
             reps: pe.reps,
             restBetweenSetsSeconds: pe.rest_between_sets_seconds,
+            restBetweenSidesSeconds: pe.rest_between_sides_seconds,
             restAfterSeconds: pe.rest_after_seconds,
+            loadPrescription: pe.load_prescription?.trim() || null,
             note: pe.note?.trim() || null,
           },
         });
@@ -286,7 +321,9 @@ export async function fetchProgramSessionExercises(
       sets,
       reps,
       rest_between_sets_seconds,
+      rest_between_sides_seconds,
       rest_after_seconds,
+      load_prescription,
       session_phase,
       choice_group,
       note,
@@ -324,7 +361,9 @@ export async function fetchProgramSessionExercises(
       sets: row.sets,
       reps: row.reps,
       restBetweenSetsSeconds: row.rest_between_sets_seconds,
+      restBetweenSidesSeconds: row.rest_between_sides_seconds,
       restAfterSeconds: row.rest_after_seconds,
+      loadPrescription: row.load_prescription?.trim() || null,
       note: row.note?.trim() || null,
     });
   }

@@ -69,7 +69,7 @@ export async function saveAiWorkoutProgram(
 
   const { data: existingRows, error: exErr } = await supabase
     .from("exercises")
-    .select("id")
+    .select("id, both_sides")
     .in("id", exerciseIds);
 
   if (exErr) throw new Error(exErr.message);
@@ -77,6 +77,9 @@ export async function saveAiWorkoutProgram(
   if (found.size !== exerciseIds.length) {
     throw new Error("One or more exercises are not in the library. Regenerate the workout.");
   }
+  const bothSidesByExerciseId = new Map(
+    (existingRows ?? []).map((row) => [row.id as string, Boolean(row.both_sides)])
+  );
 
   const totalMinutes = estimateTotalMinutes(proposal);
   const locationSlug = options?.locationSlug?.trim() || "home";
@@ -113,7 +116,10 @@ export async function saveAiWorkoutProgram(
   const exerciseRows: ProgramExercisePayload[] = proposal.exercises.map((ex, index) =>
     aiExerciseToProgramPayload(
       { ...ex, choice_group: ex.choice_group ?? null, note: ex.note ?? null },
-      { isLastInSession: index === proposal.exercises.length - 1 }
+      {
+        isLastInSession: index === proposal.exercises.length - 1,
+        bothSides: bothSidesByExerciseId.get(ex.exercise_id) ?? false,
+      }
     )
   );
 

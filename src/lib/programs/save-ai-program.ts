@@ -44,14 +44,27 @@ function estimateSessionMinutes(session: ProgramProposal["sessions"][number]): n
 }
 
 function toExercisePayload(
-  exercises: ProgramProposal["sessions"][number]["exercises"]
+  exercises: ProgramProposal["sessions"][number]["exercises"],
+  bothSidesByExerciseId: Map<string, boolean>
 ): ProgramExercisePayload[] {
   return exercises.map((ex, index) =>
     aiExerciseToProgramPayload(
       { ...ex, choice_group: ex.choice_group ?? null, note: ex.note ?? null },
-      { isLastInSession: index === exercises.length - 1 }
+      {
+        isLastInSession: index === exercises.length - 1,
+        bothSides: bothSidesByExerciseId.get(ex.exercise_id) ?? false,
+      }
     )
   );
+}
+
+async function loadBothSidesByExerciseId(
+  supabase: SupabaseClient,
+  exerciseIds: string[]
+): Promise<Map<string, boolean>> {
+  if (exerciseIds.length === 0) return new Map();
+  const { data } = await supabase.from("exercises").select("id, both_sides").in("id", exerciseIds);
+  return new Map((data ?? []).map((row) => [row.id as string, Boolean(row.both_sides)]));
 }
 
 export type SaveAiProgramResult = {
@@ -102,6 +115,11 @@ export async function saveAiProgram(
   const locationId = await resolveLocationId(supabase, proposal.location_slug);
   const slug = await uniqueProgramSlug(supabase, slugifyTitle(proposal.title));
 
+  const allProposalExerciseIds = [
+    ...new Set(expandedSessions.flatMap((s) => s.exercises.map((e) => e.exercise_id))),
+  ];
+  const bothSidesByExerciseId = await loadBothSidesByExerciseId(supabase, allProposalExerciseIds);
+
   let sessionPayloads: SessionPayload[] = expandedSessions.map((s) => ({
     name: s.name,
     description: s.description?.trim() || null,
@@ -111,7 +129,7 @@ export async function saveAiProgram(
         exercises: s.exercises,
         name: s.name,
       } as ProgramProposal["sessions"][number]),
-    exercises: toExercisePayload(s.exercises),
+    exercises: toExercisePayload(s.exercises, bothSidesByExerciseId),
   }));
 
   sessionPayloads = normalizeTrainingPlanSessionNames(sessionPayloads);

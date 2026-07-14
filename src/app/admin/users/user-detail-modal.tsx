@@ -21,7 +21,11 @@ import {
   formatTrainingDuration,
   formatTrainingTimestamp,
 } from "@/lib/admin/load-admin-user-detail";
-import { getAdminUserDetail } from "./actions";
+import {
+  ADMIN_PRO_GRANT_MONTHS,
+  type AdminProGrantMonths,
+} from "@/lib/admin/manage-pro-subscription";
+import { getAdminUserDetail, grantAdminUserPro, revokeAdminUserPro } from "./actions";
 import type { AdminUserRow } from "./users-list-client";
 
 function initials(name: string | null, email: string | null): string {
@@ -55,10 +59,64 @@ function DetailField({ label, value }: { label: string; value: string | null | u
   );
 }
 
-function UserDetailContent({ detail }: { detail: AdminUserDetail }) {
+function UserDetailContent({
+  detail,
+  onDetailChange,
+}: {
+  detail: AdminUserDetail;
+  onDetailChange: (detail: AdminUserDetail) => void;
+}) {
   const label = detail.fullName?.trim() || detail.email || "Unknown";
   const img = detail.profileImageUrl?.trim();
   const onboarded = Boolean(detail.onboardingCompletedAt);
+  const [grantMonths, setGrantMonths] = useState<AdminProGrantMonths>(12);
+  const [proAction, setProAction] = useState<"grant" | "revoke" | null>(null);
+  const [proError, setProError] = useState<string | null>(null);
+  const [proMessage, setProMessage] = useState<string | null>(null);
+
+  async function handleGrantPro() {
+    setProAction("grant");
+    setProError(null);
+    setProMessage(null);
+    const res = await grantAdminUserPro(detail.id, grantMonths);
+    setProAction(null);
+    if ("error" in res) {
+      setProError(res.error);
+      return;
+    }
+    onDetailChange(res.detail);
+    setProMessage(
+      res.detail.subscription.hasActivePro
+        ? `Pro access updated through ${formatJoined(res.detail.subscription.currentPeriodEnd!)}.`
+        : "Pro access granted."
+    );
+  }
+
+  async function handleRevokePro() {
+    if (
+      !window.confirm(
+        "Revoke this user's manual Pro access? Stripe-managed subscriptions must be canceled in Stripe."
+      )
+    ) {
+      return;
+    }
+    setProAction("revoke");
+    setProError(null);
+    setProMessage(null);
+    const res = await revokeAdminUserPro(detail.id);
+    setProAction(null);
+    if ("error" in res) {
+      setProError(res.error);
+      return;
+    }
+    onDetailChange(res.detail);
+    setProMessage("Manual Pro access revoked.");
+  }
+
+  const canRevokeManualPro =
+    detail.subscription.hasActivePro &&
+    !detail.isAdmin &&
+    !detail.subscription.isStripeManaged;
 
   return (
     <div className="space-y-6">
@@ -168,7 +226,64 @@ function UserDetailContent({ detail }: { detail: AdminUserDetail }) {
                 {detail.subscription.cancelAtPeriodEnd ? " (cancels at period end)" : ""}
               </p>
             )}
+            {detail.subscription.hasActivePro && detail.subscription.isStripeManaged && (
+              <p className="mt-0.5 text-xs text-gray-500">Managed by Stripe billing</p>
+            )}
+            {detail.subscription.hasActivePro && !detail.subscription.isStripeManaged && !detail.isAdmin && (
+              <p className="mt-0.5 text-xs text-gray-500">Manual / comp access</p>
+            )}
+            {detail.isAdmin && (
+              <p className="mt-0.5 text-xs text-gray-500">Admin accounts always have Pro access.</p>
+            )}
           </div>
+          {!detail.isAdmin && (
+            <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
+              <p className="text-xs font-medium text-gray-500">Manual Pro access</p>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-1 text-xs text-gray-600">
+                  Duration
+                  <select
+                    value={grantMonths}
+                    onChange={(e) => setGrantMonths(Number(e.target.value) as AdminProGrantMonths)}
+                    disabled={proAction !== null}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                  >
+                    {ADMIN_PRO_GRANT_MONTHS.map((months) => (
+                      <option key={months} value={months}>
+                        {months} month{months === 1 ? "" : "s"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void handleGrantPro()}
+                  disabled={proAction !== null}
+                  className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {proAction === "grant" && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {detail.subscription.hasActivePro ? "Extend Pro" : "Grant Pro"}
+                </button>
+                {canRevokeManualPro && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRevokePro()}
+                    disabled={proAction !== null}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {proAction === "revoke" && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Revoke Pro
+                  </button>
+                )}
+              </div>
+              {proError && (
+                <p className="text-sm text-red-700">{proError}</p>
+              )}
+              {proMessage && (
+                <p className="text-sm text-emerald-700">{proMessage}</p>
+              )}
+            </div>
+          )}
           {detail.enrollments.length > 0 && (
             <div>
               <p className="text-xs font-medium text-gray-500">Purchased programs</p>
@@ -419,7 +534,12 @@ export function UserDetailModal({
               {error}
             </div>
           )}
-          {detail && !loading && <UserDetailContent detail={detail} />}
+          {detail && !loading && (
+            <UserDetailContent
+              detail={detail}
+              onDetailChange={(next) => setDetail(next)}
+            />
+          )}
         </div>
       </div>
     </div>,

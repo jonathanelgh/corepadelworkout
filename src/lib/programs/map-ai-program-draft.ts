@@ -23,6 +23,7 @@ export type AiProgramExerciseRow = {
   sets: string;
   reps: string;
   restBetweenSetsSeconds: string;
+  restBetweenSidesSeconds: string;
   restAfterSeconds: string;
   note: string;
 };
@@ -180,6 +181,11 @@ export function mapGeminiDraftToForm(
           sets: intToField(ex.sets),
           reps: intToField(ex.reps),
           restBetweenSetsSeconds: intToField(ex.rest_between_sets_seconds),
+          restBetweenSidesSeconds: intToField(
+            "rest_between_sides_seconds" in ex
+              ? (ex as { rest_between_sides_seconds?: number | null }).rest_between_sides_seconds
+              : null
+          ),
           restAfterSeconds: intToField(ex.rest_after_seconds),
           note: "",
         });

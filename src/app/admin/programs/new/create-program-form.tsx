@@ -77,6 +77,10 @@ function exerciseProgramMode(
   return exercises.find((e) => e.id === exerciseId)?.programPrescriptionMode ?? "all";
 }
 
+function exerciseBothSides(exercises: ExerciseOption[], exerciseId: string): boolean {
+  return exercises.find((e) => e.id === exerciseId)?.bothSides ?? false;
+}
+
 function prescriptionOptionsForMode(mode: ExerciseProgramPrescriptionMode) {
   const allowed = new Set(allowedProgramPrescriptionTypes(mode));
   return PRESCRIPTION_OPTIONS.filter((opt) => allowed.has(opt.id));
@@ -95,6 +99,8 @@ export type SessionExerciseEntry = {
   reps: string;
   /** Seconds of rest between timed rounds */
   restBetweenSetsSeconds: string;
+  /** Seconds of rest when switching sides on bilateral timed exercises */
+  restBetweenSidesSeconds: string;
   /** Seconds of pause after this exercise before the next; empty = none */
   restAfterSeconds: string;
   /** Optional coach note shown during the workout */
@@ -170,6 +176,7 @@ function cloneSessionBlock(src: SessionBlock, name: string): SessionBlock {
       sets: e.sets,
       reps: e.reps,
       restBetweenSetsSeconds: e.restBetweenSetsSeconds,
+      restBetweenSidesSeconds: e.restBetweenSidesSeconds,
       restAfterSeconds: e.restAfterSeconds,
       note: e.note,
     })),
@@ -404,6 +411,7 @@ export function CreateProgramForm({
             sets: ex.sets,
             reps: ex.reps,
             restBetweenSetsSeconds: ex.restBetweenSetsSeconds,
+            restBetweenSidesSeconds: ex.restBetweenSidesSeconds ?? "",
             restAfterSeconds: ex.restAfterSeconds,
             note: ex.note ?? "",
           };
@@ -751,6 +759,7 @@ export function CreateProgramForm({
                   sets: "",
                   reps: "",
                   restBetweenSetsSeconds: "",
+                  restBetweenSidesSeconds: "",
                   restAfterSeconds: "",
                   note: "",
                 },
@@ -874,7 +883,7 @@ export function CreateProgramForm({
     trackKey: string,
     sessionKey: string,
     entryKey: string,
-    field: "durationValue" | "sets" | "reps" | "restBetweenSetsSeconds" | "restAfterSeconds",
+    field: "durationValue" | "sets" | "reps" | "restBetweenSetsSeconds" | "restBetweenSidesSeconds" | "restAfterSeconds",
     value: string
   ) {
     if (value !== "" && !/^\d*$/.test(value)) return;
@@ -1017,6 +1026,7 @@ export function CreateProgramForm({
             let sets: number | null = null;
             let reps: number | null = null;
             let rest_between_sets_seconds: number | null = null;
+            let rest_between_sides_seconds: number | null = null;
 
             if (prescriptionType === "time" || prescriptionType === "timed_intervals") {
               if (e.durationValue.trim() !== "") {
@@ -1050,6 +1060,16 @@ export function CreateProgramForm({
               }
             }
 
+            if (
+              (prescriptionType === "time" || prescriptionType === "timed_intervals") &&
+              exerciseBothSides(exercises, e.exerciseId)
+            ) {
+              if (e.restBetweenSidesSeconds.trim() !== "") {
+                const n = Number.parseInt(e.restBetweenSidesSeconds, 10);
+                if (Number.isFinite(n) && n > 0) rest_between_sides_seconds = n;
+              }
+            }
+
             let rest_after_seconds: number | null = null;
             if (e.restAfterSeconds.trim() !== "") {
               const n = Number.parseInt(e.restAfterSeconds, 10);
@@ -1063,6 +1083,7 @@ export function CreateProgramForm({
               sets,
               reps,
               rest_between_sets_seconds,
+              rest_between_sides_seconds,
               rest_after_seconds,
               session_phase: e.sessionPhase,
               choice_group: e.choiceGroup.trim() || null,
@@ -2156,6 +2177,7 @@ export function CreateProgramForm({
                               {session.exercises.map((entry, index) => {
                                 const exerciseMeta = exercises.find((e) => e.id === entry.exerciseId);
                                 const programMode = exerciseProgramMode(exercises, entry.exerciseId);
+                                const entryBothSides = exerciseBothSides(exercises, entry.exerciseId);
                                 const prescriptionOptions = prescriptionOptionsForMode(programMode);
                                 const activeType = clampProgramPrescriptionType(
                                   programMode,
@@ -2235,6 +2257,11 @@ export function CreateProgramForm({
                                         <p className="text-sm font-medium text-gray-900 truncate">
                                           {exerciseTitle(entry.exerciseId)}
                                         </p>
+                                        {entryBothSides && (
+                                          <p className="mt-1 text-xs font-medium text-violet-700">
+                                            Both sides — timed work runs left side, rest, then right side.
+                                          </p>
+                                        )}
                                         <div className="mt-3">
                                           <label
                                             htmlFor={`ex-note-${entry.key}`}
@@ -2360,60 +2387,90 @@ export function CreateProgramForm({
                                         )}
 
                                         {activeType === "time" && (
-                                          <div className="mt-3 max-w-xs">
-                                            <label
-                                              className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
-                                              htmlFor={`ex-dur-${entry.key}`}
-                                            >
-                                              Duration
-                                            </label>
-                                            <div className="flex gap-1">
-                                              <input
-                                                id={`ex-dur-${entry.key}`}
-                                                type="text"
-                                                inputMode="numeric"
-                                                pattern="[0-9]*"
-                                                value={entry.durationValue}
-                                                onChange={(e) =>
-                                                  setSessionExerciseNumericField(
-                                                    activeTrack.key,
-                                                    session.key,
-                                                    entry.key,
-                                                    "durationValue",
-                                                    e.target.value
-                                                  )
-                                                }
-                                                placeholder="—"
-                                                className="min-w-0 flex-1 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                                              />
-                                              <select
-                                                value={entry.durationUnit}
-                                                onChange={(e) =>
-                                                  setSessionExerciseDurationUnit(
-                                                    activeTrack.key,
-                                                    session.key,
-                                                    entry.key,
-                                                    e.target.value as ExerciseDurationUnit
-                                                  )
-                                                }
-                                                className="shrink-0 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
-                                                aria-label="Duration unit"
-                                              >
-                                                <option value="sec">Sec</option>
-                                                <option value="min">Min</option>
-                                              </select>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {activeType === "timed_intervals" && (
-                                          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:max-w-xl">
+                                          <div className={`mt-3 ${entryBothSides ? "grid max-w-xl grid-cols-2 gap-2" : "max-w-xs"}`}>
                                             <div>
                                               <label
                                                 className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
                                                 htmlFor={`ex-dur-${entry.key}`}
                                               >
-                                                Work
+                                                {entryBothSides ? "Work per side" : "Duration"}
+                                              </label>
+                                              <div className="flex gap-1">
+                                                <input
+                                                  id={`ex-dur-${entry.key}`}
+                                                  type="text"
+                                                  inputMode="numeric"
+                                                  pattern="[0-9]*"
+                                                  value={entry.durationValue}
+                                                  onChange={(e) =>
+                                                    setSessionExerciseNumericField(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      "durationValue",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  placeholder="—"
+                                                  className="min-w-0 flex-1 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                />
+                                                <select
+                                                  value={entry.durationUnit}
+                                                  onChange={(e) =>
+                                                    setSessionExerciseDurationUnit(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      e.target.value as ExerciseDurationUnit
+                                                    )
+                                                  }
+                                                  className="shrink-0 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                  aria-label="Duration unit"
+                                                >
+                                                  <option value="sec">Sec</option>
+                                                  <option value="min">Min</option>
+                                                </select>
+                                              </div>
+                                            </div>
+                                            {entryBothSides && (
+                                              <div>
+                                                <label
+                                                  className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                  htmlFor={`ex-rest-sides-${entry.key}`}
+                                                >
+                                                  Rest between sides (sec)
+                                                </label>
+                                                <input
+                                                  id={`ex-rest-sides-${entry.key}`}
+                                                  type="text"
+                                                  inputMode="numeric"
+                                                  pattern="[0-9]*"
+                                                  value={entry.restBetweenSidesSeconds}
+                                                  onChange={(e) =>
+                                                    setSessionExerciseNumericField(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      "restBetweenSidesSeconds",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  placeholder="15"
+                                                  className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {activeType === "timed_intervals" && (
+                                          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:max-w-3xl">
+                                            <div>
+                                              <label
+                                                className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                htmlFor={`ex-dur-${entry.key}`}
+                                              >
+                                                {entryBothSides ? "Work per side" : "Work"}
                                               </label>
                                               <div className="flex gap-1">
                                                 <input
@@ -2457,7 +2514,7 @@ export function CreateProgramForm({
                                                 className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
                                                 htmlFor={`ex-rest-between-${entry.key}`}
                                               >
-                                                Rest (sec)
+                                                {entryBothSides ? "Rest between rounds (sec)" : "Rest (sec)"}
                                               </label>
                                               <input
                                                 id={`ex-rest-between-${entry.key}`}
@@ -2504,6 +2561,34 @@ export function CreateProgramForm({
                                                 className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                                               />
                                             </div>
+                                            {entryBothSides && (
+                                              <div>
+                                                <label
+                                                  className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                  htmlFor={`ex-rest-sides-${entry.key}`}
+                                                >
+                                                  Rest between sides (sec)
+                                                </label>
+                                                <input
+                                                  id={`ex-rest-sides-${entry.key}`}
+                                                  type="text"
+                                                  inputMode="numeric"
+                                                  pattern="[0-9]*"
+                                                  value={entry.restBetweenSidesSeconds}
+                                                  onChange={(e) =>
+                                                    setSessionExerciseNumericField(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      "restBetweenSidesSeconds",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  placeholder="15"
+                                                  className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                />
+                                              </div>
+                                            )}
                                           </div>
                                         )}
 

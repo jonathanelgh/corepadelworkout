@@ -38,6 +38,11 @@ export type AdminUserWorkoutLogEntry = {
   completedAt: string | null;
 };
 
+export type AdminUserSubscriptionDetail = MemberSubscriptionStatus & {
+  subscriptionId: string | null;
+  isStripeManaged: boolean;
+};
+
 export type AdminUserDetail = {
   id: string;
   fullName: string | null;
@@ -53,7 +58,7 @@ export type AdminUserDetail = {
   envLabel: string;
   painsStr: string;
   isAdmin: boolean;
-  subscription: MemberSubscriptionStatus;
+  subscription: AdminUserSubscriptionDetail;
   enrollments: AdminUserEnrollment[];
   activePrograms: ActiveProgramSummary[];
   workoutLog: AdminUserWorkoutLogEntry[];
@@ -209,10 +214,17 @@ export async function loadAdminUserDetail(
   const { goalLabel, envLabel, painsStr } = profileLabels(p);
   const dateOfBirth = p.date_of_birth ?? null;
 
-  const [subscription, isAdmin, enrollRes, runsRes, completionsRes, activePrograms] =
+  const [subscription, isAdmin, proSubRes, enrollRes, runsRes, completionsRes, activePrograms] =
     await Promise.all([
       loadMemberSubscriptionStatus(supabase, userId),
       getIsAdminUser(supabase, userId),
+      supabase
+        .from("customer_subscriptions")
+        .select(
+          "id, status, current_period_end, stripe_subscription_id, subscription_plans!inner ( grants_all_programs )"
+        )
+        .eq("user_id", userId)
+        .order("current_period_end", { ascending: false }),
       supabase
         .from("program_enrollments")
         .select(
@@ -242,6 +254,32 @@ export async function loadAdminUserDetail(
         .eq("user_id", userId),
       loadUserActivePrograms(supabase, userId, profileEnv),
     ]);
+
+  type ProSubRow = {
+    id: string;
+    status: string;
+    current_period_end: string;
+    stripe_subscription_id: string | null;
+    subscription_plans: { grants_all_programs: boolean } | { grants_all_programs: boolean }[];
+  };
+
+  const now = Date.now();
+  const proRows = (proSubRes.data ?? []) as ProSubRow[];
+  const activeProRow = proRows.find((row) => {
+    const planRow = Array.isArray(row.subscription_plans)
+      ? row.subscription_plans[0]
+      : row.subscription_plans;
+    if (!planRow?.grants_all_programs) return false;
+    if (row.status !== "active" && row.status !== "trialing") return false;
+    return new Date(row.current_period_end).getTime() > now;
+  });
+  const latestProRow = activeProRow ?? proRows[0] ?? null;
+
+  const subscriptionDetail: AdminUserSubscriptionDetail = {
+    ...subscription,
+    subscriptionId: latestProRow?.id ?? null,
+    isStripeManaged: Boolean(latestProRow?.stripe_subscription_id?.trim()),
+  };
 
   const enrollments: AdminUserEnrollment[] = [];
   for (const row of enrollRes.data ?? []) {
@@ -292,7 +330,7 @@ export async function loadAdminUserDetail(
     envLabel,
     painsStr,
     isAdmin,
-    subscription,
+    subscription: subscriptionDetail,
     enrollments,
     activePrograms,
     workoutLog,

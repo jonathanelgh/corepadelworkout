@@ -9,7 +9,9 @@ export type ProgramExercisePayload = {
   sets: number | null;
   reps: number | null;
   rest_between_sets_seconds: number | null;
+  rest_between_sides_seconds: number | null;
   rest_after_seconds: number | null;
+  load_prescription: string | null;
   session_phase: SessionPhase;
   choice_group: string | null;
   note: string | null;
@@ -54,7 +56,9 @@ async function insertSessionExercises(
     sets: ex.sets,
     reps: ex.reps,
     rest_between_sets_seconds: ex.rest_between_sets_seconds,
+    rest_between_sides_seconds: ex.rest_between_sides_seconds,
     rest_after_seconds: ex.rest_after_seconds,
+    load_prescription: ex.load_prescription?.trim() || null,
     session_phase: ex.session_phase,
     choice_group: ex.choice_group,
     note: ex.note?.trim() || null,

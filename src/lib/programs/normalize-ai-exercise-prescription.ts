@@ -5,6 +5,7 @@ import {
 } from "@/lib/programs/program-exercises";
 import { parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 import { WARMUP_DURATION_SECONDS } from "@/lib/programs/warmup-prescription";
+import { DEFAULT_REST_BETWEEN_SIDES_SECONDS } from "@/lib/programs/program-exercises";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
@@ -13,7 +14,9 @@ export type AiExerciseFields = {
   sets?: number | null;
   reps?: number | null;
   rest_between_sets_seconds?: number | null;
+  rest_between_sides_seconds?: number | null;
   rest_after_seconds?: number | null;
+  load_prescription?: string | null;
 };
 
 function parseNonNegInt(v: unknown): number | null {
@@ -38,13 +41,27 @@ export function inferAiPrescriptionType(ex: AiExerciseFields): ExercisePrescript
 }
 
 const DEFAULT_REST_AFTER: Record<SessionPhase, number> = {
-  warmup: 20,
+  warmup: 15,
   main: 45,
   cooldown: 15,
 };
 
 const DEFAULT_REST_AFTER_TIMED = 30;
 const DEFAULT_REST_BETWEEN_SETS = 30;
+const DEFAULT_REST_BETWEEN_SIDES = DEFAULT_REST_BETWEEN_SIDES_SECONDS;
+
+/** Rest between left and right on bilateral timed exercises. */
+export function defaultRestBetweenSidesSeconds(
+  ex: AiExerciseFields,
+  opts?: { bothSides?: boolean }
+): number | null {
+  const explicit = parseNonNegInt(ex.rest_between_sides_seconds);
+  if (explicit != null && explicit > 0) return explicit;
+  if (!opts?.bothSides) return null;
+  const type = inferAiPrescriptionType(ex);
+  if (type === "time" || type === "timed_intervals") return DEFAULT_REST_BETWEEN_SIDES;
+  return null;
+}
 
 /** Rest before the next exercise in the session. */
 export function defaultRestAfterSeconds(
@@ -77,7 +94,7 @@ export function aiExerciseToProgramPayload(
     choice_group?: string | null;
     note?: string | null;
   },
-  opts: { isLastInSession: boolean }
+  opts: { isLastInSession: boolean; bothSides?: boolean }
 ): ProgramExercisePayload {
   let durationSeconds =
     ex.duration_seconds != null && ex.duration_seconds > 0
@@ -97,21 +114,34 @@ export function aiExerciseToProgramPayload(
     sets: ex.phase === "warmup" ? null : ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null,
     reps: ex.phase === "warmup" ? null : ex.reps != null && ex.reps > 0 ? Math.ceil(ex.reps) : null,
     rest_between_sets_seconds: defaultRestBetweenSetsSeconds(ex),
+    rest_between_sides_seconds: defaultRestBetweenSidesSeconds(ex, {
+      bothSides: opts.bothSides,
+    }),
     rest_after_seconds: defaultRestAfterSeconds(ex, opts),
+    load_prescription: ex.load_prescription?.trim() || null,
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
     note: ex.note ?? null,
   };
 }
 
-export function normalizeAiExerciseRest<T extends AiExerciseFields>(exercises: T[]): T[] {
-  return exercises.map((ex, index) => ({
-    ...ex,
-    rest_between_sets_seconds: defaultRestBetweenSetsSeconds(ex) ?? undefined,
-    rest_after_seconds: defaultRestAfterSeconds(ex, {
-      isLastInSession: index === exercises.length - 1,
-    }),
-  }));
+export function normalizeAiExerciseRest<T extends AiExerciseFields>(
+  exercises: T[],
+  opts?: { bothSidesByExerciseId?: Map<string, boolean> }
+): T[] {
+  return exercises.map((ex, index) => {
+    const exerciseId = "exercise_id" in ex && typeof ex.exercise_id === "string" ? ex.exercise_id : "";
+    const bothSides = opts?.bothSidesByExerciseId?.get(exerciseId) ?? false;
+    return {
+      ...ex,
+      rest_between_sets_seconds: defaultRestBetweenSetsSeconds(ex) ?? undefined,
+      rest_between_sides_seconds:
+        defaultRestBetweenSidesSeconds(ex, { bothSides }) ?? undefined,
+      rest_after_seconds: defaultRestAfterSeconds(ex, {
+        isLastInSession: index === exercises.length - 1,
+      }),
+    };
+  });
 }
 
 export type StoredProgramExerciseFields = {
@@ -121,6 +151,7 @@ export type StoredProgramExerciseFields = {
   sets: number | null;
   reps: number | null;
   rest_between_sets_seconds: number | null;
+  rest_between_sides_seconds?: number | null;
   rest_after_seconds: number | null;
 };
 
@@ -141,6 +172,7 @@ export function storedExerciseToAiFields(ex: StoredProgramExerciseFields): AiExe
     sets: ex.sets,
     reps: ex.reps,
     rest_between_sets_seconds: ex.rest_between_sets_seconds,
+    rest_between_sides_seconds: ex.rest_between_sides_seconds ?? null,
     rest_after_seconds: ex.rest_after_seconds,
   };
 }

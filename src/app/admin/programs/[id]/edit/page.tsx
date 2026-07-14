@@ -24,6 +24,7 @@ type ExerciseRow = {
   sets: number | null;
   reps: number | null;
   rest_between_sets_seconds: number | null;
+  rest_between_sides_seconds: number | null;
   rest_after_seconds: number | null;
   session_phase: "warmup" | "main" | "cooldown" | null;
   choice_group: string | null;
@@ -87,6 +88,10 @@ function mapSessionRow(
       restBetweenSetsSeconds:
         e.rest_between_sets_seconds != null && Number.isFinite(e.rest_between_sets_seconds)
           ? String(e.rest_between_sets_seconds)
+          : "",
+      restBetweenSidesSeconds:
+        e.rest_between_sides_seconds != null && Number.isFinite(e.rest_between_sides_seconds)
+          ? String(e.rest_between_sides_seconds)
           : "",
       restAfterSeconds:
         e.rest_after_seconds != null && Number.isFinite(e.rest_after_seconds)
@@ -270,6 +275,7 @@ export default async function EditProgramPage({ params }: PageProps) {
             sets,
             reps,
             rest_between_sets_seconds,
+            rest_between_sides_seconds,
             rest_after_seconds,
             session_phase,
             choice_group,

@@ -8,8 +8,9 @@ import {
 } from "@google/generative-ai";
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
-import { AI_COACH_METHODOLOGY_BLOCK } from "@/lib/programs/ai-coach-methodology";
+import { AI_COACH_PROGRAM_RULES_BLOCK } from "@/lib/programs/ai-program-rules";
 import { AI_COACH_WEEKLY_PROGRESSION_BLOCK } from "@/lib/programs/apply-weekly-progression";
+import { AI_COACH_METHODOLOGY_BLOCK } from "@/lib/programs/ai-coach-methodology";
 import { AI_COACH_WARMUP_RULES_BLOCK } from "@/lib/programs/warmup-prescription";
 import {
   parseChoiceGroup,
@@ -35,7 +36,9 @@ export type WorkoutProposalExercise = {
   sets?: number;
   reps?: number;
   rest_between_sets_seconds?: number;
+  rest_between_sides_seconds?: number;
   rest_after_seconds: number;
+  load_prescription?: string;
   note?: string;
 };
 
@@ -117,6 +120,9 @@ function buildSystemInstruction(
   }
   if (!out.includes("Warm-up prescription (mandatory")) {
     out += `\n\n${AI_COACH_WARMUP_RULES_BLOCK}`;
+  }
+  if (!out.includes("Program prescription rules (mandatory")) {
+    out += `\n\n${AI_COACH_PROGRAM_RULES_BLOCK}`;
   }
   if (!out.includes("Weekly progression (automatic on save)")) {
     out += `\n\n${AI_COACH_WEEKLY_PROGRESSION_BLOCK}`;
@@ -217,7 +223,12 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Optional coach note shown during the workout (e.g. increase load 5–10%, perform on both sides).",
+                  "Optional coach note shown during the workout (form cues, setup — not weekly load increases).",
+              },
+              load_prescription: {
+                type: SchemaType.STRING,
+                description:
+                  "Week-1 external load for weighted exercises (e.g. \"12 kg\", \"20 lb\", \"yellow band\"). The app scales numeric loads ~10% each week.",
               },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
@@ -278,7 +289,12 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Optional coach note shown during the workout (e.g. increase load 5–10%, perform on both sides).",
+                  "Optional coach note shown during the workout (form cues, setup — not weekly load increases).",
+              },
+              load_prescription: {
+                type: SchemaType.STRING,
+                description:
+                  "Week-1 external load for weighted exercises (e.g. \"12 kg\", \"20 lb\"). The app scales numeric loads ~10% each week on multi-week programs.",
               },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
@@ -319,7 +335,8 @@ function parseNonNegInt(v: unknown): number | null {
 
 function parseExerciseList(
   rawList: unknown,
-  catalogById: Map<string, string>
+  catalogById: Map<string, string>,
+  bothSidesByExerciseId: Map<string, boolean> = new Map()
 ): WorkoutProposalExercise[] {
   const exercises: WorkoutProposalExercise[] = [];
   const seenIds = new Set<string>();
@@ -336,6 +353,7 @@ function parseExerciseList(
 
     const restAfter = parseNonNegInt(ex.rest_after_seconds);
     const restBetween = parseNonNegInt(ex.rest_between_sets_seconds);
+    const loadRaw = ex.load_prescription;
 
     exercises.push({
       exercise_id,
@@ -343,6 +361,8 @@ function parseExerciseList(
       phase: parseSessionPhase(ex.phase),
       choice_group: parseChoiceGroup(ex.choice_group) ?? undefined,
       note: typeof ex.note === "string" && ex.note.trim() ? ex.note.trim() : undefined,
+      load_prescription:
+        typeof loadRaw === "string" && loadRaw.trim() ? loadRaw.trim() : undefined,
       duration_seconds:
         typeof ex.duration_seconds === "number" && Number.isFinite(ex.duration_seconds)
           ? Math.ceil(ex.duration_seconds)
@@ -358,25 +378,27 @@ function parseExerciseList(
     });
   }
 
-  return normalizeAiExerciseRest(exercises);
+  return normalizeAiExerciseRest(exercises, { bothSidesByExerciseId });
 }
 
 function parseWorkoutProposal(
   args: Record<string, unknown>,
-  catalogById: Map<string, string>
+  catalogById: Map<string, string>,
+  bothSidesByExerciseId: Map<string, boolean>
 ): WorkoutProposal | null {
   const title = typeof args.title === "string" ? args.title.trim() : "";
   const description = typeof args.description === "string" ? args.description.trim() : "";
   if (!title || !description) return null;
 
-  const exercises = parseExerciseList(args.exercises, catalogById);
+  const exercises = parseExerciseList(args.exercises, catalogById, bothSidesByExerciseId);
   if (exercises.length === 0) return null;
   return { title, description, exercises };
 }
 
 function parseProgramProposal(
   args: Record<string, unknown>,
-  catalogById: Map<string, string>
+  catalogById: Map<string, string>,
+  bothSidesByExerciseId: Map<string, boolean>
 ): ProgramProposal | null {
   const title = typeof args.title === "string" ? args.title.trim() : "";
   const description = typeof args.description === "string" ? args.description.trim() : "";
@@ -392,7 +414,7 @@ function parseProgramProposal(
       const name = typeof row.name === "string" ? row.name.trim() : "";
       if (!name) continue;
 
-      const exercises = parseExerciseList(row.exercises, catalogById);
+      const exercises = parseExerciseList(row.exercises, catalogById, bothSidesByExerciseId);
       if (exercises.length === 0) continue;
 
       sessions.push({
@@ -452,6 +474,7 @@ export async function chatWithAiCoach(params: {
   programsCatalog: ProgramCatalogForAI[];
   exerciseCatalog: string;
   catalogById: Map<string, string>;
+  bothSidesByExerciseId?: Map<string, boolean>;
   systemPromptTemplate: string;
   userContextBlock: string;
   extraTemplateVars?: Record<string, string>;
@@ -566,11 +589,19 @@ export async function chatWithAiCoach(params: {
         if (parsed) return { type: "functionCall", name: "recommend_programs", args: parsed };
       }
       if (fc.name === "generate_workout") {
-        const parsed = parseWorkoutProposal(args, params.catalogById);
+        const parsed = parseWorkoutProposal(
+          args,
+          params.catalogById,
+          params.bothSidesByExerciseId ?? new Map()
+        );
         if (parsed) return { type: "functionCall", name: "generate_workout", args: parsed };
       }
       if (fc.name === "generate_program") {
-        const parsed = parseProgramProposal(args, params.catalogById);
+        const parsed = parseProgramProposal(
+          args,
+          params.catalogById,
+          params.bothSidesByExerciseId ?? new Map()
+        );
         if (parsed) return { type: "functionCall", name: "generate_program", args: parsed };
       }
     }
@@ -605,7 +636,7 @@ export async function chatWithAiCoach(params: {
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
       `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
-      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs at least 4 warmup exercises (duration_seconds: 60 each), main (include rotation or anti-rotation), and cooldown.`,
+      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs at least 5 warmup exercises (duration_seconds: 60 each), main (include rotation or anti-rotation), and cooldown (≥5 at 60s).`,
       `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
     ];
 

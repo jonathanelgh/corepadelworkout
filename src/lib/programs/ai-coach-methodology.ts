@@ -57,7 +57,7 @@ Every workout must follow this order:
 5. **Accessory & Injury Prevention** (3–5 min) — Shoulders, elbows, hips, knees, ankles.
 6. **Dynamic Cool-Down & Mobility** (3–5 min) — Mobility and recovery-focused movements.
 
-**Beginner progressive overload:** Keep the same core exercises for the full 4-week block. Each week increase only ONE variable: weight OR reps OR sets (never multiple in the same week). Add exactly one new exercise per workout per week for variety without sacrificing movement quality.
+**Beginner progressive overload:** Keep the same core exercises for the full block. The app applies weekly progression from your week-1 template — for strength, **one lever per week** (reps or sets or load). Add at most one new exercise per week for variety.
 
 ### Mandatory workout structure — INTERMEDIATE
 
@@ -70,7 +70,7 @@ Every workout must follow this order:
 5. **Accessory Strength & Injury Prevention** (5–8 min) — Shoulder health, core endurance, grip strength, hip stability.
 6. **Mobility & Recovery** (3–5 min) — Dynamic mobility, flexibility, controlled breathing.
 
-**Intermediate progressive overload:** Same core exercises for 4 weeks. Each week increase only ONE variable: weight OR reps OR sets OR tempo (when appropriate). Never multiple in the same week. Add exactly one new exercise per workout per week.
+**Intermediate progressive overload:** Same core exercises for the block. The app applies weekly progression from your week-1 template — strength moves progress one lever per week (reps, sets, or load). Add at most one new exercise per week.
 
 ### Mandatory workout structure — ADVANCED
 
@@ -83,12 +83,13 @@ Every workout must follow this order:
 5. **Performance Accessory & Injury Prevention** (5–8 min) — Shoulders, elbows, hips, knees, ankles, grip strength, trunk stability; durability and season-long joint health.
 6. **Mobility, Recovery & Regeneration** (3–5 min) — Recovery-focused mobility and flexibility.
 
-**Advanced progressive overload:** Same core exercises for 4 weeks. Each week increase only ONE variable: weight OR reps OR sets OR movement complexity OR training intensity. Never multiple in the same week. Add exactly one new exercise per workout per week.
+**Advanced progressive overload:** Same core exercises for the block. The app applies weekly progression from your week-1 template — strength moves progress one lever per week (reps, sets, or load). Add at most one new exercise per week.
 
 ### Coach notes and bilateral exercises
 
-- When prescribing progressive overload week-to-week, include a coach **note** on relevant strength exercises telling the athlete to increase load by **5–10%** when they can complete all prescribed sets and reps with good form.
-- For catalog exercises tagged **both_sides**: add a coach **note** that the exercise is performed on both sides, and **adapt** duration, sets, reps, or timed sets so total work accounts for both sides (e.g. timed hold per side, or sets × 2 when appropriate).
+- When prescribing progressive overload week-to-week, set week-1 **load_prescription** on weighted strength exercises (e.g. \`12 kg\`). The app auto-scales **one strength lever per week** (reps, sets, or load) — do **not** put "increase load 5–10%" in \`note\`.
+- For catalog exercises tagged **both_sides** on **timed** prescriptions: set **duration_seconds** as the work time **per side** (left then right). The app runs left-side timer → rest → right-side timer automatically. Set **rest_between_sides_seconds** to 10–20s for the switch (or leave blank for the 15s default). Use **rest_between_sets_seconds** only for rest **between full left+right rounds** when you prescribe multiple timed rounds. Do **not** double duration_seconds to account for both sides.
+- For **both_sides** on sets & reps: add a coach **note** to perform both sides; reps are per side unless noted otherwise.
 - Use the per-exercise **note** field on generate_workout and generate_program exercises for these coach cues.
 
 ${AI_COACH_WARMUP_RULES_BLOCK}`.trim();
