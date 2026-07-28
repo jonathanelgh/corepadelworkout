@@ -2333,7 +2333,7 @@ export function CreateProgramForm({
                                         </p>
                                         {entryBothSides && (
                                           <p className="mt-1 text-xs font-medium text-violet-700">
-                                            Both sides — timed work runs left side, rest, then right side.
+                                            Both sides — enter total work time; the player splits it evenly (left → rest → right).
                                           </p>
                                         )}
                                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2492,7 +2492,7 @@ export function CreateProgramForm({
                                                 className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
                                                 htmlFor={`ex-dur-${entry.key}`}
                                               >
-                                                {entryBothSides ? "Work per side" : "Duration"}
+                                                {entryBothSides ? "Total time (both sides)" : "Duration"}
                                               </label>
                                               <div className="flex gap-1">
                                                 <input
@@ -2569,7 +2569,7 @@ export function CreateProgramForm({
                                                 className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
                                                 htmlFor={`ex-dur-${entry.key}`}
                                               >
-                                                {entryBothSides ? "Work per side" : "Work"}
+                                                {entryBothSides ? "Total work (both sides)" : "Work"}
                                               </label>
                                               <div className="flex gap-1">
                                                 <input

@@ -124,6 +124,21 @@ export function workDurationSeconds(ex: ProgramExerciseItem): number {
   return 60;
 }
 
+/**
+ * For both_sides timed work, `duration_seconds` is TOTAL work across both sides.
+ * Split evenly (left gets floor, right gets the remainder so they sum to total).
+ */
+export function bothSidesPerSideDurations(totalSeconds: number): { left: number; right: number } {
+  const total = Math.max(2, Math.round(totalSeconds));
+  const left = Math.max(1, Math.floor(total / 2));
+  const right = Math.max(1, total - left);
+  return { left, right };
+}
+
+export function bothSidesPerSideWorkSeconds(totalSeconds: number): number {
+  return bothSidesPerSideDurations(totalSeconds).left;
+}
+
 export function hasRestBetweenSets(ex: ProgramExerciseItem): boolean {
   return restBetweenSetsSeconds(ex) > 0;
 }
@@ -166,8 +181,10 @@ export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
 
   if (ex.bothSides && exerciseUsesTimedPlayback(ex) && workSecs != null) {
     const rounds = sets != null && sets > 0 ? sets : 1;
+    const perSide = bothSidesPerSideWorkSeconds(workSecs);
     const parts = [
-      `${formatWorkDurationShort(workSecs)} per side`,
+      `${formatWorkDurationShort(workSecs)} total`,
+      `${formatWorkDurationShort(perSide)}/side`,
       `${sideRest}s switch`,
     ];
     if (rounds > 1) {

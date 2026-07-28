@@ -112,7 +112,7 @@ Do not call tools for casual conversation. Never call generate_program.
 - For generate_workout: exactly 5 warmup, main (include rotation or anti-rotation; prep before explosive), exactly 5 cooldown; phase on every exercise.
 - Use ONLY exercises from the catalog below. Copy exercise_id UUIDs exactly.
 - REQUIRED: at least one rotational or anti-rotational exercise in the main block.
-- Use structured rest fields matching the tag rest band. both_sides: reps/duration_seconds are PER SIDE.
+- Use structured rest fields matching the tag rest band. both_sides: reps are PER SIDE; duration_seconds is TOTAL for both sides (split evenly).
 - Omit \`note\` for member-generated sessions. Never put progression instructions in notes (including "add weight").
 
 {{methodology_block}}

@@ -1,11 +1,13 @@
 import type { ProgramExerciseItem } from "@/lib/programs/program-exercises";
 import {
+  bothSidesPerSideDurations,
   exerciseUsesTimedPlayback,
   hasRestBetweenSets,
   restBetweenSetsSeconds,
   restBetweenSidesSeconds,
   restDurationSeconds,
   setsCount,
+  workDurationSeconds,
 } from "@/lib/programs/program-exercises";
 
 export type WorkoutSide = "left" | "right";
@@ -60,6 +62,8 @@ export function expandWorkoutPlaybackPlaylist(
     const sideRest = restBetweenSidesSeconds(ex);
     const roundRest = hasRestBetweenSets(ex) ? restBetweenSetsSeconds(ex) : 0;
     const exerciseRest = !isLastExercise ? restDurationSeconds(ex) : 0;
+    // duration_seconds is TOTAL for both sides — split evenly for playback.
+    const { left: leftSecs, right: rightSecs } = bothSidesPerSideDurations(workDurationSeconds(ex));
 
     for (let round = 1; round <= rounds; round++) {
       const sides: WorkoutSide[] = ["left", "right"];
@@ -67,6 +71,7 @@ export function expandWorkoutPlaybackPlaylist(
         const side = sides[sideIndex]!;
         const isLastSide = side === "right";
         const isLastRound = round === rounds;
+        const sideSecs = side === "left" ? leftSecs : rightSecs;
 
         let postRest = 0;
         let postKind: PostWorkRestKind | null = null;
@@ -84,6 +89,8 @@ export function expandWorkoutPlaybackPlaylist(
 
         steps.push({
           ...ex,
+          durationSeconds: sideSecs,
+          durationMinutes: null,
           playbackKey: `${ex.id}-r${round}-${side}`,
           workoutSide: side,
           playbackSet: round,

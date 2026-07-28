@@ -202,7 +202,7 @@ const TOOLS: FunctionDeclaration[] = [
               duration_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Timed work in seconds. For both_sides catalog exercises this is PER SIDE. Warm-up/cool-down typically 30–60s.",
+                  "Timed work in seconds. For both_sides catalog exercises this is TOTAL for both sides (app splits evenly, e.g. 60 → 30s each). Warm-up/cool-down typically 30–60s.",
               },
               duration_minutes: { type: SchemaType.NUMBER, description: "Avoid — prefer duration_seconds" },
               sets: { type: SchemaType.NUMBER, description: "Sets (fixed across the 8-week block — do not plan set progression)" },
@@ -277,7 +277,7 @@ const TOOLS: FunctionDeclaration[] = [
               duration_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Timed work in seconds. For both_sides: PER SIDE. Warm-up/cool-down typically 30–60s.",
+                  "Timed work in seconds. For both_sides: TOTAL for both sides (split evenly). Warm-up/cool-down typically 30–60s.",
               },
               duration_minutes: { type: SchemaType.NUMBER, description: "Avoid — prefer duration_seconds" },
               sets: { type: SchemaType.NUMBER, description: "Sets for strength work" },
