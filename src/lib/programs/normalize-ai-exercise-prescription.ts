@@ -6,6 +6,7 @@ import {
 import { parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 import { WARMUP_DURATION_SECONDS } from "@/lib/programs/warmup-prescription";
 import { DEFAULT_REST_BETWEEN_SIDES_SECONDS } from "@/lib/programs/program-exercises";
+import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
@@ -17,6 +18,7 @@ export type AiExerciseFields = {
   rest_between_sides_seconds?: number | null;
   rest_after_seconds?: number | null;
   load_prescription?: string | null;
+  note?: string | null;
 };
 
 function parseNonNegInt(v: unknown): number | null {
@@ -96,6 +98,11 @@ export function aiExerciseToProgramPayload(
   },
   opts: { isLastInSession: boolean; bothSides?: boolean }
 ): ProgramExercisePayload {
+  const cleaned = promoteProgressionOutOfNote({
+    note: ex.note ?? null,
+    load_prescription: ex.load_prescription ?? null,
+  });
+
   let durationSeconds =
     ex.duration_seconds != null && ex.duration_seconds > 0
       ? Math.ceil(ex.duration_seconds)
@@ -118,10 +125,10 @@ export function aiExerciseToProgramPayload(
       bothSides: opts.bothSides,
     }),
     rest_after_seconds: defaultRestAfterSeconds(ex, opts),
-    load_prescription: ex.load_prescription?.trim() || null,
+    load_prescription: cleaned.load_prescription,
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
-    note: ex.note ?? null,
+    note: cleaned.note,
   };
 }
 
@@ -132,8 +139,14 @@ export function normalizeAiExerciseRest<T extends AiExerciseFields>(
   return exercises.map((ex, index) => {
     const exerciseId = "exercise_id" in ex && typeof ex.exercise_id === "string" ? ex.exercise_id : "";
     const bothSides = opts?.bothSidesByExerciseId?.get(exerciseId) ?? false;
+    const cleaned = promoteProgressionOutOfNote({
+      note: ex.note ?? null,
+      load_prescription: ex.load_prescription ?? null,
+    });
     return {
       ...ex,
+      note: cleaned.note ?? undefined,
+      load_prescription: cleaned.load_prescription ?? undefined,
       rest_between_sets_seconds: defaultRestBetweenSetsSeconds(ex) ?? undefined,
       rest_between_sides_seconds:
         defaultRestBetweenSidesSeconds(ex, { bothSides }) ?? undefined,

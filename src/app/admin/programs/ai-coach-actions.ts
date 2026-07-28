@@ -16,6 +16,7 @@ import {
   type ProgramCatalogRow,
 } from "@/lib/programs/programs-catalog";
 import { formatExerciseCatalogForPrompt, loadProgramAiContext, type ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
+import { filterCatalogByTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 import {
   listMembersForAiPicker,
   loadProfileAiContext,
@@ -48,6 +49,11 @@ import {
   ensureWorkoutProposalStructure,
   resolveSessionEnforcementOptions,
 } from "@/lib/programs/ensure-session-structure";
+import {
+  debugLogFromProgram,
+  debugLogFromWorkout,
+  type AiGenerationDebugLog,
+} from "@/lib/programs/ai-generation-debug";
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
 import { saveAiProgram } from "@/lib/programs/save-ai-program";
 import { generateProgramCoverImage } from "@/lib/programs/generate-program-cover";
@@ -108,8 +114,8 @@ export type SendAiCoachMessageResult =
       introText: string;
       programs: ProgramCatalogRow[];
     }
-  | { type: "workout_proposal"; proposal: WorkoutProposal }
-  | { type: "program_proposal"; proposal: ProgramProposal }
+  | { type: "workout_proposal"; proposal: WorkoutProposal; debugLog: AiGenerationDebugLog }
+  | { type: "program_proposal"; proposal: ProgramProposal; debugLog: AiGenerationDebugLog }
   | { error: string };
 
 export async function sendAiCoachMessage(input: {
@@ -183,26 +189,6 @@ export async function sendAiCoachMessage(input: {
       }
     }
 
-    const generationExercises =
-      inCreateFlow && consultationComplete
-        ? exercisesForLocation(
-            publishedExercises,
-            consultation.locationSlug,
-            locations
-          )
-        : publishedExercises;
-
-    const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
-    const bothSidesByExerciseId = new Map(
-      generationExercises.map((e) => [e.id, e.bothSides])
-    );
-    const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
-
-    const fullHistory: ChatHistoryMessage[] = [
-      ...input.history,
-      { role: "user", parts: [{ text: userMessage }] },
-    ];
-
     const systemPromptTemplate = await loadAiPrompt(auth.supabase, "ai_coach_system");
     const profileContext = input.targetUserId
       ? await loadProfileAiContext(auth.supabase, input.targetUserId)
@@ -218,6 +204,30 @@ export async function sendAiCoachMessage(input: {
       athleteContext: userContextBlock,
       goal: consultation.goal,
     });
+    const levelCap = enforcementOptions.trainingLevel ?? "beginner";
+
+    const generationExercises = filterCatalogByTrainingLevel(
+      inCreateFlow && consultationComplete
+        ? exercisesForLocation(
+            publishedExercises,
+            consultation.locationSlug,
+            locations
+          )
+        : publishedExercises,
+      levelCap
+    );
+
+    const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
+    const bothSidesByExerciseId = new Map(
+      generationExercises.map((e) => [e.id, e.bothSides])
+    );
+    const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
+
+    const fullHistory: ChatHistoryMessage[] = [
+      ...input.history,
+      { role: "user", parts: [{ text: userMessage }] },
+    ];
+
     const consultationBrief = inCreateFlow
       ? formatConsultationGuide(consultation, isProgram, equipmentLibrary)
       : undefined;
@@ -325,45 +335,67 @@ export async function sendAiCoachMessage(input: {
     }
 
     if (result.name === "generate_workout") {
+      const rawProposal = result.args;
       const { proposal: rotated, warnings: rotationWarnings } = ensureWorkoutProposalRotation(
-        result.args,
-        publishedExercises
+        rawProposal,
+        generationExercises,
+        { trainingLevel: enforcementOptions.trainingLevel }
       );
       const { proposal, warnings: structureWarnings } = ensureWorkoutProposalStructure(
         rotated,
-        publishedExercises,
+        generationExercises,
         enforcementOptions
       );
       const allWarnings = [...rotationWarnings, ...structureWarnings];
       if (allWarnings.length > 0) {
         console.info("[ai-coach] workout enforcement:", allWarnings.join(" "));
       }
-      return { type: "workout_proposal", proposal };
+      const debugLog = debugLogFromWorkout({
+        catalog: generationExercises,
+        raw: rawProposal,
+        final: proposal,
+        enforcementChanges: allWarnings,
+        trainingLevel: enforcementOptions.trainingLevel ?? null,
+        locationSlug: enforcementOptions.locationSlug ?? null,
+        goal: consultation.goal ?? null,
+      });
+      return { type: "workout_proposal", proposal, debugLog };
     }
 
+    const rawProgramArgs = {
+      ...result.args,
+      duration_weeks: consultation.durationWeeks ?? 8,
+      sessions_per_week: consultation.sessionsPerWeek ?? result.args.sessions_per_week,
+      minutes_per_session: consultation.minutes ?? result.args.minutes_per_session,
+      location_slug:
+        consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
+          ? consultation.locationSlug
+          : result.args.location_slug,
+    };
     const { proposal: rotated, warnings: rotationWarnings } = ensureProgramProposalRotation(
-      {
-        ...result.args,
-        duration_weeks: consultation.durationWeeks ?? result.args.duration_weeks,
-        sessions_per_week: consultation.sessionsPerWeek ?? result.args.sessions_per_week,
-        minutes_per_session: consultation.minutes ?? result.args.minutes_per_session,
-        location_slug:
-          consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
-            ? consultation.locationSlug
-            : result.args.location_slug,
-      },
-      publishedExercises
+      rawProgramArgs,
+      generationExercises,
+      { trainingLevel: enforcementOptions.trainingLevel }
     );
     const { proposal, warnings: structureWarnings } = ensureProgramProposalStructure(
       rotated,
-      publishedExercises,
+      generationExercises,
       enforcementOptions
     );
     const allWarnings = [...rotationWarnings, ...structureWarnings];
     if (allWarnings.length > 0) {
       console.info("[ai-coach] program enforcement:", allWarnings.join(" "));
     }
-    return { type: "program_proposal", proposal };
+    const debugLog = debugLogFromProgram({
+      catalog: generationExercises,
+      raw: rawProgramArgs,
+      final: proposal,
+      enforcementChanges: allWarnings,
+      trainingLevel: enforcementOptions.trainingLevel ?? null,
+      locationSlug: proposal.location_slug ?? null,
+      goal: consultation.goal ?? null,
+    });
+    return { type: "program_proposal", proposal, debugLog };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Chat failed." };
   }
@@ -396,18 +428,37 @@ export type SaveAiWorkoutResult =
 
 export async function saveAiCoachProgram(
   proposal: ProgramProposal,
-  options?: { publish?: boolean; generateCover?: boolean }
+  options?: {
+    publish?: boolean;
+    generateCover?: boolean;
+    trainingLevel?: string | null;
+  }
 ): Promise<SaveAiCoachProgramResult> {
   const auth = await requireAdmin();
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   try {
+    // Round-trip through JSON so the server action never receives non-serializable client junk.
+    const cleanProposal = JSON.parse(JSON.stringify(proposal)) as ProgramProposal;
+    if (!cleanProposal?.sessions?.length) {
+      return { error: "Program has no sessions to save." };
+    }
+
     const ctx = await loadProgramAiContext(auth.supabase);
     const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
     const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
+    const trainingLevel = isOnboardingLevel(options?.trainingLevel)
+      ? options.trainingLevel
+      : null;
 
-    const { proposal: rotated } = ensureProgramProposalRotation(proposal, publishedExercises);
-    const { proposal: fixed } = ensureProgramProposalStructure(rotated, publishedExercises);
+    // Light touch on save: keep AI draft structure, only ensure weeks/defaults.
+    // Full warm-up/tag enforcement already ran at generation time.
+    const fixed: ProgramProposal = {
+      ...cleanProposal,
+      duration_weeks: Math.max(8, Math.floor(cleanProposal.duration_weeks || 8)),
+      sessions_per_week: Math.max(1, Math.floor(cleanProposal.sessions_per_week || 3)),
+      design_rationale: undefined,
+    };
 
     const saved = await saveAiProgram(auth.supabase, fixed, {
       status: options?.publish ? "published" : "draft",
@@ -415,10 +466,15 @@ export async function saveAiCoachProgram(
       durationWeeks: fixed.duration_weeks,
       sessionsPerWeek: fixed.sessions_per_week,
       minutesPerSession: fixed.minutes_per_session,
+      trainingLevel,
     });
 
-    revalidatePath("/admin/programs");
-    revalidatePath("/programs");
+    try {
+      revalidatePath("/admin/programs");
+      revalidatePath("/programs");
+    } catch (revalidateErr) {
+      console.warn("[saveAiCoachProgram] revalidate failed:", revalidateErr);
+    }
 
     const generateCover = options?.generateCover !== false;
     if (generateCover) {
@@ -444,6 +500,7 @@ export async function saveAiCoachProgram(
       status: saved.status,
     };
   } catch (e) {
+    console.error("[saveAiCoachProgram]", e);
     return { error: e instanceof Error ? e.message : "Could not save program." };
   }
 }

@@ -3,8 +3,8 @@ import type { OnboardingLevel } from "@/lib/member/onboarding";
 import type { WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
 import {
   catalogEntryHasTag,
-  clampMainRestSeconds,
-  defaultMainRestAfterSeconds,
+  clampRestToBand,
+  defaultRestForEntry,
   defaultStrengthSetsReps,
   detectRehabFocus,
   exerciseIsHighIntensityStart,
@@ -13,14 +13,19 @@ import {
   exerciseMatchesLocation,
   exerciseNeedsMainBlockRest,
   kineticChainBodyParts,
+  resolveRestBand,
+  sessionHasCoreBlock,
   type RehabFocus,
 } from "@/lib/programs/program-prescription-rules";
+import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
 export type ProgramRulesContext = {
   trainingLevel?: OnboardingLevel | null;
   title?: string;
   description?: string;
   goal?: string;
+  /** Override per-session footwork floor (default 1). Weekly 2/1/2 uses 2,1,2. */
+  minFootworkPerSession?: number;
 };
 
 function catalogById(
@@ -35,14 +40,19 @@ function pickFromCatalog(
   excludeIds: Set<string>,
   score: (entry: ExerciseCatalogEntry) => number,
   count: number,
-  locationSlug?: string
+  locationSlug?: string,
+  trainingLevel?: OnboardingLevel | null,
+  opts?: { require?: (entry: ExerciseCatalogEntry) => boolean }
 ): ExerciseCatalogEntry[] {
+  const level = trainingLevel ?? "beginner";
   const pool = catalog
     .filter(
       (e) =>
         e.status === "published" &&
         !excludeIds.has(e.id) &&
-        exerciseMatchesLocation(e, locationSlug)
+        exerciseMatchesLocation(e, locationSlug) &&
+        exerciseEligibleForTrainingLevel(e, level) &&
+        (opts?.require ? opts.require(e) : true)
     )
     .sort((a, b) => score(a) - score(b));
   return pool.slice(0, count);
@@ -56,11 +66,14 @@ function cooldownScore(entry: ExerciseCatalogEntry): number {
   return score;
 }
 
-function coreScore(entry: ExerciseCatalogEntry): number {
+function mainBlockScore(entry: ExerciseCatalogEntry): number {
   let score = 100;
-  if (catalogEntryHasTag(entry, "core")) score -= 60;
-  if (exerciseIsStrength(entry)) score -= 10;
-  if (entry.programPrescriptionMode === "sets_reps_only") score -= 5;
+  // Prefer real training moves over pure mobility for the main ("core") block.
+  if (catalogEntryHasTag(entry, "mobility")) score += 40;
+  if (catalogEntryHasTag(entry, "footwork")) score -= 20;
+  if (exerciseIsStrength(entry)) score -= 25;
+  if (entry.programPrescriptionMode === "sets_reps_only") score -= 15;
+  if (entry.programPrescriptionMode === "time_only") score += 10;
   return score;
 }
 
@@ -170,16 +183,26 @@ function applyMainRest(
   entry: ExerciseCatalogEntry,
   level: OnboardingLevel
 ): WorkoutProposalExercise {
-  if (ex.phase !== "main" || !exerciseNeedsMainBlockRest(entry)) return ex;
+  if (ex.phase !== "main") {
+    const band = resolveRestBand(entry, ex.phase);
+    const after =
+      ex.rest_after_seconds > 0
+        ? clampRestToBand(ex.rest_after_seconds, band)
+        : band.default;
+    return { ...ex, rest_after_seconds: after };
+  }
+
+  if (!exerciseNeedsMainBlockRest(entry) && !exerciseIsStrength(entry)) return ex;
+
+  const band = resolveRestBand(entry, "main");
+  const fallback = defaultRestForEntry(entry, "main", level);
   const targetAfter =
-    ex.rest_after_seconds > 0
-      ? clampMainRestSeconds(ex.rest_after_seconds, level)
-      : defaultMainRestAfterSeconds(level);
+    ex.rest_after_seconds > 0 ? clampRestToBand(ex.rest_after_seconds, band) : fallback;
   const targetBetween =
     ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
-      ? clampMainRestSeconds(ex.rest_between_sets_seconds, level)
+      ? clampRestToBand(ex.rest_between_sets_seconds, band)
       : ex.sets != null && ex.sets > 1
-        ? defaultMainRestAfterSeconds(level)
+        ? fallback
         : ex.rest_between_sets_seconds;
   return {
     ...ex,
@@ -194,7 +217,8 @@ function ensureSafeMainStart(
   usedIds: Set<string>,
   locationSlug: string | undefined,
   sessionLabel: string | undefined,
-  warnings: string[]
+  warnings: string[],
+  trainingLevel?: OnboardingLevel | null
 ): WorkoutProposalExercise[] {
   const mainIndices = exercises
     .map((ex, index) => ({ ex, index }))
@@ -226,7 +250,14 @@ function ensureSafeMainStart(
     return out;
   }
 
-  const pick = pickFromCatalog(catalog, usedIds, safeMainStartScore, 1, locationSlug)[0];
+  const pick = pickFromCatalog(
+    catalog,
+    usedIds,
+    safeMainStartScore,
+    1,
+    locationSlug,
+    trainingLevel
+  )[0];
   if (!pick) {
     warnings.push(
       sessionLabel
@@ -252,7 +283,8 @@ function ensureKineticChain(
   usedIds: Set<string>,
   locationSlug: string | undefined,
   sessionLabel: string | undefined,
-  warnings: string[]
+  warnings: string[],
+  trainingLevel?: OnboardingLevel | null
 ): WorkoutProposalExercise[] {
   let out = exercises;
   for (const part of kineticChainBodyParts(focus)) {
@@ -267,7 +299,8 @@ function ensureKineticChain(
       usedIds,
       (entry) => kineticChainScore(entry, part),
       1,
-      locationSlug
+      locationSlug,
+      trainingLevel
     )[0];
     if (!pick) {
       warnings.push(
@@ -302,26 +335,63 @@ export function applyProgramRulesToSession(
   const warnings: string[] = [];
   const sessionLabel = options?.sessionLabel?.trim();
   const level = options?.trainingLevel ?? "beginner";
-  const usedIds = new Set(exercises.map((e) => e.exercise_id));
-  let out = [...exercises];
+  let out = exercises.filter((ex) => {
+    const entry = catalogById(catalog, ex.exercise_id);
+    if (!entry) return true;
+    if (exerciseEligibleForTrainingLevel(entry, level)) return true;
+    warnings.push(
+      sessionLabel
+        ? `${sessionLabel}: Removed ${entry.title} — above ${level} exercise level.`
+        : `Removed ${entry.title} — above ${level} exercise level.`
+    );
+    return false;
+  });
+  const usedIds = new Set(out.map((e) => e.exercise_id));
 
-  if (!sessionHasTag(out, catalog, "core")) {
-    const pick = pickFromCatalog(catalog, usedIds, coreScore, 1, options?.locationSlug)[0];
+  // "Core" = main block (not warm-up / cool-down). Ensure at least one main exercise.
+  if (!sessionHasCoreBlock(out)) {
+    const pick = pickFromCatalog(
+      catalog,
+      usedIds,
+      mainBlockScore,
+      1,
+      options?.locationSlug,
+      level,
+      {
+        require: (e) =>
+          !catalogEntryHasTag(e, "mobility") || catalogEntryHasTag(e, "footwork") || exerciseIsStrength(e),
+      }
+    )[0];
     if (pick) {
       usedIds.add(pick.id);
       out = insertIntoMain(out, [defaultMainExercise(pick)]);
       warnings.push(
         sessionLabel
-          ? `${sessionLabel}: Added ${pick.title} — every session needs at least one core exercise.`
-          : `Added ${pick.title} — every session needs at least one core exercise.`
+          ? `${sessionLabel}: Added ${pick.title} to the main (core) block.`
+          : `Added ${pick.title} to the main (core) block.`
+      );
+    } else {
+      warnings.push(
+        sessionLabel
+          ? `${sessionLabel}: No main-block exercise available in catalog for this level/location.`
+          : "No main-block exercise available in catalog for this level/location."
       );
     }
   }
 
   const footworkCount = countTag(out, catalog, "footwork");
-  const footworkNeeded = Math.max(0, 2 - footworkCount);
+  const minFootwork = options?.programContext?.minFootworkPerSession ?? 1;
+  const footworkNeeded = Math.max(0, minFootwork - footworkCount);
   if (footworkNeeded > 0) {
-    const picks = pickFromCatalog(catalog, usedIds, footworkScore, footworkNeeded, options?.locationSlug);
+    const picks = pickFromCatalog(
+      catalog,
+      usedIds,
+      footworkScore,
+      footworkNeeded,
+      options?.locationSlug,
+      level,
+      { require: (e) => catalogEntryHasTag(e, "footwork") }
+    );
     if (picks.length > 0) {
       for (const pick of picks) {
         usedIds.add(pick.id);
@@ -332,11 +402,25 @@ export function applyProgramRulesToSession(
           ? `${sessionLabel}: Added ${picks.length} footwork exercise(s).`
           : `Added ${picks.length} footwork exercise(s).`
       );
+    } else {
+      warnings.push(
+        sessionLabel
+          ? `${sessionLabel}: Could not add footwork — no footwork-tagged exercises left in catalog.`
+          : "Could not add footwork — no footwork-tagged exercises left in catalog."
+      );
     }
   }
 
   if (!sessionHasTag(out, catalog, "mobility", "cooldown")) {
-    const pick = pickFromCatalog(catalog, usedIds, cooldownScore, 1, options?.locationSlug)[0];
+    const pick = pickFromCatalog(
+      catalog,
+      usedIds,
+      cooldownScore,
+      1,
+      options?.locationSlug,
+      level,
+      { require: (e) => catalogEntryHasTag(e, "mobility") }
+    )[0];
     if (pick) {
       usedIds.add(pick.id);
       const cooldowns = out.filter((e) => e.phase === "cooldown");
@@ -346,6 +430,12 @@ export function applyProgramRulesToSession(
         sessionLabel
           ? `${sessionLabel}: Added ${pick.title} to cool-down for mobility coverage.`
           : `Added ${pick.title} to cool-down for mobility coverage.`
+      );
+    } else {
+      warnings.push(
+        sessionLabel
+          ? `${sessionLabel}: Could not add cool-down mobility — no mobility-tagged exercises left.`
+          : "Could not add cool-down mobility — no mobility-tagged exercises left."
       );
     }
   }
@@ -366,7 +456,8 @@ export function applyProgramRulesToSession(
       usedIds,
       options?.locationSlug,
       sessionLabel,
-      warnings
+      warnings,
+      level
     );
   }
 
@@ -376,7 +467,15 @@ export function applyProgramRulesToSession(
     return applyMainRest(normalizeStrengthExercise(ex, entry), entry, level);
   });
 
-  out = ensureSafeMainStart(out, catalog, usedIds, options?.locationSlug, sessionLabel, warnings);
+  out = ensureSafeMainStart(
+    out,
+    catalog,
+    usedIds,
+    options?.locationSlug,
+    sessionLabel,
+    warnings,
+    level
+  );
 
   return { exercises: out, warnings };
 }

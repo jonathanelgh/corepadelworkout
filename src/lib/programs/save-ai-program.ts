@@ -86,12 +86,13 @@ export async function saveAiProgram(
     durationWeeks?: number;
     sessionsPerWeek?: number;
     minutesPerSession?: number;
+    trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null;
   }
 ): Promise<SaveAiProgramResult> {
   const status = options?.status ?? "draft";
   const durationWeeks = Math.max(
-    1,
-    Math.floor(options?.durationWeeks ?? proposal.duration_weeks)
+    8,
+    Math.floor(options?.durationWeeks ?? proposal.duration_weeks ?? 8)
   );
   const sessionsPerWeek = Math.max(
     1,
@@ -106,7 +107,11 @@ export async function saveAiProgram(
   const { sessions: expandedSessions, warnings: expandWarnings } = expandSessionsToTarget(
     proposal.sessions,
     targetSessionCount,
-    { sessionsPerWeek, applyWeeklyProgression: durationWeeks > 1 }
+    {
+      sessionsPerWeek,
+      applyWeeklyProgression: durationWeeks > 1,
+      trainingLevel: options?.trainingLevel ?? "beginner",
+    }
   );
   if (expandWarnings.length > 0) {
     console.info("[save-ai-program]", expandWarnings.join(" "));

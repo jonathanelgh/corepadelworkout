@@ -12,6 +12,8 @@ import {
 import {
   clampProgramPrescriptionType,
 } from "@/lib/exercises/program-prescription-mode";
+import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
+import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
 export type AiProgramExerciseRow = {
   exerciseId: string;
@@ -25,6 +27,7 @@ export type AiProgramExerciseRow = {
   restBetweenSetsSeconds: string;
   restBetweenSidesSeconds: string;
   restAfterSeconds: string;
+  loadPrescription: string;
   note: string;
 };
 
@@ -61,6 +64,7 @@ function normalizeSlug(s: string): string {
 export type ScheduleHints = {
   durationWeeks?: number | null;
   sessionsPerWeek?: number | null;
+  trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null;
 };
 
 function intToField(n: number | null | undefined): string {
@@ -75,7 +79,7 @@ export function mapGeminiDraftToForm(
 ): { draft: AiProgramFormDraft; warnings: string[] } {
   const warnings: string[] = [];
 
-  const durationWeeks = scheduleHints?.durationWeeks ?? draft.duration_weeks;
+  const durationWeeks = Math.max(8, scheduleHints?.durationWeeks ?? draft.duration_weeks ?? 8);
   const sessionsPerWeek = scheduleHints?.sessionsPerWeek ?? draft.sessions_per_week;
   const targetSessionCount =
     durationWeeks != null && sessionsPerWeek != null && durationWeeks > 0 && sessionsPerWeek > 0
@@ -126,6 +130,7 @@ export function mapGeminiDraftToForm(
       const expanded = expandSessionsToTarget(trackSessions, targetSessionCount, {
         sessionsPerWeek: sessionsPerWeek ?? trackSessions.length,
         applyWeeklyProgression: (durationWeeks ?? 1) > 1,
+        trainingLevel: scheduleHints?.trainingLevel ?? "beginner",
       });
       trackSessions = expanded.sessions.map((s) => ({
         name: s.name,
@@ -151,6 +156,14 @@ export function mapGeminiDraftToForm(
           warnings.push(`Removed "${ex.exercise_id}" from "${sess.name}" — wrong location for ${loc.name}.`);
           continue;
         }
+        const catalogEntry = ctx.exercises.find((e) => e.id === ex.exercise_id);
+        const levelCap = scheduleHints?.trainingLevel ?? "beginner";
+        if (catalogEntry && !exerciseEligibleForTrainingLevel(catalogEntry, levelCap)) {
+          warnings.push(
+            `Removed "${catalogEntry.title}" from "${sess.name}" — above ${levelCap} exercise level.`
+          );
+          continue;
+        }
         if (seenInSession.has(ex.exercise_id)) continue;
         seenInSession.add(ex.exercise_id);
 
@@ -167,9 +180,12 @@ export function mapGeminiDraftToForm(
           sets: ex.sets,
           restBetweenSetsSeconds: ex.rest_between_sets_seconds,
         });
-        const catalogEntry = ctx.exercises.find((e) => e.id === ex.exercise_id);
         const mode = catalogEntry?.programPrescriptionMode ?? "all";
         const hasSeconds = ex.duration_seconds != null && ex.duration_seconds > 0;
+        const cleaned = promoteProgressionOutOfNote({
+          note: ex.note,
+          load_prescription: ex.load_prescription,
+        });
 
         exercises.push({
           exerciseId: ex.exercise_id,
@@ -187,7 +203,8 @@ export function mapGeminiDraftToForm(
               : null
           ),
           restAfterSeconds: intToField(ex.rest_after_seconds),
-          note: "",
+          loadPrescription: cleaned.load_prescription?.trim() ?? "",
+          note: cleaned.note?.trim() ?? "",
         });
       }
 

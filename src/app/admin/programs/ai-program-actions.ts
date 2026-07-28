@@ -10,6 +10,7 @@ import {
   loadProfileAiContext,
 } from "@/lib/programs/profile-ai-context";
 import { generateProgramWithGemini, type AiProgramGenerateRequest } from "@/lib/programs/gemini-generate-program";
+import { filterCatalogByTrainingLevel, resolveExerciseLevelCap } from "@/lib/programs/exercise-level-eligibility";
 import { ensureGeminiDraftRotation } from "@/lib/programs/ensure-rotational-exercise";
 import { ensureGeminiDraftStructure, resolveSessionEnforcementOptions } from "@/lib/programs/ensure-session-structure";
 import { mapGeminiDraftToForm, type AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
@@ -50,8 +51,16 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
       : null;
     const adminTrainingLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
     const userContextBlock = buildAdminAiAthleteContext(profileContext, adminTrainingLevel);
+    const difficultySlug = input.difficultyLevelId
+      ? ctx.difficulties.find((d) => d.id === input.difficultyLevelId)?.slug ?? null
+      : null;
+    const levelCap =
+      resolveExerciseLevelCap({
+        trainingLevel: adminTrainingLevel,
+        difficultySlug,
+      }) ?? "beginner";
     const enforcementOptions = resolveSessionEnforcementOptions({
-      trainingLevel: adminTrainingLevel,
+      trainingLevel: levelCap,
       athleteContext: userContextBlock,
       goal: input.brief?.trim() || undefined,
     });
@@ -59,20 +68,26 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
       promptTemplate,
       userContextBlock,
     });
+    const levelCatalog = filterCatalogByTrainingLevel(
+      ctx.exercises.filter((e) => e.status === "published"),
+      levelCap
+    );
     const { draft: rotationDraft, warnings: rotationWarnings } = ensureGeminiDraftRotation(
       geminiDraft,
-      ctx.exercises.filter((e) => e.status === "published"),
-      ctx.locations
+      levelCatalog,
+      ctx.locations,
+      { trainingLevel: levelCap }
     );
     const { draft: structuredDraft, warnings: structureWarnings } = ensureGeminiDraftStructure(
       rotationDraft,
-      ctx.exercises.filter((e) => e.status === "published"),
+      levelCatalog,
       enforcementOptions
     );
-    const catalogIds = new Set(ctx.exercises.map((e) => e.id));
+    const catalogIds = new Set(levelCatalog.map((e) => e.id));
     const { draft, warnings } = mapGeminiDraftToForm(structuredDraft, ctx, catalogIds, {
-      durationWeeks: input.durationWeeks,
+      durationWeeks: input.durationWeeks ?? 8,
       sessionsPerWeek: input.sessionsPerWeek,
+      trainingLevel: levelCap,
     });
 
     const usedIds = new Set<string>();

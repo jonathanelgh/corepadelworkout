@@ -15,6 +15,8 @@ export type ExerciseCatalogEntry = {
   locationName: string | null;
   locationNames: string[];
   levelName: string | null;
+  /** `exercise_levels.slug` when set (e.g. rookie-starter, intermediate). */
+  levelSlug: string | null;
   categoryTypes: string[];
   movementPatterns: string[];
   bodyRegions: string[];
@@ -71,7 +73,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
     supabase.from("movement_patterns").select("id, name"),
     supabase.from("body_regions").select("id, name"),
     supabase.from("body_parts").select("id, name"),
-    supabase.from("exercise_levels").select("id, name"),
+    supabase.from("exercise_levels").select("id, name, slug"),
     supabase.from("equipment").select("id, title"),
   ]);
 
@@ -115,6 +117,9 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
   const bodyRegionName = new Map((bodyRegionsRes.data ?? []).map((r) => [r.id as string, r.name as string]));
   const bodyPartName = new Map((bodyPartsRes.data ?? []).map((r) => [r.id as string, r.name as string]));
   const levelName = new Map((exerciseLevelsRes.data ?? []).map((r) => [r.id as string, r.name as string]));
+  const levelSlug = new Map(
+    (exerciseLevelsRes.data ?? []).map((r) => [r.id as string, r.slug as string])
+  );
   const equipmentName = new Map((equipmentRes.data ?? []).map((r) => [r.id as string, r.title as string]));
 
   const catalog: ExerciseCatalogEntry[] = exercises.map((row) => {
@@ -173,6 +178,7 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
       locationName: item.locationName,
       locationNames: item.locationNames,
       levelName: item.exerciseLevelId ? levelName.get(item.exerciseLevelId) ?? null : null,
+      levelSlug: item.exerciseLevelId ? levelSlug.get(item.exerciseLevelId) ?? null : null,
       categoryTypes: item.categoryTypeIds.map((id) => categoryTypeName.get(id)).filter(Boolean) as string[],
       movementPatterns: item.movementPatternIds.map((id) => movementName.get(id)).filter(Boolean) as string[],
       bodyRegions: item.bodyRegionIds.map((id) => bodyRegionName.get(id)).filter(Boolean) as string[],
@@ -216,7 +222,7 @@ export function formatExerciseCatalogForPrompt(entries: ExerciseCatalogEntry[]):
       const tags = [
         e.bothSides ? "both_sides" : null,
         e.programPrescriptionMode !== "all" ? `prescription:${e.programPrescriptionMode}` : null,
-        e.levelName ? `level:${e.levelName}` : null,
+        e.levelSlug ? `level:${e.levelSlug}` : e.levelName ? `level:${e.levelName}` : null,
         e.categoryTypes.length ? `types:${e.categoryTypes.join("/")}` : null,
         e.movementPatterns.length ? `move:${e.movementPatterns.join("/")}` : null,
         e.bodyRegions.length ? `regions:${e.bodyRegions.join("/")}` : null,

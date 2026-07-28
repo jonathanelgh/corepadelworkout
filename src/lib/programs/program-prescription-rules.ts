@@ -6,13 +6,39 @@ export const COOLDOWN_DURATION_SECONDS = 60;
 export const COOLDOWN_REST_AFTER_SECONDS = 15;
 export const MIN_COOLDOWN_EXERCISES_PER_SESSION = 5;
 
+/** @deprecated Prefer tag-based rest bands from resolveRestBand(). */
 export const BEGINNER_MAIN_REST_SECONDS_MIN = 30;
-export const BEGINNER_MAIN_REST_SECONDS_MAX = 45;
+export const BEGINNER_MAIN_REST_SECONDS_MAX = 60;
 export const ADVANCED_MAIN_REST_SECONDS_MIN = 60;
 export const ADVANCED_MAIN_REST_SECONDS_MAX = 90;
 
 const STRENGTH_TYPE_HINTS = ["strength", "hypertrofy", "hypertrophy", "maximal", "plyometric"];
 const AGILITY_FOOTWORK_STRENGTH_REST_TYPES = ["strength", "agility", "footwork"];
+
+export type RestBand = { min: number; max: number; default: number };
+
+/** Central rest matrix by exercise tag (Section 9). */
+export function resolveRestBand(entry: ExerciseCatalogEntry, phase: string): RestBand {
+  const types = entry.categoryTypes.map(normalizeToken).join(" ");
+  const p = phase.toLowerCase();
+
+  if (p === "warmup") {
+    if (/explosive|plyometric|speed/.test(types)) return { min: 30, max: 45, default: 35 };
+    if (/footwork|coordination|agility|skill/.test(types)) return { min: 15, max: 20, default: 15 };
+    return { min: 10, max: 15, default: 15 };
+  }
+  if (p === "cooldown") return { min: 10, max: 15, default: 15 };
+
+  if (/supramaximal/.test(types)) return { min: 180, max: 300, default: 210 };
+  if (/maximalstrength|explosive/.test(types)) return { min: 120, max: 180, default: 150 };
+  if (/speedstrength|plyometric/.test(types)) return { min: 90, max: 180, default: 120 };
+  if (/specific|sport-specific/.test(types)) return { min: 60, max: 120, default: 90 };
+  if (/hypertrofy|hypertrophy/.test(types)) return { min: 60, max: 90, default: 75 };
+  if (/endurance|stability/.test(types)) return { min: 30, max: 60, default: 45 };
+  if (/footwork|agility|coordination/.test(types)) return { min: 30, max: 60, default: 45 };
+  if (/strength/.test(types)) return { min: 60, max: 90, default: 75 };
+  return { min: 30, max: 90, default: 60 };
+}
 
 function normalizeToken(value: string): string {
   return value.trim().toLowerCase().replace(/[_\s]+/g, "-");
@@ -30,8 +56,34 @@ function blob(entry: ExerciseCatalogEntry): string {
     .toLowerCase();
 }
 
+/**
+ * "Core" in Core Padel programs = main-block work (not warm-up / cool-down).
+ * Trunk/abs work is covered separately via rotation / anti-rotation rules.
+ */
+export function exerciseIsCoreFocus(entry: ExerciseCatalogEntry): boolean {
+  // Catalog exercises are phase-agnostic; prefer anything that isn't clearly
+  // warm-up/cool-down mobility-only when used as a main-block filler.
+  if (entry.programPrescriptionMode === "time_only") {
+    const types = entry.categoryTypes.map(normalizeToken).join(" ");
+    if (/mobility|stretch|cool|warm/.test(types)) return false;
+  }
+  return true;
+}
+
+/** Session-level: any main-phase exercise counts as core-block work. */
+export function sessionHasCoreBlock(
+  exercises: Array<{ phase: string }>
+): boolean {
+  return exercises.some((e) => e.phase === "main");
+}
+
 export function catalogEntryHasTag(entry: ExerciseCatalogEntry, tag: string): boolean {
   const needle = normalizeToken(tag);
+  // "core" as a catalog tag is ambiguous — prefer explicit main-block checks via
+  // sessionHasCoreBlock. Keep a loose catalog match for legacy callers.
+  if (needle === "core") {
+    return exerciseIsCoreFocus(entry);
+  }
   const haystack = [
     ...entry.categoryTypes,
     ...entry.bodyRegions,
@@ -39,9 +91,6 @@ export function catalogEntryHasTag(entry: ExerciseCatalogEntry, tag: string): bo
     ...entry.movementPatterns,
   ].map(normalizeToken);
   if (haystack.some((t) => t === needle || t.includes(needle))) return true;
-  if (needle === "core") {
-    return haystack.some((t) => t === "core" || t === "abdomen" || t.includes("core"));
-  }
   return blob(entry).includes(needle);
 }
 
@@ -71,6 +120,11 @@ export function exerciseIsHighIntensityStart(entry: ExerciseCatalogEntry): boole
   });
 }
 
+export function clampRestToBand(seconds: number, band: RestBand): number {
+  return Math.min(band.max, Math.max(band.min, Math.round(seconds)));
+}
+
+/** Level-aware fallback when no catalog entry is available. */
 export function clampMainRestSeconds(seconds: number, level: OnboardingLevel): number {
   const min =
     level === "beginner" ? BEGINNER_MAIN_REST_SECONDS_MIN : ADVANCED_MAIN_REST_SECONDS_MIN;
@@ -80,7 +134,19 @@ export function clampMainRestSeconds(seconds: number, level: OnboardingLevel): n
 }
 
 export function defaultMainRestAfterSeconds(level: OnboardingLevel): number {
-  return level === "beginner" ? 37 : 75;
+  return level === "beginner" ? 45 : 75;
+}
+
+export function defaultRestForEntry(
+  entry: ExerciseCatalogEntry,
+  phase: string,
+  level: OnboardingLevel
+): number {
+  const band = resolveRestBand(entry, phase);
+  if (level === "beginner" && band.min > 90) {
+    return Math.min(band.default, 90);
+  }
+  return band.default;
 }
 
 export function defaultStrengthSetsReps(): Pick<WorkoutProposalExercise, "sets" | "reps"> {

@@ -1,7 +1,9 @@
 import {
   applyWeeklyProgressionToExercise,
   type ProgressableExercise,
+  type WeeklyProgressionOptions,
 } from "@/lib/programs/apply-weekly-progression";
+import type { OnboardingLevel } from "@/lib/member/onboarding";
 
 export type ExpandableSession<T> = {
   name: string;
@@ -13,8 +15,9 @@ export type ExpandableSession<T> = {
 export type ExpandSessionsOptions = {
   /** Sessions per training week (defaults to template count). */
   sessionsPerWeek?: number;
-  /** Apply reps/sets/load progression when repeating templates across weeks. Default true. */
+  /** Apply level-aware progression when repeating templates across weeks. Default true. */
   applyWeeklyProgression?: boolean;
+  trainingLevel?: OnboardingLevel | null;
 };
 
 /**
@@ -32,6 +35,9 @@ export function expandSessionsToTarget<T extends ProgressableExercise>(
 
   const sessionsPerWeek = Math.max(1, options?.sessionsPerWeek ?? sessions.length);
   const applyProgression = options?.applyWeeklyProgression !== false;
+  const progressionOpts: WeeklyProgressionOptions = {
+    trainingLevel: options?.trainingLevel ?? "beginner",
+  };
   const warnings: string[] = [];
 
   const template = sessions.slice(0, Math.min(sessionsPerWeek, sessions.length));
@@ -72,7 +78,7 @@ export function expandSessionsToTarget<T extends ProgressableExercise>(
       exercises: src.exercises.map((ex) => {
         const copy = { ...ex };
         return applyProgression
-          ? applyWeeklyProgressionToExercise(copy, weekIndex)
+          ? applyWeeklyProgressionToExercise(copy, weekIndex, progressionOpts)
           : copy;
       }),
     });

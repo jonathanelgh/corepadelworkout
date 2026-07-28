@@ -5,6 +5,7 @@ import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseChoiceGroup, parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
+import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
 import {
   insertProgramCurriculum,
   type TrackPayload,
@@ -94,17 +95,16 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
   const rest_between_sides_seconds = parseOptionalNonNegIntField(
     row.rest_between_sides_seconds ?? row.restBetweenSidesSeconds
   );
-  const load_prescription =
-    typeof (row.load_prescription ?? row.loadPrescription) === "string" &&
-    String(row.load_prescription ?? row.loadPrescription).trim().length > 0
-      ? String(row.load_prescription ?? row.loadPrescription).trim()
-      : null;
   const rest_after_seconds = parseOptionalNonNegIntField(
     row.rest_after_seconds ?? row.restAfterSeconds ?? row.pause_seconds
   );
   const noteRaw = row.note;
-  const note =
-    typeof noteRaw === "string" && noteRaw.trim().length > 0 ? noteRaw.trim() : null;
+  const loadRaw = row.load_prescription ?? row.loadPrescription;
+  const promoted = promoteProgressionOutOfNote({
+    note: typeof noteRaw === "string" && noteRaw.trim().length > 0 ? noteRaw.trim() : null,
+    load_prescription:
+      typeof loadRaw === "string" && loadRaw.trim().length > 0 ? String(loadRaw).trim() : null,
+  });
   return {
     exercise_id,
     duration_minutes,
@@ -113,11 +113,11 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
     reps,
     rest_between_sets_seconds,
     rest_between_sides_seconds,
-    load_prescription,
+    load_prescription: promoted.load_prescription,
     rest_after_seconds,
     session_phase: parseSessionPhase(row.session_phase ?? row.sessionPhase),
     choice_group: parseChoiceGroup(row.choice_group ?? row.choiceGroup),
-    note,
+    note: promoted.note,
   };
 }
 

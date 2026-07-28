@@ -25,10 +25,11 @@ import {
 } from "@/lib/programs/session-phase";
 import {
   getProgramCoverUrl,
-  saveAiCoachProgram,
   saveAiCoachWorkout,
   sendAiCoachMessage,
 } from "../ai-coach-actions";
+import { AiGenerationDebugPanel } from "./ai-generation-debug-panel";
+import type { AiGenerationDebugLog } from "@/lib/programs/ai-generation-debug";
 
 const SUGGESTED_PROMPTS = [
   "Recommend programs for intermediate players who want better court movement.",
@@ -58,6 +59,7 @@ type ChatMessage = {
   };
   workoutProposal?: WorkoutProposal;
   programProposal?: ProgramProposal;
+  generationDebugLog?: AiGenerationDebugLog;
   proposalSaved?: boolean;
   generatedWorkout?: GeneratedWorkout;
 };
@@ -380,6 +382,7 @@ export function AiCoachClient({
           id: assistantId,
           role: "assistant",
           workoutProposal: res.proposal,
+          generationDebugLog: res.debugLog,
         },
       ]);
     } else {
@@ -389,6 +392,7 @@ export function AiCoachClient({
           id: assistantId,
           role: "assistant",
           programProposal: res.proposal,
+          generationDebugLog: res.debugLog,
         },
       ]);
     }
@@ -402,37 +406,82 @@ export function AiCoachClient({
     setSavingProposalId(proposalMsgId);
     setError(null);
 
-    const res = await saveAiCoachProgram(proposal, { publish, generateCover: true });
-    setSavingProposalId(null);
+    try {
+      const payload = JSON.parse(JSON.stringify(proposal)) as ProgramProposal;
+      const response = await fetch("/api/admin/ai-coach/save-program", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposal: payload,
+          publish,
+          generateCover: true,
+          trainingLevel: trainingLevel || null,
+        }),
+      });
 
-    if ("error" in res) {
-      setError(res.error);
-      return;
-    }
+      let res: {
+        ok?: true;
+        error?: string;
+        programId?: string;
+        slug?: string;
+        title?: string;
+        description?: string;
+        sessionCount?: number;
+        coverPending?: boolean;
+        status?: "draft" | "published";
+      };
+      try {
+        res = (await response.json()) as typeof res;
+      } catch {
+        setError(
+          `Save failed (HTTP ${response.status}). The server returned a non-JSON response — check the terminal log.`
+        );
+        return;
+      }
 
-    setMessages((prev) =>
-      prev
-        .map((m) =>
-          m.id === proposalMsgId
-            ? { ...m, proposalSaved: true, programProposal: undefined }
-            : m
-        )
-        .concat({
-          id: `saved-${Date.now()}`,
-          role: "assistant",
-          generatedWorkout: {
-            programId: res.programId,
-            slug: res.slug,
-            title: res.title,
-            description: `${res.description} (${res.sessionCount} sessions)`,
-            status: res.status,
-            coverPending: res.coverPending,
-          },
-        })
-    );
+      if (!response.ok || res.error || !res.ok || !res.programId) {
+        setError(res.error || `Could not save program (HTTP ${response.status}).`);
+        return;
+      }
 
-    if (res.coverPending) {
-      void pollCover(res.programId);
+      setMessages((prev) =>
+        prev
+          .map((m) =>
+            m.id === proposalMsgId
+              ? {
+                  ...m,
+                  proposalSaved: true,
+                  programProposal: undefined,
+                  generationDebugLog: undefined,
+                }
+              : m
+          )
+          .concat({
+            id: `saved-${Date.now()}`,
+            role: "assistant",
+            generatedWorkout: {
+              programId: res.programId!,
+              slug: res.slug ?? "",
+              title: res.title ?? proposal.title,
+              description: `${res.description ?? proposal.description} (${res.sessionCount ?? 0} sessions)`,
+              status: res.status ?? (publish ? "published" : "draft"),
+              coverPending: Boolean(res.coverPending),
+            },
+          })
+      );
+
+      if (res.coverPending) {
+        void pollCover(res.programId);
+      }
+    } catch (e) {
+      const message =
+        e instanceof Error && e.message.trim()
+          ? e.message
+          : "Could not save the program. Check your connection and try again.";
+      setError(message);
+      console.error("[ai-coach] save program failed:", e);
+    } finally {
+      setSavingProposalId(null);
     }
   }
 
@@ -702,6 +751,9 @@ export function AiCoachClient({
                       Saves all sessions with correct week/frequency metadata. Uses only published
                       exercises from your library.
                     </p>
+                    {m.generationDebugLog && (
+                      <AiGenerationDebugPanel log={m.generationDebugLog} />
+                    )}
                   </div>
                 )}
 
@@ -714,6 +766,9 @@ export function AiCoachClient({
                       <p className="mt-1 text-gray-600">{m.workoutProposal.description}</p>
                     </div>
                     {renderPhasedExerciseList(m.workoutProposal.exercises)}
+                    {m.generationDebugLog && (
+                      <AiGenerationDebugPanel log={m.generationDebugLog} />
+                    )}
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"

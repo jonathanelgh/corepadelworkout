@@ -32,7 +32,6 @@ import {
   UploadCloud,
   Video,
 } from "lucide-react";
-import { createProgram, updateProgram } from "../actions";
 import { createClient } from "@/utils/supabase/client";
 import { STORAGE_BUCKETS } from "@/utils/supabase/storage";
 import { ExerciseSearchCombobox, type ExerciseOption } from "./exercise-search-combobox";
@@ -103,7 +102,9 @@ export type SessionExerciseEntry = {
   restBetweenSidesSeconds: string;
   /** Seconds of pause after this exercise before the next; empty = none */
   restAfterSeconds: string;
-  /** Optional coach note shown during the workout */
+  /** Suggested external load (e.g. "12 kg") — progression lives here, not in notes */
+  loadPrescription: string;
+  /** Optional coach note shown during the workout (technique/setup — never weekly increases) */
   note: string;
 };
 
@@ -178,6 +179,7 @@ function cloneSessionBlock(src: SessionBlock, name: string): SessionBlock {
       restBetweenSetsSeconds: e.restBetweenSetsSeconds,
       restBetweenSidesSeconds: e.restBetweenSidesSeconds,
       restAfterSeconds: e.restAfterSeconds,
+      loadPrescription: e.loadPrescription,
       note: e.note,
     })),
   };
@@ -413,6 +415,7 @@ export function CreateProgramForm({
             restBetweenSetsSeconds: ex.restBetweenSetsSeconds,
             restBetweenSidesSeconds: ex.restBetweenSidesSeconds ?? "",
             restAfterSeconds: ex.restAfterSeconds,
+            loadPrescription: ex.loadPrescription ?? "",
             note: ex.note ?? "",
           };
         }),
@@ -761,6 +764,7 @@ export function CreateProgramForm({
                   restBetweenSetsSeconds: "",
                   restBetweenSidesSeconds: "",
                   restAfterSeconds: "",
+                  loadPrescription: "",
                   note: "",
                 },
               ],
@@ -879,11 +883,42 @@ export function CreateProgramForm({
     );
   }
 
+  function setSessionExerciseLoad(
+    trackKey: string,
+    sessionKey: string,
+    entryKey: string,
+    loadPrescription: string
+  ) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.key !== sessionKey) return s;
+            return {
+              ...s,
+              exercises: s.exercises.map((e) =>
+                e.key === entryKey ? { ...e, loadPrescription } : e
+              ),
+            };
+          }),
+        };
+      })
+    );
+  }
+
   function setSessionExerciseNumericField(
     trackKey: string,
     sessionKey: string,
     entryKey: string,
-    field: "durationValue" | "sets" | "reps" | "restBetweenSetsSeconds" | "restBetweenSidesSeconds" | "restAfterSeconds",
+    field:
+      | "durationValue"
+      | "sets"
+      | "reps"
+      | "restBetweenSetsSeconds"
+      | "restBetweenSidesSeconds"
+      | "restAfterSeconds",
     value: string
   ) {
     if (value !== "" && !/^\d*$/.test(value)) return;
@@ -993,13 +1028,17 @@ export function CreateProgramForm({
       }
 
       const fd = new FormData(form);
-      fd.set("cover_image_url", cover_image_url);
-      fd.set("promo_video_url", promo_video_url);
-      fd.set("song_url", song_url);
-      for (const cid of selectedCategoryIds) {
-        fd.append("category_ids", cid);
-      }
-      fd.set("program_format", programFormat);
+      const isFree =
+        fd.get("is_free") === "1" || fd.get("is_free") === "on" || fd.get("is_free") === "true";
+      const status = fd.get("status") === "published" ? "published" : "draft";
+      const difficultyRaw = (fd.get("difficulty_level_id") as string | null)?.trim() || null;
+      const title = ((fd.get("title") as string) ?? "").trim();
+      const description = ((fd.get("description") as string) ?? "").trim() || null;
+      const body = ((fd.get("body") as string) ?? "").trim() || null;
+      const duration_weeks = ((fd.get("duration_weeks") as string) ?? "").trim() || null;
+      const sessions_per_week = ((fd.get("sessions_per_week") as string) ?? "").trim() || null;
+      const minutes_per_session = ((fd.get("minutes_per_session") as string) ?? "").trim() || null;
+
       const curriculumPayload = tracks.map((tr) => {
         const sessionList =
           programFormat === "single_workout" ? tr.sessions.slice(0, 1) : tr.sessions;
@@ -1076,6 +1115,7 @@ export function CreateProgramForm({
               if (Number.isFinite(n) && n >= 0) rest_after_seconds = n;
             }
             const note = e.note.trim() || null;
+            const load_prescription = e.loadPrescription.trim() || null;
             return {
               exercise_id: e.exerciseId,
               duration_seconds,
@@ -1085,6 +1125,7 @@ export function CreateProgramForm({
               rest_between_sets_seconds,
               rest_between_sides_seconds,
               rest_after_seconds,
+              load_prescription,
               session_phase: e.sessionPhase,
               choice_group: e.choiceGroup.trim() || null,
               note,
@@ -1099,26 +1140,59 @@ export function CreateProgramForm({
         }),
         };
       });
-      fd.set("curriculum_json", JSON.stringify(curriculumPayload));
       const outcomesPayload = outcomeLines.map((o) => o.text.trim()).filter(Boolean);
-      fd.set("outcomes_json", JSON.stringify(outcomesPayload));
 
-      if (programId) {
-        fd.set("program_id", programId);
+      const response = await fetch("/api/admin/programs/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programId: programId || null,
+          fields: {
+            title,
+            description,
+            body,
+            category_ids: selectedCategoryIds,
+            difficulty_level_id: difficultyRaw,
+            status,
+            cover_image_url,
+            promo_video_url,
+            song_url,
+            is_free: isFree,
+            program_format: programFormat,
+            duration_weeks,
+            sessions_per_week,
+            minutes_per_session,
+          },
+          tracks: curriculumPayload,
+          outcomes: outcomesPayload,
+        }),
+      });
+
+      let result: { ok?: true; error?: string } = {};
+      try {
+        result = (await response.json()) as { ok?: true; error?: string };
+      } catch {
+        setError(
+          response.ok
+            ? "Saved, but the server returned an unreadable response."
+            : `Could not save program (HTTP ${response.status}).`
+        );
+        return;
       }
 
-      const mediaUrls = { cover_image_url, promo_video_url, song_url };
-      const result = programId
-        ? await updateProgram(fd, mediaUrls)
-        : await createProgram(fd, mediaUrls);
-      if ("error" in result) {
-        setError(result.error);
+      if (!response.ok || result.error) {
+        setError(result.error || `Could not save program (HTTP ${response.status}).`);
       } else {
         router.push("/admin/programs");
         router.refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setError(
+        /unexpected response/i.test(msg)
+          ? "Save failed — the program may be too large for the old save path. Refresh and try again."
+          : msg
+      );
     } finally {
       setPending(false);
     }
@@ -2262,6 +2336,31 @@ export function CreateProgramForm({
                                             Both sides — timed work runs left side, rest, then right side.
                                           </p>
                                         )}
+                                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                          <div>
+                                            <label
+                                              htmlFor={`ex-load-${entry.key}`}
+                                              className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
+                                            >
+                                              Load
+                                            </label>
+                                            <input
+                                              id={`ex-load-${entry.key}`}
+                                              type="text"
+                                              value={entry.loadPrescription}
+                                              onChange={(e) =>
+                                                setSessionExerciseLoad(
+                                                  activeTrack.key,
+                                                  session.key,
+                                                  entry.key,
+                                                  e.target.value
+                                                )
+                                              }
+                                              placeholder='e.g. 12 kg'
+                                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
+                                            />
+                                          </div>
+                                        </div>
                                         <div className="mt-3">
                                           <label
                                             htmlFor={`ex-note-${entry.key}`}
@@ -2281,7 +2380,7 @@ export function CreateProgramForm({
                                               )
                                             }
                                             rows={2}
-                                            placeholder="Optional note for the athlete (e.g. focus on form, tempo, or setup)"
+                                            placeholder="Technique or setup only — never weekly load/reps increases"
                                             className="w-full resize-y rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
                                           />
                                         </div>

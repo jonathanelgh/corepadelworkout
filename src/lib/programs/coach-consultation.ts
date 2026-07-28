@@ -154,7 +154,6 @@ export function getCurrentConsultationTopic(
   if (!state.locationSlug) return "location";
   if (needsHomeEquipmentQuestion(state)) return "equipment";
   if (isProgram && !state.movementScreen) return "movement";
-  if (isProgram && !state.durationWeeks) return "weeks";
   if (isProgram && !state.sessionsPerWeek) return "sessions";
   if (!state.minutes) return "minutes";
   return null;
@@ -870,7 +869,6 @@ export function missingConsultationTopics(
         "movement screen — can they squat, lunge, do push-ups, and jump (or any limits)"
       );
     }
-    if (!state.durationWeeks) missing.push("how many weeks the program should run");
     if (!state.sessionsPerWeek) missing.push("how many sessions per week");
     if (!state.minutes) missing.push("how long each session should be (minutes)");
   } else if (!state.minutes) {
@@ -1003,7 +1001,7 @@ export function formatConsultationBrief(state: ConsultationState, isProgram: boo
         lines.push("- Movement screen: cleared for squats, lunges, push-ups, and jumps");
       }
     }
-    if (state.durationWeeks) lines.push(`- Duration: ${state.durationWeeks} weeks`);
+    lines.push(`- Duration: ${state.durationWeeks ?? 8} weeks (always 8 unless admin overrides)`);
     if (state.sessionsPerWeek) lines.push(`- Frequency: ${state.sessionsPerWeek} sessions per week`);
     if (state.minutes) lines.push(`- Target session length: ~${state.minutes} minutes per workout`);
   } else if (state.minutes) {
@@ -1071,7 +1069,7 @@ export function formatGenerationCoachBrief(
 ${
   isProgram
     ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block. Each template day must include the full warm-up block.
-- Week-1 templates only: the app repeats them for the full block and auto-applies ~10% weekly progression to reps, timed work, sets, and load_prescription in each week's stored sessions — do not duplicate sessions per week in sessions[].`
+- Week-1 templates only: the app repeats them for the full block and auto-applies level-aware progression to reps, timed work, and load_prescription in each week's stored sessions (sets stay fixed) — do not put progression in notes, and do not duplicate sessions per week in sessions[].`
     : `- Target ~${state.minutes ?? 30} minutes for this single workout.`
 }
 - Include at least one rotational or anti-rotational exercise in the main block.`;

@@ -8,6 +8,7 @@ export const COOLDOWN_REST_AFTER_SECONDS = 15;
 export const MIN_COOLDOWN_EXERCISES_PER_SESSION = 5;
 
 export {
+  AI_COACH_GOVERNING_RULES_BLOCK,
   AI_COACH_PROGRAM_RULES_BLOCK,
   AI_COACH_WARMUP_RULES_BLOCK,
 } from "@/lib/programs/ai-program-rules";

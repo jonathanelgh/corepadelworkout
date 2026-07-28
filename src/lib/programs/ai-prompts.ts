@@ -66,8 +66,8 @@ Tool selection (CRITICAL):
 1. CREATE requests — If the admin asks to create, build, make, generate, or draft a custom program or workout, use generate_program (multi-session / multi-week) or generate_workout (single session). NEVER use recommend_programs for these, even when similar published programs exist.
 2. BROWSE requests — Use recommend_programs ONLY when the admin explicitly asks to find, recommend, list, or compare EXISTING published programs in the catalog (e.g. "what programs do we have for shoulders?"). Do not use it when they want something new built.
 
-- generate_workout: one custom session (one day only). MUST include warm-up, main work, and cool-down exercises (phase on each exercise). Warm-up: at least 5 exercises, each duration_seconds: 60, rest_after_seconds: 15 — no sets/reps in warm-up. Cool-down: at least 5 exercises at 60s/15s with ≥1 mobility. Prefer mobility/activation for warm-up, stretching/mobility for cool-down. Optional: 1–2 choice_group alternatives in warm-up and/or cool-down (2–3 exercises per group).
-- generate_program: multi-session plan — set duration_weeks and sessions_per_week. Return ONLY sessions_per_week session templates in sessions[] (one training week); the app repeats them for the full block. Every session MUST have warm-up (≥5 exercises at 60s each), main, and cool-down blocks (phase on each exercise).
+- generate_workout: exactly one session. Exactly 5 warmup + main + exactly 5 cooldown. Use structured fields only (never hide rest/load/progression in note).
+- generate_program: always 8 weeks. Return ONLY sessions_per_week week-1 templates; the app expands and progresses. Exactly 5 warmup and 5 cooldown per session. For 3×/week: footwork 2/1/2 across days. Across the week, at most 3 exercises may repeat on multiple days — prefer unique picks. Never put "add weight" in note.
 - For generate_workout and generate_program, use ONLY exercises from the exercise catalog below. Every exercise_id MUST be copied exactly from a catalog line (the UUID in square brackets).
 - REQUIRED: Every workout/session MUST include at least one rotational or anti-rotational exercise (catalog move: tag contains Rotation, Anti-rotation, or Rotational transfer). Place it in the main block unless it fits warm-up mobility.
 - Do NOT invent exercises, IDs, or names not in the catalog.
@@ -109,11 +109,11 @@ Do not call tools for casual conversation. Never call generate_program.
 - A private **consultation_state** block may guide you — use it silently; never expose it in your reply.
 
 ## Generation rules
-- For generate_workout: warm-up (≥5 exercises, each duration_seconds: 60), main (include rotation or anti-rotation), cool-down (≥5 at 60s); phase on every exercise.
+- For generate_workout: exactly 5 warmup, main (include rotation or anti-rotation; prep before explosive), exactly 5 cooldown; phase on every exercise.
 - Use ONLY exercises from the catalog below. Copy exercise_id UUIDs exactly.
 - REQUIRED: at least one rotational or anti-rotational exercise in the main block.
-- Prescription rest: sets+reps → rest_after_seconds 30–60s main; timed work → 20–45s; timed sets → rest_between_sets_seconds + rest_after_seconds.
-- Coach **note** on exercises when useful (5–10% load increase; both_sides timing).
+- Use structured rest fields matching the tag rest band. both_sides: reps/duration_seconds are PER SIDE.
+- Omit \`note\` for member-generated sessions. Never put progression instructions in notes (including "add weight").
 
 {{methodology_block}}
 
@@ -138,13 +138,13 @@ Design a complete, periodized training program for competitive and recreational 
 - Do NOT invent exercises, IDs, or names not in the catalog.
 - Build one track per location: {{location_list}}
 - For each track, only use exercises whose location matches that track (see @location in catalog).
-- Sessions should progress logically: warm-up (mobility/activation) → main work → cool-down (stretching/mobility).
+- Sessions should progress logically: warm-up (exactly 5) → main work → cool-down (exactly 5).
 - Every exercise must include phase: warmup, main, or cooldown.
-- Warm-up block: at least 5 exercises per session; each warm-up exercise uses duration_seconds: 60 and rest_after_seconds: 15 (no sets/reps in warm-up).
+- Warm-up block: exactly 5 exercises per session; cool-down: exactly 5 with ≥1 mobility.
 - For warm-up and cool-down, you may add choice_group on 2–3 alternative exercises (same choice_group = athlete picks one).
 - REQUIRED: Every session MUST include at least one rotational or anti-rotational exercise (catalog move: Rotation, Anti-rotation, or Rotational transfer). This is non-negotiable for padel trunk control.
-- Typical session: 6–12 exercises. Also include legs, shoulders, and core variety.
-- Prescribe realistic sets/reps/duration/rest for padel S&C (e.g. strength 3–4×6–10, mobility timed, rest 30–90s).
+- Session size is driven by phase requirements (no global 6–12 cap).
+- Prescribe realistic sets/reps/duration/rest for padel S&C. Sets stay fixed across weeks; set numeric load_prescription on weighted strength.
 - Avoid repeating the same exercise in one session unless intentional (e.g. ladder drills).
 {{schedule_targets}}{{difficulty_hint}}
 ## Allowed program metadata
@@ -159,7 +159,7 @@ Return JSON only (no markdown), matching:
 Rules:
 - category_slugs and difficulty_level_slug must match slugs from metadata lists, or use empty/null when unsure.
 - tracks array must include exactly one entry per requested location slug.
-- Session count MUST match the brief and schedule exactly (e.g. 3 sessions/week × 4 weeks → exactly 12 sessions per track).
+- Return week-1 templates only (sessions_per_week per track). The app expands to 8 weeks — do NOT return every week.
 - body: engaging copy explaining who the program is for and how it improves padel performance.`,
   },
   ai_program_cover: {

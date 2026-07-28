@@ -13,6 +13,11 @@ import {
   parseSessionPhase,
   type SessionPhase,
 } from "@/lib/programs/session-phase";
+import {
+  filterCatalogByTrainingLevel,
+  resolveExerciseLevelCap,
+} from "@/lib/programs/exercise-level-eligibility";
+import { isOnboardingLevel } from "@/lib/programs/profile-ai-context";
 
 export type GeminiProgramExercise = {
   exercise_id: string;
@@ -24,6 +29,8 @@ export type GeminiProgramExercise = {
   reps: number | null;
   rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
+  load_prescription?: string | null;
+  note?: string | null;
 };
 
 export type GeminiProgramSession = {
@@ -93,7 +100,9 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
               "sets": "number | null",
               "reps": "number | null",
               "rest_between_sets_seconds": "number | null",
-              "rest_after_seconds": "number | null"
+              "rest_after_seconds": "number | null",
+              "load_prescription": "string | null (week-1 load e.g. \"12 kg\" — NOT in note)",
+              "note": "string | null (technique/setup only — never weekly increases)"
             }
           ]
         }
@@ -126,6 +135,11 @@ function parseExerciseRow(row: unknown): GeminiProgramExercise | null {
     reps: parseOptionalInt(r.reps),
     rest_between_sets_seconds: parseOptionalInt(r.rest_between_sets_seconds),
     rest_after_seconds: parseOptionalInt(r.rest_after_seconds),
+    load_prescription:
+      typeof r.load_prescription === "string" && r.load_prescription.trim()
+        ? r.load_prescription.trim()
+        : null,
+    note: typeof r.note === "string" && r.note.trim() ? r.note.trim() : null,
   };
 }
 
@@ -233,9 +247,20 @@ export async function generateProgramWithGemini(
   const slugSet = new Set(selectedLocations.map((l) => normalizeSlug(l.slug)));
 
   const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
-  const relevantExercises = catalogForLocations(publishedExercises, slugSet, locationIdBySlug);
+  const locationExercises = catalogForLocations(publishedExercises, slugSet, locationIdBySlug);
+  const difficultySlug = input.difficultyLevelId
+    ? ctx.difficulties.find((d) => d.id === input.difficultyLevelId)?.slug ?? null
+    : null;
+  const levelCap =
+    resolveExerciseLevelCap({
+      trainingLevel: isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null,
+      difficultySlug,
+    }) ?? "beginner";
+  const relevantExercises = filterCatalogByTrainingLevel(locationExercises, levelCap);
   if (relevantExercises.length === 0) {
-    throw new Error("No exercises in the library for the selected locations. Add exercises first.");
+    throw new Error(
+      `No exercises in the library for the selected locations at ${levelCap} level. Add or retag exercises first.`
+    );
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -249,12 +274,14 @@ export async function generateProgramWithGemini(
 
   const scheduleParts: string[] = [];
   if (input.durationWeeks != null) scheduleParts.push(`Duration: ${input.durationWeeks} weeks`);
+  else scheduleParts.push("Duration: 8 weeks (required default)");
   if (input.sessionsPerWeek != null) scheduleParts.push(`Frequency: ${input.sessionsPerWeek} sessions per week`);
   if (input.minutesPerSession != null) scheduleParts.push(`Target session length: ~${input.minutesPerSession} minutes`);
-  if (input.durationWeeks != null && input.sessionsPerWeek != null) {
-    const required = input.durationWeeks * input.sessionsPerWeek;
+  const weeks = input.durationWeeks ?? 8;
+  const spw = input.sessionsPerWeek;
+  if (spw != null) {
     scheduleParts.push(
-      `REQUIRED: Each track MUST contain exactly ${required} sessions (${input.durationWeeks} weeks × ${input.sessionsPerWeek} per week). Returning fewer sessions is not allowed.`
+      `REQUIRED: Each track MUST contain exactly ${spw} week-1 session templates only (one training week). The app expands to ${weeks} weeks × ${spw} sessions and writes progressed prescriptions. Do NOT return all ${weeks * spw} sessions.`
     );
   }
 
@@ -265,7 +292,13 @@ export async function generateProgramWithGemini(
     ? ctx.difficulties.find((d) => d.id === input.difficultyLevelId)?.name
     : null;
 
-  const difficulty_hint = difficultyName ? `\n## Target difficulty\n${difficultyName}\n` : "";
+  const difficulty_hint = [
+    difficultyName ? `## Target difficulty\n${difficultyName}` : "",
+    `## Exercise level cap\nOnly use exercises from the catalog below. Catalog is already filtered for **${levelCap}** — do not invent harder progressions outside this list.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const difficulty_hint_block = difficulty_hint ? `\n${difficulty_hint}\n` : "";
 
   const metaBlock = formatProgramMetaForPrompt(ctx);
   const catalogBlock = formatExerciseCatalogForPrompt(relevantExercises);
@@ -276,7 +309,7 @@ export async function generateProgramWithGemini(
     coach_brief: brief,
     location_list: locationList,
     schedule_targets,
-    difficulty_hint,
+    difficulty_hint: difficulty_hint_block,
     program_metadata: metaBlock,
     exercise_catalog: catalogBlock,
     exercise_count: String(relevantExercises.length),

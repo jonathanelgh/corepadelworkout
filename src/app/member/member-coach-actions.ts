@@ -17,6 +17,7 @@ import {
   type ProgramCatalogRow,
 } from "@/lib/programs/programs-catalog";
 import { formatExerciseCatalogForPrompt, loadProgramAiContext } from "@/lib/programs/exercise-catalog";
+import { filterCatalogByTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 import {
   buildMemberAiAthleteContext,
   loadProfileAiContext,
@@ -187,22 +188,6 @@ export async function sendMemberCoachMessage(input: {
       }
     }
 
-    const generationExercises =
-      wantsWorkoutCreate && consultationComplete
-        ? exercisesForLocation(publishedExercises, consultation.locationSlug, locations)
-        : publishedExercises;
-
-    const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
-    const bothSidesByExerciseId = new Map(
-      generationExercises.map((e) => [e.id, e.bothSides])
-    );
-    const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
-
-    const fullHistory: ChatHistoryMessage[] = [
-      ...input.history,
-      { role: "user", parts: [{ text: userMessage }] },
-    ];
-
     const [profileContext, trainingContext] = await Promise.all([
       loadProfileAiContext(auth.supabase, auth.user.id),
       loadMemberCoachTrainingContext(auth.supabase, auth.user.id),
@@ -218,6 +203,25 @@ export async function sendMemberCoachMessage(input: {
       athleteContext: userContextBlock,
       goal: consultation.goal,
     });
+    const levelCap = enforcementOptions.trainingLevel ?? "beginner";
+
+    const generationExercises = filterCatalogByTrainingLevel(
+      wantsWorkoutCreate && consultationComplete
+        ? exercisesForLocation(publishedExercises, consultation.locationSlug, locations)
+        : publishedExercises,
+      levelCap
+    );
+
+    const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
+    const bothSidesByExerciseId = new Map(
+      generationExercises.map((e) => [e.id, e.bothSides])
+    );
+    const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
+
+    const fullHistory: ChatHistoryMessage[] = [
+      ...input.history,
+      { role: "user", parts: [{ text: userMessage }] },
+    ];
 
     const systemPromptTemplate = await loadAiPrompt(auth.supabase, "ai_member_coach_system");
     const inCreateFlow = wantsWorkoutCreate || wantsRecommend || wantsProgram;
@@ -336,8 +340,10 @@ export async function sendMemberCoachMessage(input: {
     }
 
     if (result.name === "generate_workout") {
-      const { proposal: rotated } = ensureWorkoutProposalRotation(result.args, publishedExercises);
-      const { proposal } = ensureWorkoutProposalStructure(rotated, publishedExercises, enforcementOptions);
+      const { proposal: rotated } = ensureWorkoutProposalRotation(result.args, generationExercises, {
+        trainingLevel: enforcementOptions.trainingLevel,
+      });
+      const { proposal } = ensureWorkoutProposalStructure(rotated, generationExercises, enforcementOptions);
       return {
         type: "workout_proposal",
         proposal,

@@ -8,10 +8,9 @@ import {
 } from "@google/generative-ai";
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
-import { AI_COACH_PROGRAM_RULES_BLOCK } from "@/lib/programs/ai-program-rules";
+import { AI_COACH_GOVERNING_RULES_BLOCK } from "@/lib/programs/ai-program-rules";
 import { AI_COACH_WEEKLY_PROGRESSION_BLOCK } from "@/lib/programs/apply-weekly-progression";
 import { AI_COACH_METHODOLOGY_BLOCK } from "@/lib/programs/ai-coach-methodology";
-import { AI_COACH_WARMUP_RULES_BLOCK } from "@/lib/programs/warmup-prescription";
 import {
   parseChoiceGroup,
   parseSessionPhase,
@@ -46,6 +45,8 @@ export type WorkoutProposal = {
   title: string;
   description: string;
   exercises: WorkoutProposalExercise[];
+  /** Optional coach explanation of structure / split choices (admin debug). */
+  design_rationale?: string;
 };
 
 export type ProgramProposalSession = {
@@ -64,6 +65,8 @@ export type ProgramProposal = {
   minutes_per_session?: number;
   location_slug?: string;
   sessions: ProgramProposalSession[];
+  /** Optional coach explanation of weekly split / progression intent (admin debug). */
+  design_rationale?: string;
 };
 
 export type RecommendProgramsArgs = {
@@ -118,13 +121,10 @@ function buildSystemInstruction(
   if (!out.includes("Core Padel methodology")) {
     out += `\n\n${AI_COACH_METHODOLOGY_BLOCK}`;
   }
-  if (!out.includes("Warm-up prescription (mandatory")) {
-    out += `\n\n${AI_COACH_WARMUP_RULES_BLOCK}`;
+  if (!out.includes("Core Padel AI — governing rules")) {
+    out += `\n\n${AI_COACH_GOVERNING_RULES_BLOCK}`;
   }
-  if (!out.includes("Program prescription rules (mandatory")) {
-    out += `\n\n${AI_COACH_PROGRAM_RULES_BLOCK}`;
-  }
-  if (!out.includes("Weekly progression (automatic on save)")) {
+  if (!out.includes("Weekly progression (automatic on save")) {
     out += `\n\n${AI_COACH_WEEKLY_PROGRESSION_BLOCK}`;
   }
 
@@ -155,20 +155,25 @@ const TOOLS: FunctionDeclaration[] = [
   {
     name: "generate_program",
     description:
-      "Create a brand-new multi-session training program from the exercise catalog (e.g. 4 weeks × 3 sessions/week). Each session must have warm-up, main (with rotation or anti-rotation), and cool-down. Never use this to point at existing published programs.",
+      "Create an 8-week training program as week-1 session templates only (sessions_per_week entries). The app expands to 8 weeks and progresses prescriptions. Each session needs exactly 5 warmup, main (rotation/anti-rotation), and exactly 5 cooldown exercises. Never recommend existing published programs.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         title: { type: SchemaType.STRING },
         description: { type: SchemaType.STRING, description: "Short summary for program cards" },
         body: { type: SchemaType.STRING, description: "Optional longer copy for the program detail page" },
+        design_rationale: {
+          type: SchemaType.STRING,
+          description:
+            "3–6 sentences: weekly split logic, day roles, footwork 2/1/2, progression intent, and any tradeoffs. For admin review.",
+        },
         duration_weeks: {
           type: SchemaType.NUMBER,
-          description: "Program length in weeks (e.g. 4 for a 4-week block)",
+          description: "Always 8 for Core Padel programs unless admin explicitly requests another length.",
         },
         sessions_per_week: {
           type: SchemaType.NUMBER,
-          description: "Training sessions per week (e.g. 3)",
+          description: "Training sessions per week (typically 3).",
         },
         minutes_per_session: { type: SchemaType.NUMBER },
         location_slug: {
@@ -178,11 +183,11 @@ const TOOLS: FunctionDeclaration[] = [
         sessions: {
           type: SchemaType.ARRAY,
           description:
-            "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 entries for 3×/week). The app repeats them for duration_weeks — do NOT return every week. Each session needs warm-up, main, and cool-down exercises.",
+            "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 for 3×/week). App expands to 8 weeks — do NOT return every week. Each session: exactly 5 warmup, main, exactly 5 cooldown.",
           items: {
             type: SchemaType.OBJECT,
             properties: {
-              name: { type: SchemaType.STRING, description: "e.g. Week 1 — Day 1: Lower body power" },
+              name: { type: SchemaType.STRING, description: "e.g. Day 1: Bilateral lower + push/pull" },
               description: { type: SchemaType.STRING },
               duration_minutes: { type: SchemaType.NUMBER },
               exercises: {
@@ -196,20 +201,24 @@ const TOOLS: FunctionDeclaration[] = [
               },
               duration_seconds: {
                 type: SchemaType.NUMBER,
-                description: `Timed work in seconds. REQUIRED for warmup phase: always ${60} (60 seconds).`,
+                description:
+                  "Timed work in seconds. For both_sides catalog exercises this is PER SIDE. Warm-up/cool-down typically 30–60s.",
               },
-              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes for main/cool-down (not warm-up — use duration_seconds there)" },
-              sets: { type: SchemaType.NUMBER, description: "Sets or timed rounds" },
-              reps: { type: SchemaType.NUMBER, description: "Reps per set (sets/reps mode)" },
+              duration_minutes: { type: SchemaType.NUMBER, description: "Avoid — prefer duration_seconds" },
+              sets: { type: SchemaType.NUMBER, description: "Sets (fixed across the 8-week block — do not plan set progression)" },
+              reps: {
+                type: SchemaType.NUMBER,
+                description: "Reps per set. For both_sides: reps PER SIDE.",
+              },
               rest_between_sets_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Rest between sets/rounds. Required when duration_minutes AND sets >= 2 (timed intervals). Typical 20–45s.",
+                  "Rest between sets of the same exercise. Match tag band (e.g. hypertrophy 60–90s, max strength 120–180s).",
               },
               rest_after_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Rest before the next exercise. Required on every exercise except the last in a session. Typical 20s warmup, 30–60s main, 15s cooldown.",
+                  "Rest after the final set before the next exercise. Required on every exercise except the last in a session.",
               },
               phase: {
                 type: SchemaType.STRING,
@@ -223,12 +232,12 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Optional coach note shown during the workout (form cues, setup — not weekly load increases).",
+                  "Admin coach note only (technique/split rationale). Never put progression, rest, or load values here.",
               },
               load_prescription: {
                 type: SchemaType.STRING,
                 description:
-                  "Week-1 external load for weighted exercises (e.g. \"12 kg\", \"20 lb\", \"yellow band\"). The app scales numeric loads ~10% each week.",
+                  "Week-1 numeric load for weighted strength (e.g. \"12 kg\"). Required for Intermediate/Advanced load progression from week 5.",
               },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
@@ -245,12 +254,17 @@ const TOOLS: FunctionDeclaration[] = [
   {
     name: "generate_workout",
     description:
-      "Create a brand-new single workout session from the exercise catalog. Use when the admin asks to create, build, make, or generate one custom session (one day only). Structure: warm-up → main (must include rotation or anti-rotation) → cool-down. Never use this to recommend existing published programs.",
+      "Create exactly one workout session (not an 8-week program). Structure: exactly 5 warmup → main (include rotation/anti-rotation; prep before explosive) → exactly 5 cooldown. Use catalog UUIDs only.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         title: { type: SchemaType.STRING },
         description: { type: SchemaType.STRING },
+        design_rationale: {
+          type: SchemaType.STRING,
+          description:
+            "2–5 sentences: why this session structure, exercise order, and key rule choices (warm-up, footwork, rotation, rest). For admin review — not shown to athletes.",
+        },
         exercises: {
           type: SchemaType.ARRAY,
           items: {
@@ -262,20 +276,23 @@ const TOOLS: FunctionDeclaration[] = [
               },
               duration_seconds: {
                 type: SchemaType.NUMBER,
-                description: `Timed work in seconds. REQUIRED for warmup phase: always ${60} (60 seconds).`,
+                description:
+                  "Timed work in seconds. For both_sides: PER SIDE. Warm-up/cool-down typically 30–60s.",
               },
-              duration_minutes: { type: SchemaType.NUMBER, description: "Timed work in minutes for main/cool-down (not warm-up — use duration_seconds there)" },
-              sets: { type: SchemaType.NUMBER, description: "Sets or timed rounds" },
-              reps: { type: SchemaType.NUMBER, description: "Reps per set (sets/reps mode)" },
+              duration_minutes: { type: SchemaType.NUMBER, description: "Avoid — prefer duration_seconds" },
+              sets: { type: SchemaType.NUMBER, description: "Sets for strength work" },
+              reps: {
+                type: SchemaType.NUMBER,
+                description: "Reps per set. For both_sides: reps PER SIDE.",
+              },
               rest_between_sets_seconds: {
                 type: SchemaType.NUMBER,
-                description:
-                  "Rest between sets/rounds. Required when duration_minutes AND sets >= 2 (timed intervals). Typical 20–45s.",
+                description: "Rest between sets of the same exercise (match tag rest band).",
               },
               rest_after_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Rest before the next exercise. Required on every exercise except the last in a session. Typical 20s warmup, 30–60s main, 15s cooldown.",
+                  "Rest after the final set before the next exercise. Required except on the last exercise.",
               },
               phase: {
                 type: SchemaType.STRING,
@@ -289,12 +306,11 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Optional coach note shown during the workout (form cues, setup — not weekly load increases).",
+                  "Admin coach note only. Never put progression, rest, or load values here. Omit for member sessions.",
               },
               load_prescription: {
                 type: SchemaType.STRING,
-                description:
-                  "Week-1 external load for weighted exercises (e.g. \"12 kg\", \"20 lb\"). The app scales numeric loads ~10% each week on multi-week programs.",
+                description: 'Numeric load when relevant (e.g. "12 kg").',
               },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
@@ -392,7 +408,9 @@ function parseWorkoutProposal(
 
   const exercises = parseExerciseList(args.exercises, catalogById, bothSidesByExerciseId);
   if (exercises.length === 0) return null;
-  return { title, description, exercises };
+  const design_rationale =
+    typeof args.design_rationale === "string" ? args.design_rationale.trim() || undefined : undefined;
+  return { title, description, exercises, design_rationale };
 }
 
 function parseProgramProposal(
@@ -402,7 +420,7 @@ function parseProgramProposal(
 ): ProgramProposal | null {
   const title = typeof args.title === "string" ? args.title.trim() : "";
   const description = typeof args.description === "string" ? args.description.trim() : "";
-  const duration_weeks = parseOptionalPositiveInt(args.duration_weeks) ?? 1;
+  const duration_weeks = Math.max(8, parseOptionalPositiveInt(args.duration_weeks) ?? 8);
   const sessions_per_week = parseOptionalPositiveInt(args.sessions_per_week) ?? 1;
   if (!title || !description) return null;
 
@@ -435,6 +453,10 @@ function parseProgramProposal(
     title,
     description,
     body: typeof args.body === "string" ? args.body.trim() : undefined,
+    design_rationale:
+      typeof args.design_rationale === "string"
+        ? args.design_rationale.trim() || undefined
+        : undefined,
     duration_weeks,
     sessions_per_week,
     minutes_per_session:

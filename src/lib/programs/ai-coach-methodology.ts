@@ -57,7 +57,7 @@ Every workout must follow this order:
 5. **Accessory & Injury Prevention** (3–5 min) — Shoulders, elbows, hips, knees, ankles.
 6. **Dynamic Cool-Down & Mobility** (3–5 min) — Mobility and recovery-focused movements.
 
-**Beginner progressive overload:** Keep the same core exercises for the full block. The app applies weekly progression from your week-1 template — for strength, **one lever per week** (reps or sets or load). Add at most one new exercise per week for variety.
+**Beginner progressive overload:** Keep the same compound exercises for the full 8-week block. App progresses **reps only** (sets and load fixed). Add at most one non-compound variation from week 5.
 
 ### Mandatory workout structure — INTERMEDIATE
 
@@ -70,26 +70,26 @@ Every workout must follow this order:
 5. **Accessory Strength & Injury Prevention** (5–8 min) — Shoulder health, core endurance, grip strength, hip stability.
 6. **Mobility & Recovery** (3–5 min) — Dynamic mobility, flexibility, controlled breathing.
 
-**Intermediate progressive overload:** Same core exercises for the block. The app applies weekly progression from your week-1 template — strength moves progress one lever per week (reps, sets, or load). Add at most one new exercise per week.
+**Intermediate progressive overload:** Weeks 1–4 reps only; week 5 reset reps and start load increases; weeks 5–8 load only. Sets stay fixed.
 
 ### Mandatory workout structure — ADVANCED
 
 Every workout must follow this order:
 
 1. **Dynamic Warm-Up & Performance Preparation** (5–7 min) — Dynamic mobility, activation, sport-specific prep; maximal movement quality, joint readiness, nervous system activation.
-2. **Explosive Power, Agility & Reactive Performance** (8–10 min) — MUST be performed fresh. Explosive power, first-step acceleration, deceleration, multi-directional speed, reactive ability, jump and landing mechanics, court movement efficiency. High intensity, excellent technique.
+2. **Explosive Power, Agility & Reactive Performance** (8–10 min) — MUST be performed fresh after movement prep. Explosive power, first-step acceleration, deceleration, multi-directional speed, reactive ability, jump and landing mechanics. High intensity, excellent technique.
 3. **Main Strength & Power Block** (15–20 min) — Primary performance block; maximum force production; compound exercises, progressive overload.
-4. **Unilateral Strength, Dynamic Stability & Rotational Performance** (6–10 min) — Single-leg strength, dynamic balance, rotational force, core stiffness, change-of-direction control, deceleration under speed.
-5. **Performance Accessory & Injury Prevention** (5–8 min) — Shoulders, elbows, hips, knees, ankles, grip strength, trunk stability; durability and season-long joint health.
+4. **Unilateral Strength, Dynamic Stability & Rotational Performance** (6–10 min) — Single-leg strength, dynamic balance, rotational force, core stiffness, change-of-direction control.
+5. **Performance Accessory & Injury Prevention** (5–8 min) — Shoulders, elbows, hips, knees, ankles, grip strength, trunk stability.
 6. **Mobility, Recovery & Regeneration** (3–5 min) — Recovery-focused mobility and flexibility.
 
-**Advanced progressive overload:** Same core exercises for the block. The app applies weekly progression from your week-1 template — strength moves progress one lever per week (reps, sets, or load). Add at most one new exercise per week.
+**Advanced progressive overload:** Same Intermediate model. Sets stay fixed. Never auto-progress sets.
 
 ### Coach notes and bilateral exercises
 
-- When prescribing progressive overload week-to-week, set week-1 **load_prescription** on weighted strength exercises (e.g. \`12 kg\`). The app auto-scales **one strength lever per week** (reps, sets, or load) — do **not** put "increase load 5–10%" in \`note\`.
-- For catalog exercises tagged **both_sides** on **timed** prescriptions: set **duration_seconds** as the work time **per side** (left then right). The app runs left-side timer → rest → right-side timer automatically. Set **rest_between_sides_seconds** to 10–20s for the switch (or leave blank for the 15s default). Use **rest_between_sets_seconds** only for rest **between full left+right rounds** when you prescribe multiple timed rounds. Do **not** double duration_seconds to account for both sides.
-- For **both_sides** on sets & reps: add a coach **note** to perform both sides; reps are per side unless noted otherwise.
-- Use the per-exercise **note** field on generate_workout and generate_program exercises for these coach cues.
+- When prescribing progressive overload week-to-week, set week-1 **load_prescription** on weighted strength (e.g. \`12 kg\`). The app applies level-aware progression — do **not** put "increase load 5–10%" in \`note\`.
+- For catalog exercises tagged **both_sides** on **timed** prescriptions: set **duration_seconds** as the work time **per side**. The app runs left → rest → right. Set **rest_between_sides_seconds** to 10–20s when supported (else 15s default).
+- For **both_sides** on sets & reps: **reps** are per side.
+- Use the per-exercise **note** field for admin technique/split cues only — never for values that belong in structured fields.
 
 ${AI_COACH_WARMUP_RULES_BLOCK}`.trim();

@@ -5,6 +5,8 @@ import { parseTrainingLevelFromAthleteContext } from "@/lib/programs/program-pre
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
 import type { GeminiProgramDraft } from "@/lib/programs/gemini-generate-program";
 import { applyProgramRulesToSession, type ProgramRulesContext } from "@/lib/programs/ensure-program-rules";
+import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
+import { ensureWeeklyExerciseVariety } from "@/lib/programs/ensure-weekly-exercise-variety";
 import { normalizeAiExerciseRest } from "@/lib/programs/normalize-ai-exercise-prescription";
 import type { SessionPhase } from "@/lib/programs/session-phase";
 import {
@@ -145,15 +147,18 @@ function pickCatalogExercises(
   excludeIds: Set<string>,
   count: number,
   score: (entry: ExerciseCatalogEntry) => number,
-  locationSlug?: string
+  locationSlug?: string,
+  trainingLevel?: OnboardingLevel | null
 ): ExerciseCatalogEntry[] {
   if (count <= 0) return [];
+  const level = trainingLevel ?? "beginner";
   const pool = catalog
     .filter(
       (e) =>
         e.status === "published" &&
         !excludeIds.has(e.id) &&
-        exerciseMatchesLocation(e, locationSlug)
+        exerciseMatchesLocation(e, locationSlug) &&
+        exerciseEligibleForTrainingLevel(e, level)
     )
     .sort((a, b) => score(a) - score(b));
   return pool.slice(0, count);
@@ -170,10 +175,23 @@ export function ensureSessionExerciseStructure(
 ): { exercises: WorkoutProposalExercise[]; warnings: string[] } {
   const warnings: string[] = [];
   const sessionLabel = options?.sessionLabel?.trim();
+  const level = options?.trainingLevel ?? "beginner";
 
-  const warmups = exercises.filter((e) => e.phase === "warmup").map(normalizeWarmupPrescription);
-  const cooldowns = exercises.filter((e) => e.phase === "cooldown").map(normalizeCooldownPrescription);
-  const mains = exercises.filter((e) => e.phase !== "warmup" && e.phase !== "cooldown");
+  const eligibleExercises = exercises.filter((ex) => {
+    const entry = catalog.find((c) => c.id === ex.exercise_id);
+    if (!entry) return true;
+    if (exerciseEligibleForTrainingLevel(entry, level)) return true;
+    warnings.push(
+      sessionLabel
+        ? `${sessionLabel}: Removed ${entry.title} — above ${level} exercise level.`
+        : `Removed ${entry.title} — above ${level} exercise level.`
+    );
+    return false;
+  });
+
+  const warmups = eligibleExercises.filter((e) => e.phase === "warmup").map(normalizeWarmupPrescription);
+  const cooldowns = eligibleExercises.filter((e) => e.phase === "cooldown").map(normalizeCooldownPrescription);
+  const mains = eligibleExercises.filter((e) => e.phase !== "warmup" && e.phase !== "cooldown");
 
   let out = [...warmups, ...mains, ...cooldowns];
   const usedIds = new Set(out.map((e) => e.exercise_id));
@@ -185,7 +203,8 @@ export function ensureSessionExerciseStructure(
       usedIds,
       warmupNeeded,
       warmupCandidateScore,
-      options?.locationSlug
+      options?.locationSlug,
+      level
     );
     if (picks.length === 0) {
       warnings.push(
@@ -217,7 +236,8 @@ export function ensureSessionExerciseStructure(
       usedIds,
       cooldownNeeded,
       cooldownCandidateScore,
-      options?.locationSlug
+      options?.locationSlug,
+      level
     );
     if (picks.length === 0) {
       warnings.push(
@@ -284,12 +304,21 @@ export function ensureProgramProposalStructure(
 ): { proposal: ProgramProposal; warnings: string[] } {
   const warnings: string[] = [];
   const locationSlug = proposal.location_slug;
-  const programContext: ProgramRulesContext = {
+  const baseContext: ProgramRulesContext = {
     title: proposal.title,
     description: proposal.description,
     ...options?.programContext,
   };
-  const sessions = proposal.sessions.map((session) => {
+
+  // 3-day week: footwork distribution 2 / 1 / 2 across day templates.
+  const footworkTargets =
+    proposal.sessions.length === 3 ? ([2, 1, 2] as const) : null;
+
+  const sessionsAfterRules = proposal.sessions.map((session, index) => {
+    const programContext: ProgramRulesContext = {
+      ...baseContext,
+      minFootworkPerSession: footworkTargets ? footworkTargets[index]! : 1,
+    };
     const result = ensureSessionExerciseStructure(session.exercises, catalog, {
       locationSlug,
       sessionLabel: session.name,
@@ -299,7 +328,37 @@ export function ensureProgramProposalStructure(
     warnings.push(...result.warnings);
     return { ...session, exercises: result.exercises };
   });
-  return { proposal: { ...proposal, sessions }, warnings };
+
+  const variety = ensureWeeklyExerciseVariety(sessionsAfterRules, catalog, {
+    locationSlug,
+    trainingLevel: options?.trainingLevel,
+  });
+  warnings.push(...variety.warnings);
+
+  // Variety can disturb required tags — re-apply structure so final always passes hard rules.
+  const sessions = variety.sessions.map((session, index) => {
+    const programContext: ProgramRulesContext = {
+      ...baseContext,
+      minFootworkPerSession: footworkTargets ? footworkTargets[index]! : 1,
+    };
+    const result = ensureSessionExerciseStructure(session.exercises, catalog, {
+      locationSlug,
+      sessionLabel: session.name,
+      trainingLevel: options?.trainingLevel,
+      programContext,
+    });
+    warnings.push(...result.warnings);
+    return { ...session, exercises: result.exercises };
+  });
+
+  // Force 8-week programs unless already set higher (never shrink below 8 for AI programs).
+  const duration_weeks =
+    proposal.duration_weeks >= 8 ? proposal.duration_weeks : 8;
+
+  return {
+    proposal: { ...proposal, sessions, duration_weeks },
+    warnings,
+  };
 }
 
 export function ensureGeminiDraftStructure(
@@ -314,7 +373,7 @@ export function ensureGeminiDraftStructure(
     ...options?.programContext,
   };
   const tracks = draft.tracks.map((track) => {
-    const sessions = track.sessions.map((session) => {
+    const structuredSessions = track.sessions.map((session) => {
       const proposalExercises: WorkoutProposalExercise[] = session.exercises.map((ex) => ({
         exercise_id: ex.exercise_id,
         title: catalog.find((c) => c.id === ex.exercise_id)?.title ?? ex.exercise_id,
@@ -327,6 +386,8 @@ export function ensureGeminiDraftStructure(
         reps: ex.reps ?? undefined,
         rest_after_seconds: ex.rest_after_seconds ?? 0,
         rest_between_sets_seconds: ex.rest_between_sets_seconds ?? undefined,
+        load_prescription: ex.load_prescription ?? undefined,
+        note: ex.note ?? undefined,
       }));
 
       const result = ensureSessionExerciseStructure(proposalExercises, catalog, {
@@ -337,7 +398,38 @@ export function ensureGeminiDraftStructure(
       });
       warnings.push(...result.warnings);
 
-      const exercises = result.exercises.map((ex) => ({
+      return { name: session.name, exercises: result.exercises, source: session };
+    });
+
+    const variety = ensureWeeklyExerciseVariety(
+      structuredSessions.map((s) => ({ name: s.name, exercises: s.exercises })),
+      catalog,
+      {
+        locationSlug: track.location_slug,
+        trainingLevel: options?.trainingLevel,
+      }
+    );
+    warnings.push(...variety.warnings);
+
+    const repairedSessions = variety.sessions.map((session, index) => {
+      const programContextForDay: ProgramRulesContext = {
+        ...programContext,
+        minFootworkPerSession:
+          variety.sessions.length === 3 ? ([2, 1, 2] as const)[index]! : 1,
+      };
+      const result = ensureSessionExerciseStructure(session.exercises, catalog, {
+        locationSlug: track.location_slug,
+        sessionLabel: session.name,
+        trainingLevel: options?.trainingLevel,
+        programContext: programContextForDay,
+      });
+      warnings.push(...result.warnings);
+      return { name: session.name, exercises: result.exercises };
+    });
+
+    const sessions = repairedSessions.map((session, index) => {
+      const source = structuredSessions[index]?.source ?? track.sessions[index]!;
+      const exercises = session.exercises.map((ex) => ({
         exercise_id: ex.exercise_id,
         phase: ex.phase,
         choice_group: ex.choice_group ?? null,
@@ -347,10 +439,12 @@ export function ensureGeminiDraftStructure(
         reps: ex.reps ?? null,
         rest_between_sets_seconds: ex.rest_between_sets_seconds ?? null,
         rest_after_seconds: ex.rest_after_seconds,
+        load_prescription: ex.load_prescription ?? null,
+        note: ex.note ?? null,
       }));
-
-      return { ...session, exercises };
+      return { ...source, exercises };
     });
+
     return { ...track, sessions };
   });
 

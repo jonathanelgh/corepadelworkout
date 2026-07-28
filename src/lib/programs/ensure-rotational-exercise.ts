@@ -2,6 +2,7 @@ import type { ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import type { GeminiProgramDraft } from "@/lib/programs/gemini-generate-program";
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
 import type { SessionPhase } from "@/lib/programs/session-phase";
+import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
 /** Movement-pattern labels that count as rotational / anti-rotational work. */
 export function isRotationalMovementLabel(label: string): boolean {
@@ -11,12 +12,22 @@ export function isRotationalMovementLabel(label: string): boolean {
     s.includes("anti rotation") ||
     s === "rotation" ||
     s.startsWith("rotation/") ||
-    s.includes("rotational")
+    s.includes("rotational") ||
+    s === "twist" ||
+    s.includes("twist")
   );
 }
 
 export function exerciseHasRotationalPattern(entry: ExerciseCatalogEntry): boolean {
-  return entry.movementPatterns.some(isRotationalMovementLabel);
+  if (entry.movementPatterns.some(isRotationalMovementLabel)) return true;
+  const title = entry.title.toLowerCase();
+  return (
+    /\bpallof\b/.test(title) ||
+    /\bwood\s*chop\b/.test(title) ||
+    /\brussian\s*twist/.test(title) ||
+    /\banti[-\s]?rotation\b/.test(title) ||
+    /\b(trunk|torso|thoracic)\s+rotation\b/.test(title)
+  );
 }
 
 function catalogEntryById(
@@ -39,16 +50,31 @@ function listHasRotationalExercise(
 function pickRotationalExercise(
   catalog: ExerciseCatalogEntry[],
   usedIds: Set<string>,
-  options?: { locationIds?: Set<string> }
+  options?: {
+    locationIds?: Set<string>;
+    trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null;
+  }
 ): ExerciseCatalogEntry | null {
-  const pool = catalog.filter((e) => {
+  const level = options?.trainingLevel ?? "beginner";
+  const baseFilter = (e: ExerciseCatalogEntry) => {
     if (usedIds.has(e.id) || e.status !== "published") return false;
     if (!exerciseHasRotationalPattern(e)) return false;
+    if (!exerciseEligibleForTrainingLevel(e, level)) return false;
+    return true;
+  };
+
+  let pool = catalog.filter((e) => {
+    if (!baseFilter(e)) return false;
     if (options?.locationIds?.size) {
       return e.locationIds.some((id) => options.locationIds!.has(id));
     }
     return true;
   });
+
+  // Location filter can empty the pool when the catalog is already location-scoped — retry without it.
+  if (pool.length === 0 && options?.locationIds?.size) {
+    pool = catalog.filter(baseFilter);
+  }
 
   if (pool.length === 0) return null;
 
@@ -58,9 +84,32 @@ function pickRotationalExercise(
 
 function rotationalPickScore(entry: ExerciseCatalogEntry): number {
   const joined = entry.movementPatterns.join(" ").toLowerCase();
-  if (joined.includes("anti")) return 0;
-  if (joined.includes("rotation")) return 1;
-  return 2;
+  const title = entry.title.toLowerCase();
+  let score = 50;
+  if (joined.includes("anti-rotation") || /\bpallof\b/.test(title)) score -= 40;
+  if (/\b(wood\s*chop|russian\s*twist|trunk|torso|thoracic|dead\s*bug|bird\s*dog|plank)\b/.test(title)) {
+    score -= 25;
+  }
+  if (joined.includes("rotational transfer")) score -= 15;
+  if (joined.includes("rotation")) score -= 10;
+  // Prefer moves that also satisfy the core hard-rule.
+  try {
+    // Lazy require avoided — inline abdomen/trunk anti-rotation preference
+    if (
+      entry.bodyParts.some((p) => /abdomen/i.test(p)) &&
+      (joined.includes("anti-rotation") || joined.includes("plank"))
+    ) {
+      score -= 20;
+    }
+  } catch {
+    /* ignore */
+  }
+  // Deprioritize joint CARs / shoulder IR-ER / ankle-wrist "rotation" mobility.
+  if (/\b(car|shoulder|wrist|ankle|tibial|forearm|eversion)\b/.test(title)) score += 40;
+  if (/\b(stretch|mobility|opener)\b/.test(title) && !/\bpallof|chop|twist|press|plank|bug|dog\b/.test(title)) {
+    score += 20;
+  }
+  return score;
 }
 
 function defaultRotationalExercise(pick: ExerciseCatalogEntry): WorkoutProposalExercise {
@@ -89,7 +138,10 @@ function insertRotationalExercise(
 function ensureListHasRotation(
   exercises: WorkoutProposalExercise[],
   catalog: ExerciseCatalogEntry[],
-  options?: { locationIds?: Set<string> }
+  options?: {
+    locationIds?: Set<string>;
+    trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null;
+  }
 ): { exercises: WorkoutProposalExercise[]; warnings: string[] } {
   const warnings: string[] = [];
   const usedIds = new Set(exercises.map((e) => e.exercise_id));
@@ -112,15 +164,19 @@ function ensureListHasRotation(
 
 export function ensureWorkoutProposalRotation(
   proposal: WorkoutProposal,
-  catalog: ExerciseCatalogEntry[]
+  catalog: ExerciseCatalogEntry[],
+  options?: { trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null }
 ): { proposal: WorkoutProposal; warnings: string[] } {
-  const { exercises, warnings } = ensureListHasRotation(proposal.exercises, catalog);
+  const { exercises, warnings } = ensureListHasRotation(proposal.exercises, catalog, {
+    trainingLevel: options?.trainingLevel,
+  });
   return { proposal: { ...proposal, exercises }, warnings };
 }
 
 export function ensureProgramProposalRotation(
   proposal: ProgramProposal,
-  catalog: ExerciseCatalogEntry[]
+  catalog: ExerciseCatalogEntry[],
+  options?: { trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null }
 ): { proposal: ProgramProposal; warnings: string[] } {
   const warnings: string[] = [];
   const sessions = proposal.sessions.map((session) => {
@@ -135,6 +191,7 @@ export function ensureProgramProposalRotation(
     }
     const result = ensureListHasRotation(session.exercises, catalog, {
       locationIds: locationIds.size > 0 ? locationIds : undefined,
+      trainingLevel: options?.trainingLevel,
     });
     warnings.push(...result.warnings.map((w) => `${session.name}: ${w}`));
     return { ...session, exercises: result.exercises };
@@ -146,7 +203,8 @@ export function ensureProgramProposalRotation(
 export function ensureGeminiDraftRotation(
   draft: GeminiProgramDraft,
   catalog: ExerciseCatalogEntry[],
-  ctxLocations: { id: string; slug: string }[]
+  ctxLocations: { id: string; slug: string }[],
+  options?: { trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null }
 ): { draft: GeminiProgramDraft; warnings: string[] } {
   const warnings: string[] = [];
   const slugToId = new Map(ctxLocations.map((l) => [l.slug.toLowerCase(), l.id]));
@@ -169,7 +227,10 @@ export function ensureGeminiDraftRotation(
         rest_between_sets_seconds: ex.rest_between_sets_seconds ?? undefined,
       }));
 
-      const result = ensureListHasRotation(proposalExercises, catalog, { locationIds });
+      const result = ensureListHasRotation(proposalExercises, catalog, {
+        locationIds,
+        trainingLevel: options?.trainingLevel,
+      });
       warnings.push(...result.warnings.map((w) => `${session.name}: ${w}`));
 
       const exercises = result.exercises.map((ex) => ({
@@ -182,6 +243,8 @@ export function ensureGeminiDraftRotation(
         reps: ex.reps ?? null,
         rest_between_sets_seconds: ex.rest_between_sets_seconds ?? null,
         rest_after_seconds: ex.rest_after_seconds,
+        load_prescription: ex.load_prescription ?? null,
+        note: ex.note ?? null,
       }));
 
       return { ...session, exercises };
