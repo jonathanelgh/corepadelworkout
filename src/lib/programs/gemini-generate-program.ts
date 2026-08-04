@@ -7,6 +7,7 @@ import {
 } from "@/lib/programs/exercise-catalog";
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
+import { appendHardAiConstraints } from "@/lib/programs/ai-hard-constraints";
 import {
   normalizeExercisePhases,
   parseChoiceGroup,
@@ -304,17 +305,19 @@ export async function generateProgramWithGemini(
   const catalogBlock = formatExerciseCatalogForPrompt(relevantExercises);
   const locationList = selectedLocations.map((l) => `${l.name} (${l.slug})`).join(", ");
 
-  const prompt = fillPromptTemplate(options.promptTemplate, {
-    user_context_block: options.userContextBlock ?? "",
-    coach_brief: brief,
-    location_list: locationList,
-    schedule_targets,
-    difficulty_hint: difficulty_hint_block,
-    program_metadata: metaBlock,
-    exercise_catalog: catalogBlock,
-    exercise_count: String(relevantExercises.length),
-    response_schema: AI_PROGRAM_RESPONSE_SCHEMA,
-  });
+  const prompt = appendHardAiConstraints(
+    fillPromptTemplate(options.promptTemplate, {
+      user_context_block: options.userContextBlock ?? "",
+      coach_brief: brief,
+      location_list: locationList,
+      schedule_targets,
+      difficulty_hint: difficulty_hint_block,
+      program_metadata: metaBlock,
+      exercise_catalog: catalogBlock,
+      exercise_count: String(relevantExercises.length),
+      response_schema: AI_PROGRAM_RESPONSE_SCHEMA,
+    })
+  );
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();

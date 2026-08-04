@@ -97,6 +97,14 @@ export function AiPromptsEditor({ initialPrompts }: { initialPrompts: AiPromptRe
         </div>
       </div>
 
+      <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-950">
+        <strong className="font-semibold">Hard rules come from code</strong>
+        {" — "}
+        tool routing, session structure, rest, levels, both_sides, and progression are always injected at
+        generation time and override anything in these templates. Edit here for tone and consultation style
+        only. Use <span className="font-medium">Reset default</span> to clear stale DB copies.
+      </div>
+
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <aside className="w-56 shrink-0 overflow-y-auto border-r border-gray-200 bg-white p-3">
           <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">

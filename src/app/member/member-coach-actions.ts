@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
-import { AI_COACH_METHODOLOGY_BLOCK } from "@/lib/programs/ai-coach-methodology";
 import { loadAiPrompt } from "@/lib/programs/ai-prompts";
 import {
   chatWithAiCoach,
@@ -201,7 +200,7 @@ export async function sendMemberCoachMessage(input: {
           ? consultation.locationSlug
           : undefined,
       athleteContext: userContextBlock,
-      goal: consultation.goal,
+      goal: [consultation.goal, userMessage].filter(Boolean).join("\n"),
     });
     const levelCap = enforcementOptions.trainingLevel ?? "beginner";
 
@@ -243,7 +242,10 @@ export async function sendMemberCoachMessage(input: {
       bothSidesByExerciseId,
       systemPromptTemplate,
       userContextBlock,
-      extraTemplateVars: { methodology_block: AI_COACH_METHODOLOGY_BLOCK },
+      extraTemplateVars: {
+        methodology_block:
+          "(Methodology and hard generation rules are injected by the app below — follow those if anything conflicts.)",
+      },
       creationOnly: inCreateFlow,
       consultationBrief,
       toolsEnabled:

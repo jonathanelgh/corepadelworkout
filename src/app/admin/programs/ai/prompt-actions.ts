@@ -80,10 +80,16 @@ export async function resetAiPrompt(key: AiPromptKey): Promise<{ ok: true; body:
     return { error: "Unknown prompt key." };
   }
 
-  const body = DEFAULT_AI_PROMPT_BODIES[key].body;
+  const fallback = DEFAULT_AI_PROMPT_BODIES[key];
+  const body = fallback.body;
   const { error } = await auth.supabase
     .from("ai_prompts")
-    .update({ body, updated_by: auth.user.id })
+    .update({
+      body,
+      label: fallback.label,
+      description: fallback.description,
+      updated_by: auth.user.id,
+    })
     .eq("key", key);
 
   if (error) return { error: error.message };

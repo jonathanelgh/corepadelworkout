@@ -6,10 +6,11 @@ import { sortedJunctionIds } from "@/app/admin/exercises/exercise-row-utils";
 export async function loadProgramExerciseOptions(
   supabase: SupabaseClient
 ): Promise<{ exercises: ExerciseOption[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from("exercises")
-    .select(
-      `
+  const [exercisesRes, levelsRes] = await Promise.all([
+    supabase
+      .from("exercises")
+      .select(
+        `
       id,
       title,
       status,
@@ -17,20 +18,28 @@ export async function loadProgramExerciseOptions(
       video_url,
       program_prescription_mode,
       both_sides,
+      exercise_level_id,
       location_id,
       exercise_locations ( location_id, sort_order )
     `
-    )
-    .order("title", { ascending: true });
+      )
+      .order("title", { ascending: true }),
+    supabase.from("exercise_levels").select("id, name"),
+  ]);
 
-  if (error) return { exercises: [], error: error.message };
+  if (exercisesRes.error) return { exercises: [], error: exercisesRes.error.message };
 
-  const exercises: ExerciseOption[] = (data ?? []).map((row) => {
+  const levelNameById = new Map(
+    (levelsRes.data ?? []).map((r) => [r.id as string, r.name as string])
+  );
+
+  const exercises: ExerciseOption[] = (exercisesRes.data ?? []).map((row) => {
     const junction = row.exercise_locations as
       | { location_id: string; sort_order: number }[]
       | null
       | undefined;
     const location_ids = sortedJunctionIds(junction, (r) => r.location_id);
+    const levelId = (row.exercise_level_id as string | null) ?? null;
     return {
       id: row.id as string,
       title: row.title as string,
@@ -45,6 +54,7 @@ export async function loadProgramExerciseOptions(
       bothSides: Boolean(row.both_sides),
       image_url: (row.image_url as string | null) ?? null,
       video_url: (row.video_url as string | null) ?? null,
+      levelName: levelId ? levelNameById.get(levelId) ?? null : null,
     };
   });
 

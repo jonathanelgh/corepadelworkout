@@ -416,13 +416,7 @@ export function buildAiGenerationDebugLog(
         if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
         if (seenHere.has(ex.exercise_id)) continue;
         seenHere.add(ex.exercise_id);
-        if (!seenInPrior.has(ex.exercise_id)) continue;
-        const entry = catalogById(input.catalog, ex.exercise_id);
-        const isProtected =
-          entry != null &&
-          (catalogEntryHasTag(entry, "footwork") ||
-            entry.movementPatterns.some(isRotationalMovementLabel));
-        if (!isProtected) mainRepeatIds.add(ex.exercise_id);
+        if (seenInPrior.has(ex.exercise_id)) mainRepeatIds.add(ex.exercise_id);
       }
       for (const id of seenHere) seenInPrior.add(id);
     }
@@ -430,9 +424,9 @@ export function buildAiGenerationDebugLog(
     ruleChecks.push(
       check(
         "main-variety",
-        "Main exercise variety (≤3 non-required repeats)",
-        repeatCount <= 3 ? "pass" : "fail",
-        `${repeatCount} non-required main exercise(s) appear on more than one day (cap 3). Core/footwork/rotation may repeat.`
+        "Main exercise variety (≤1 main repeat across days)",
+        repeatCount <= 1 ? "pass" : "fail",
+        `${repeatCount} main exercise(s) appear on more than one day (cap 1). Footwork/rotation should rotate to different drills.`
       )
     );
   }

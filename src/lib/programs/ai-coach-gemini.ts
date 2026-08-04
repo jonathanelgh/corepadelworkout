@@ -8,9 +8,7 @@ import {
 } from "@google/generative-ai";
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
-import { AI_COACH_GOVERNING_RULES_BLOCK } from "@/lib/programs/ai-program-rules";
-import { AI_COACH_WEEKLY_PROGRESSION_BLOCK } from "@/lib/programs/apply-weekly-progression";
-import { AI_COACH_METHODOLOGY_BLOCK } from "@/lib/programs/ai-coach-methodology";
+import { appendHardAiConstraints } from "@/lib/programs/ai-hard-constraints";
 import {
   parseChoiceGroup,
   parseSessionPhase,
@@ -118,15 +116,8 @@ function buildSystemInstruction(
     out += `\n\n${options.consultationBrief.trim()}`;
   }
 
-  if (!out.includes("Core Padel methodology")) {
-    out += `\n\n${AI_COACH_METHODOLOGY_BLOCK}`;
-  }
-  if (!out.includes("Core Padel AI — governing rules")) {
-    out += `\n\n${AI_COACH_GOVERNING_RULES_BLOCK}`;
-  }
-  if (!out.includes("Weekly progression (automatic on save")) {
-    out += `\n\n${AI_COACH_WEEKLY_PROGRESSION_BLOCK}`;
-  }
+  // Hard product rules always win over editable DB prompts (which may be stale).
+  out = appendHardAiConstraints(out);
 
   if (options?.creationOnly) {
     const who = options.audience === "member" ? "The athlete" : "The admin";

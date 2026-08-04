@@ -1,7 +1,8 @@
 import { Plus, Package, Layers } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
-import { bucketJunctionByExerciseId, exerciseRowToListItem, EXERCISE_LOCATIONS_SELECT } from "./exercise-row-utils";
+import { exerciseRowToListItem, EXERCISE_LOCATIONS_SELECT } from "./exercise-row-utils";
+import { loadExerciseTaxonomyJunctions } from "@/lib/exercises/load-exercise-taxonomy-junctions";
 import { ExercisesListClient } from "./exercises-list-client";
 import type { ExerciseListItem } from "./types";
 
@@ -45,37 +46,17 @@ export default async function AdminExercisesPage({
   let mpByExercise = new Map<string, { movement_pattern_id: string; sort_order: number }[]>();
   let brByExercise = new Map<string, { body_region_id: string; sort_order: number }[]>();
   let bpByExercise = new Map<string, { body_part_id: string; sort_order: number }[]>();
+  let junctionError: string | null = null;
 
   if (exerciseIds.length > 0) {
-    const [catRes, mpRes, brRes, bpRes] = await Promise.all([
-      supabase
-        .from("exercise_category_type_links")
-        .select("exercise_id, exercise_category_type_id, sort_order")
-        .in("exercise_id", exerciseIds),
-      supabase
-        .from("exercise_movement_pattern_links")
-        .select("exercise_id, movement_pattern_id, sort_order")
-        .in("exercise_id", exerciseIds),
-      supabase
-        .from("exercise_body_region_links")
-        .select("exercise_id, body_region_id, sort_order")
-        .in("exercise_id", exerciseIds),
-      supabase
-        .from("exercise_body_part_links")
-        .select("exercise_id, body_part_id, sort_order")
-        .in("exercise_id", exerciseIds),
-    ]);
-    if (!catRes.error && catRes.data) {
-      ctByExercise = bucketJunctionByExerciseId(catRes.data);
-    }
-    if (!mpRes.error && mpRes.data) {
-      mpByExercise = bucketJunctionByExerciseId(mpRes.data);
-    }
-    if (!brRes.error && brRes.data) {
-      brByExercise = bucketJunctionByExerciseId(brRes.data);
-    }
-    if (!bpRes.error && bpRes.data) {
-      bpByExercise = bucketJunctionByExerciseId(bpRes.data);
+    try {
+      const junctions = await loadExerciseTaxonomyJunctions(supabase, exerciseIds);
+      ctByExercise = junctions.ctByExercise;
+      mpByExercise = junctions.mpByExercise;
+      brByExercise = junctions.brByExercise;
+      bpByExercise = junctions.bpByExercise;
+    } catch (e) {
+      junctionError = e instanceof Error ? e.message : "Could not load exercise taxonomy links.";
     }
   }
   const [
@@ -202,6 +183,11 @@ export default async function AdminExercisesPage({
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               Could not load exercises: {error.message}
+            </div>
+          )}
+          {junctionError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              Could not load exercise categories/tags: {junctionError}
             </div>
           )}
           {sp.error && (

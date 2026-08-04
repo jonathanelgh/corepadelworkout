@@ -23,6 +23,8 @@ export type ExerciseOption = {
   bothSides?: boolean;
   image_url?: string | null;
   video_url?: string | null;
+  /** Display name from `exercise_levels` (e.g. Rookie/Starter). */
+  levelName?: string | null;
 };
 
 type Props = {
@@ -190,10 +192,17 @@ export function ExerciseSearchCombobox({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(ex.id)}
             >
-              <span className="truncate">
-                {ex.title}
-                {ex.status === "draft" ? (
-                  <span className="ml-1.5 font-normal text-amber-700">(draft)</span>
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="truncate">
+                  {ex.title}
+                  {ex.status === "draft" ? (
+                    <span className="ml-1.5 font-normal text-amber-700">(draft)</span>
+                  ) : null}
+                </span>
+                {ex.levelName ? (
+                  <span className="ml-auto shrink-0 text-[11px] font-medium text-violet-700">
+                    {ex.levelName}
+                  </span>
                 ) : null}
               </span>
             </button>

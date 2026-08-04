@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { bucketJunctionByExerciseId, exerciseRowToListItem, EXERCISE_LOCATIONS_SELECT } from "@/app/admin/exercises/exercise-row-utils";
+import { exerciseRowToListItem, EXERCISE_LOCATIONS_SELECT } from "@/app/admin/exercises/exercise-row-utils";
+import { loadExerciseTaxonomyJunctions } from "@/lib/exercises/load-exercise-taxonomy-junctions";
 import { parseExerciseProgramPrescriptionMode, type ExerciseProgramPrescriptionMode } from "@/lib/exercises/program-prescription-mode";
 
 export type ExerciseCatalogEntry = {
@@ -80,35 +81,15 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
   const exercises = exercisesRes.data ?? [];
   const exerciseIds = exercises.map((e) => e.id as string);
 
-  let ctByExercise = new Map<string, { exercise_category_type_id: string; sort_order: number }[]>();
-  let mpByExercise = new Map<string, { movement_pattern_id: string; sort_order: number }[]>();
-  let brByExercise = new Map<string, { body_region_id: string; sort_order: number }[]>();
-  let bpByExercise = new Map<string, { body_part_id: string; sort_order: number }[]>();
-
-  if (exerciseIds.length > 0) {
-    const [catRes, mpRes, brRes, bpRes] = await Promise.all([
-      supabase
-        .from("exercise_category_type_links")
-        .select("exercise_id, exercise_category_type_id, sort_order")
-        .in("exercise_id", exerciseIds),
-      supabase
-        .from("exercise_movement_pattern_links")
-        .select("exercise_id, movement_pattern_id, sort_order")
-        .in("exercise_id", exerciseIds),
-      supabase
-        .from("exercise_body_region_links")
-        .select("exercise_id, body_region_id, sort_order")
-        .in("exercise_id", exerciseIds),
-      supabase
-        .from("exercise_body_part_links")
-        .select("exercise_id, body_part_id, sort_order")
-        .in("exercise_id", exerciseIds),
-    ]);
-    if (catRes.data) ctByExercise = bucketJunctionByExerciseId(catRes.data);
-    if (mpRes.data) mpByExercise = bucketJunctionByExerciseId(mpRes.data);
-    if (brRes.data) brByExercise = bucketJunctionByExerciseId(brRes.data);
-    if (bpRes.data) bpByExercise = bucketJunctionByExerciseId(bpRes.data);
-  }
+  const { ctByExercise, mpByExercise, brByExercise, bpByExercise } =
+    exerciseIds.length > 0
+      ? await loadExerciseTaxonomyJunctions(supabase, exerciseIds)
+      : {
+          ctByExercise: new Map(),
+          mpByExercise: new Map(),
+          brByExercise: new Map(),
+          bpByExercise: new Map(),
+        };
 
   const categoryTypeName = new Map(
     (categoryTypesRes.data ?? []).map((r) => [r.id as string, r.name as string])

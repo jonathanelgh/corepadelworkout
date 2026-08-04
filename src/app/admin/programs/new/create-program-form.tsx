@@ -2328,9 +2328,20 @@ export function CreateProgramForm({
                                         videoUrl={exerciseMeta?.video_url}
                                       />
                                       <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium text-gray-900 truncate">
-                                          {exerciseTitle(entry.exerciseId)}
-                                        </p>
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                                          <p className="text-sm font-medium text-gray-900 truncate">
+                                            {exerciseTitle(entry.exerciseId)}
+                                          </p>
+                                          {exerciseMeta?.levelName ? (
+                                            <span className="inline-flex shrink-0 items-center rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-800">
+                                              {exerciseMeta.levelName}
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex shrink-0 items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                                              No level
+                                            </span>
+                                          )}
+                                        </div>
                                         {entryBothSides && (
                                           <p className="mt-1 text-xs font-medium text-violet-700">
                                             Both sides — enter total work time; the player splits it evenly (left → rest → right).

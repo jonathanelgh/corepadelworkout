@@ -9,8 +9,11 @@ import {
 import { exerciseHasRotationalPattern } from "@/lib/programs/ensure-rotational-exercise";
 import type { SessionPhase } from "@/lib/programs/session-phase";
 
-/** Max distinct *main* exercise IDs that may appear in more than one session in a week. */
-export const MAX_REPEATED_EXERCISES_PER_WEEK = 3;
+/**
+ * Max distinct *main* exercise IDs that may appear in more than one session in a week.
+ * Keep this low so days feel different; warm-up/cool-down may still share mobility.
+ */
+export const MAX_REPEATED_EXERCISES_PER_WEEK = 1;
 
 type SessionWithExercises = {
   name: string;
@@ -21,11 +24,17 @@ function phaseOf(ex: WorkoutProposalExercise): SessionPhase {
   return ex.phase === "warmup" || ex.phase === "cooldown" ? ex.phase : "main";
 }
 
-/** Structure-critical moves should not be swapped away for variety. */
+function isFootwork(entry: ExerciseCatalogEntry): boolean {
+  return catalogEntryHasTag(entry, "footwork") || catalogEntryHasTag(entry, "agility");
+}
+
+function isRotational(entry: ExerciseCatalogEntry): boolean {
+  return exerciseHasRotationalPattern(entry);
+}
+
+/** Structure-critical moves: prefer same-class replacements rather than dropping the requirement. */
 function isProtectedMainEntry(entry: ExerciseCatalogEntry): boolean {
-  if (exerciseHasRotationalPattern(entry)) return true;
-  if (catalogEntryHasTag(entry, "footwork")) return true;
-  return false;
+  return isFootwork(entry) || isRotational(entry);
 }
 
 function mainIdsAppearingInMultipleSessions(sessions: SessionWithExercises[]): string[] {
@@ -44,12 +53,24 @@ function mainIdsAppearingInMultipleSessions(sessions: SessionWithExercises[]): s
     .map(([id]) => id);
 }
 
+function replacementMatchesClass(
+  candidate: ExerciseCatalogEntry,
+  original: ExerciseCatalogEntry | undefined
+): boolean {
+  if (!original) return true;
+  if (isFootwork(original)) return isFootwork(candidate);
+  if (isRotational(original)) return isRotational(candidate);
+  // Unprotected → avoid introducing another protected filler (structure pass owns those).
+  return !isProtectedMainEntry(candidate);
+}
+
 function pickReplacement(
   catalog: ExerciseCatalogEntry[],
   opts: {
     excludeIds: Set<string>;
     locationSlug?: string;
     trainingLevel?: OnboardingLevel | null;
+    original?: ExerciseCatalogEntry;
   }
 ): ExerciseCatalogEntry | null {
   const level = opts.trainingLevel ?? "beginner";
@@ -57,19 +78,19 @@ function pickReplacement(
     if (e.status !== "published" || opts.excludeIds.has(e.id)) return false;
     if (!exerciseEligibleForTrainingLevel(e, level)) return false;
     if (!exerciseMatchesLocation(e, opts.locationSlug)) return false;
-    // Don't introduce another protected tag as a "variety" filler — structure pass handles those.
-    if (isProtectedMainEntry(e)) return false;
+    if (!replacementMatchesClass(e, opts.original)) return false;
     return true;
   });
   if (pool.length === 0) return null;
+  // Prefer alphabetically stable picks so enforcement is deterministic.
   pool.sort((a, b) => a.title.localeCompare(b.title));
   return pool[0] ?? null;
 }
 
 /**
  * Cap cross-session MAIN exercise repeats within a week of session templates.
- * Warm-up / cool-down may repeat (mobility routines). Structure-critical main
- * tags (core / footwork / rotation) are never swapped away for variety.
+ * Warm-up / cool-down may repeat (mobility routines).
+ * Footwork / rotation repeats are swapped to a different drill of the same class when possible.
  */
 export function ensureWeeklyExerciseVariety<T extends SessionWithExercises>(
   sessions: T[],
@@ -97,7 +118,7 @@ export function ensureWeeklyExerciseVariety<T extends SessionWithExercises>(
   }
 
   let guard = 0;
-  while (guard++ < 60) {
+  while (guard++ < 80) {
     const repeated = mainIdsAppearingInMultipleSessions(out);
     if (repeated.length <= maxRepeated) break;
 
@@ -110,7 +131,7 @@ export function ensureWeeklyExerciseVariety<T extends SessionWithExercises>(
       }
     }
 
-    // Prefer keeping protected (core/footwork/rotation) repeats within the allowance.
+    // Prefer keeping one intentional anchor; swap everything else (including same-class protected).
     const protectedFirst = firstSeenOrder.filter((id) => {
       const entry = byId.get(id);
       return entry != null && isProtectedMainEntry(entry);
@@ -130,9 +151,6 @@ export function ensureWeeklyExerciseVariety<T extends SessionWithExercises>(
     const candidates: Candidate[] = [];
 
     for (const id of excessIds) {
-      const entry = byId.get(id);
-      if (entry && isProtectedMainEntry(entry)) continue; // never swap these for variety
-
       let seenBefore = false;
       for (let si = 0; si < out.length; si++) {
         const session = out[si]!;
@@ -141,7 +159,7 @@ export function ensureWeeklyExerciseVariety<T extends SessionWithExercises>(
           if (ex.exercise_id !== id || phaseOf(ex) !== "main") continue;
           if (!seenBefore) {
             seenBefore = true;
-            continue;
+            continue; // keep first occurrence
           }
           candidates.push({
             sessionIndex: si,
@@ -153,36 +171,28 @@ export function ensureWeeklyExerciseVariety<T extends SessionWithExercises>(
       }
     }
 
-    if (candidates.length === 0) {
-      // Only protected excess remains — allow them rather than break structure.
-      if (excessIds.every((id) => {
-        const entry = byId.get(id);
-        return entry != null && isProtectedMainEntry(entry);
-      })) {
-        warnings.push(
-          `Kept ${excessIds.length} extra protected main repeat(s) (core/footwork/rotation) above the ${maxRepeated} soft cap.`
-        );
-      }
-      break;
-    }
+    if (candidates.length === 0) break;
 
     candidates.sort((a, b) => b.priority - a.priority);
     const target = candidates[0]!;
     const session = out[target.sessionIndex]!;
     const oldEx = session.exercises[target.exerciseIndex]!;
-    const oldTitle = byId.get(target.exerciseId)?.title ?? target.exerciseId;
+    const oldEntry = byId.get(target.exerciseId);
+    const oldTitle = oldEntry?.title ?? target.exerciseId;
 
     const sessionIds = new Set(session.exercises.map((e) => e.exercise_id));
     const replacement = pickReplacement(catalog, {
       excludeIds: new Set([...weekUsed, ...sessionIds]),
       locationSlug: options?.locationSlug,
       trainingLevel: options?.trainingLevel,
+      original: oldEntry,
     });
 
     if (!replacement) {
       warnings.push(
         `Could not replace repeated main "${oldTitle}" in "${session.name}" — not enough unused catalog exercises.`
       );
+      // Drop this id from further attempts by allowing it as a soft repeat.
       break;
     }
 
@@ -193,7 +203,7 @@ export function ensureWeeklyExerciseVariety<T extends SessionWithExercises>(
       title: replacement.title,
     };
     warnings.push(
-      `Replaced repeated main "${oldTitle}" in "${session.name}" with "${replacement.title}" — max ${maxRepeated} repeated main exercises per week.`
+      `Replaced repeated main "${oldTitle}" in "${session.name}" with "${replacement.title}" — max ${maxRepeated} repeated main exercise(s) per week.`
     );
   }
 

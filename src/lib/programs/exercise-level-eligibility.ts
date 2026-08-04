@@ -28,6 +28,7 @@ export function normalizeExerciseLevelSlug(
   if (!slugOrName?.trim()) return null;
   const s = slugOrName.trim().toLowerCase();
   if (s === "rookie-starter" || s === "rookie" || s === "starter") return "rookie-starter";
+  if (s === "beginner" || s.includes("beginner")) return "rookie-starter";
   if (s.includes("rookie") || s.includes("starter")) return "rookie-starter";
   if (s === "intermediate" || s.includes("intermediate")) return "intermediate";
   if (s === "advanced" || s.includes("advanced")) return "advanced";
@@ -47,7 +48,7 @@ export function exerciseLevelRank(
 
 /**
  * Whether an exercise may appear in a program/workout for this training level.
- * Untagged exercises (no level) are allowed — only mismatched tagged levels are blocked.
+ * Untagged exercises are treated as beginner (rookie-starter) — advanced athletes do not get them.
  */
 export function exerciseEligibleForTrainingLevel(
   entry: Pick<ExerciseCatalogEntry, "levelSlug" | "levelName">,
@@ -55,8 +56,7 @@ export function exerciseEligibleForTrainingLevel(
 ): boolean {
   if (!trainingLevel) return true;
   const allowed = TRAINING_ALLOWED_EXERCISE_RANKS[trainingLevel];
-  const rank = exerciseLevelRank(entry);
-  if (rank == null) return true;
+  const rank = exerciseLevelRank(entry) ?? 1; // missing level → beginner
   return allowed.has(rank);
 }
 

@@ -17,6 +17,7 @@ import {
 } from "@/lib/programs/programs-catalog";
 import { formatExerciseCatalogForPrompt, loadProgramAiContext, type ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import { filterCatalogByTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
+import { parseTrainingLevelFromBrief } from "@/lib/programs/program-prescription-rules";
 import {
   listMembersForAiPicker,
   loadProfileAiContext,
@@ -193,7 +194,11 @@ export async function sendAiCoachMessage(input: {
     const profileContext = input.targetUserId
       ? await loadProfileAiContext(auth.supabase, input.targetUserId)
       : null;
-    const adminTrainingLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
+    const dropdownLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
+    const chatLevel = parseTrainingLevelFromBrief(
+      [consultation.goal, userMessage].filter(Boolean).join("\n")
+    );
+    const adminTrainingLevel = dropdownLevel ?? chatLevel;
     const userContextBlock = buildAdminAiAthleteContext(profileContext, adminTrainingLevel);
     const enforcementOptions = resolveSessionEnforcementOptions({
       locationSlug:

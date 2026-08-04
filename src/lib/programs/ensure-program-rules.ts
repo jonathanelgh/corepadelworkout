@@ -6,6 +6,7 @@ import {
   clampRestToBand,
   defaultRestForEntry,
   defaultStrengthSetsReps,
+  detectFootworkSpecialtyFocus,
   detectRehabFocus,
   exerciseIsHighIntensityStart,
   exerciseIsStrength,
@@ -13,6 +14,7 @@ import {
   exerciseMatchesLocation,
   exerciseNeedsMainBlockRest,
   kineticChainBodyParts,
+  resolveMinFootworkPerSession,
   resolveRestBand,
   sessionHasCoreBlock,
   type RehabFocus,
@@ -24,15 +26,49 @@ export type ProgramRulesContext = {
   title?: string;
   description?: string;
   goal?: string;
-  /** Override per-session footwork floor (default 1). Weekly 2/1/2 uses 2,1,2. */
+  /** Override per-session footwork floor (default 1). Weekly 2/1/2 uses 2,1,2. Specialty footwork uses 4+. */
   minFootworkPerSession?: number;
+  /** When true, main block is biased toward footwork/agility density. */
+  specialtyFootwork?: boolean;
+  /**
+   * Main-block exercise IDs already used earlier in the week.
+   * Prefer not to re-pick these when filling gaps (still allowed if catalog is exhausted).
+   */
+  avoidExerciseIds?: ReadonlySet<string> | string[];
 };
+
+function contextSpecialtyFootwork(ctx?: ProgramRulesContext): boolean {
+  if (ctx?.specialtyFootwork) return true;
+  return detectFootworkSpecialtyFocus(
+    [ctx?.title, ctx?.description, ctx?.goal].filter(Boolean).join(" ")
+  );
+}
+
+function contextMinFootwork(
+  ctx: ProgramRulesContext | undefined,
+  opts?: { sessionCount?: number; sessionIndex?: number }
+): number {
+  if (ctx?.minFootworkPerSession != null && ctx.minFootworkPerSession > 0) {
+    return ctx.minFootworkPerSession;
+  }
+  return resolveMinFootworkPerSession({
+    sessionCount: opts?.sessionCount ?? 1,
+    sessionIndex: opts?.sessionIndex ?? 0,
+    specialtyFootwork: contextSpecialtyFootwork(ctx),
+  });
+}
 
 function catalogById(
   catalog: ExerciseCatalogEntry[],
   id: string
 ): ExerciseCatalogEntry | undefined {
   return catalog.find((e) => e.id === id);
+}
+
+function avoidIdSet(ctx?: ProgramRulesContext): Set<string> {
+  const raw = ctx?.avoidExerciseIds;
+  if (!raw) return new Set();
+  return raw instanceof Set ? new Set(raw) : new Set(raw);
 }
 
 function pickFromCatalog(
@@ -42,19 +78,31 @@ function pickFromCatalog(
   count: number,
   locationSlug?: string,
   trainingLevel?: OnboardingLevel | null,
-  opts?: { require?: (entry: ExerciseCatalogEntry) => boolean }
+  opts?: {
+    require?: (entry: ExerciseCatalogEntry) => boolean;
+    /** Soft-avoid: only used if a fresh pick exists; otherwise may reuse. */
+    preferAvoidIds?: ReadonlySet<string>;
+  }
 ): ExerciseCatalogEntry[] {
   const level = trainingLevel ?? "beginner";
-  const pool = catalog
-    .filter(
-      (e) =>
-        e.status === "published" &&
-        !excludeIds.has(e.id) &&
-        exerciseMatchesLocation(e, locationSlug) &&
-        exerciseEligibleForTrainingLevel(e, level) &&
-        (opts?.require ? opts.require(e) : true)
-    )
-    .sort((a, b) => score(a) - score(b));
+  const preferAvoid = opts?.preferAvoidIds;
+  const eligible = catalog.filter(
+    (e) =>
+      e.status === "published" &&
+      !excludeIds.has(e.id) &&
+      exerciseMatchesLocation(e, locationSlug) &&
+      exerciseEligibleForTrainingLevel(e, level) &&
+      (opts?.require ? opts.require(e) : true)
+  );
+
+  const fresh = preferAvoid
+    ? eligible.filter((e) => !preferAvoid.has(e.id))
+    : eligible;
+  const pool = (fresh.length >= count ? fresh : eligible).sort((a, b) => {
+    const sa = score(a) + (preferAvoid?.has(a.id) ? 500 : 0);
+    const sb = score(b) + (preferAvoid?.has(b.id) ? 500 : 0);
+    return sa - sb;
+  });
   return pool.slice(0, count);
 }
 
@@ -66,14 +114,15 @@ function cooldownScore(entry: ExerciseCatalogEntry): number {
   return score;
 }
 
-function mainBlockScore(entry: ExerciseCatalogEntry): number {
+function mainBlockScore(entry: ExerciseCatalogEntry, specialtyFootwork = false): number {
   let score = 100;
   // Prefer real training moves over pure mobility for the main ("core") block.
   if (catalogEntryHasTag(entry, "mobility")) score += 40;
-  if (catalogEntryHasTag(entry, "footwork")) score -= 20;
-  if (exerciseIsStrength(entry)) score -= 25;
-  if (entry.programPrescriptionMode === "sets_reps_only") score -= 15;
-  if (entry.programPrescriptionMode === "time_only") score += 10;
+  if (catalogEntryHasTag(entry, "footwork")) score -= specialtyFootwork ? 55 : 20;
+  if (catalogEntryHasTag(entry, "agility")) score -= specialtyFootwork ? 30 : 5;
+  if (exerciseIsStrength(entry)) score -= specialtyFootwork ? 5 : 25;
+  if (entry.programPrescriptionMode === "sets_reps_only") score -= specialtyFootwork ? 5 : 15;
+  if (entry.programPrescriptionMode === "time_only") score += specialtyFootwork ? -10 : 10;
   return score;
 }
 
@@ -240,7 +289,8 @@ function ensureSafeMainStart(
   locationSlug: string | undefined,
   sessionLabel: string | undefined,
   warnings: string[],
-  trainingLevel?: OnboardingLevel | null
+  trainingLevel?: OnboardingLevel | null,
+  preferAvoidIds?: ReadonlySet<string>
 ): WorkoutProposalExercise[] {
   const mainIndices = exercises
     .map((ex, index) => ({ ex, index }))
@@ -278,7 +328,8 @@ function ensureSafeMainStart(
     safeMainStartScore,
     1,
     locationSlug,
-    trainingLevel
+    trainingLevel,
+    { preferAvoidIds }
   )[0];
   if (!pick) {
     warnings.push(
@@ -306,7 +357,8 @@ function ensureKineticChain(
   locationSlug: string | undefined,
   sessionLabel: string | undefined,
   warnings: string[],
-  trainingLevel?: OnboardingLevel | null
+  trainingLevel?: OnboardingLevel | null,
+  preferAvoidIds?: ReadonlySet<string>
 ): WorkoutProposalExercise[] {
   let out = exercises;
   for (const part of kineticChainBodyParts(focus)) {
@@ -322,7 +374,8 @@ function ensureKineticChain(
       (entry) => kineticChainScore(entry, part),
       1,
       locationSlug,
-      trainingLevel
+      trainingLevel,
+      { preferAvoidIds }
     )[0];
     if (!pick) {
       warnings.push(
@@ -344,6 +397,87 @@ function ensureKineticChain(
   return out;
 }
 
+function isProtectedMainForFootworkSpecialty(entry: ExerciseCatalogEntry): boolean {
+  if (catalogEntryHasTag(entry, "footwork")) return true;
+  if (catalogEntryHasTag(entry, "rotation")) return true;
+  if (catalogEntryHasTag(entry, "anti-rotation")) return true;
+  if (catalogEntryHasTag(entry, "anti rotation")) return true;
+  return false;
+}
+
+/**
+ * For footwork-specialty programs, replace non-footwork main fillers with footwork
+ * until ~60% of main is footwork-tagged (keeps rotation / anti-rotation).
+ */
+function densifyFootworkSpecialtyMain(
+  exercises: WorkoutProposalExercise[],
+  catalog: ExerciseCatalogEntry[],
+  usedIds: Set<string>,
+  locationSlug: string | undefined,
+  sessionLabel: string | undefined,
+  warnings: string[],
+  trainingLevel?: OnboardingLevel | null,
+  preferAvoidIds?: ReadonlySet<string>
+): WorkoutProposalExercise[] {
+  const out = [...exercises];
+  const mainIndices = out
+    .map((ex, index) => ({ ex, index }))
+    .filter(({ ex }) => ex.phase === "main");
+  if (mainIndices.length === 0) return out;
+
+  const footworkMain = mainIndices.filter(({ ex }) => {
+    const entry = catalogById(catalog, ex.exercise_id);
+    return entry != null && catalogEntryHasTag(entry, "footwork");
+  }).length;
+  const target = Math.max(4, Math.ceil(mainIndices.length * 0.6));
+  let need = target - footworkMain;
+  if (need <= 0) return out;
+
+  const swapCandidates = mainIndices
+    .filter(({ ex }) => {
+      const entry = catalogById(catalog, ex.exercise_id);
+      return entry != null && !isProtectedMainForFootworkSpecialty(entry);
+    })
+    .reverse(); // prefer swapping later accessories first
+
+  let swapped = 0;
+  for (const candidate of swapCandidates) {
+    if (need <= 0) break;
+    const pick = pickFromCatalog(
+      catalog,
+      usedIds,
+      footworkScore,
+      1,
+      locationSlug,
+      trainingLevel,
+      {
+        require: (e) => catalogEntryHasTag(e, "footwork"),
+        preferAvoidIds,
+      }
+    )[0];
+    if (!pick) break;
+
+    usedIds.delete(candidate.ex.exercise_id);
+    usedIds.add(pick.id);
+    out[candidate.index] = {
+      ...defaultMainExercise(pick),
+      // Preserve position; defaultMainExercise already phase=main
+    };
+    swapped += 1;
+    need -= 1;
+  }
+
+  if (swapped > 0) {
+    warnings.push(
+      sessionLabel
+        ? `${sessionLabel}: Swapped ${swapped} main exercise(s) to footwork for specialty focus.`
+        : `Swapped ${swapped} main exercise(s) to footwork for specialty focus.`
+    );
+  }
+
+  return out;
+}
+
 export function applyProgramRulesToSession(
   exercises: WorkoutProposalExercise[],
   catalog: ExerciseCatalogEntry[],
@@ -359,7 +493,16 @@ export function applyProgramRulesToSession(
   const level = options?.trainingLevel ?? "beginner";
   let out = exercises.filter((ex) => {
     const entry = catalogById(catalog, ex.exercise_id);
-    if (!entry) return true;
+    if (!entry) {
+      // Catalog passed to enforcement is already level/location filtered — drop unknowns
+      // so the model cannot keep beginner (or invented) IDs outside the allowed set.
+      warnings.push(
+        sessionLabel
+          ? `${sessionLabel}: Removed unknown exercise ${ex.exercise_id} — not in allowed catalog.`
+          : `Removed unknown exercise ${ex.exercise_id} — not in allowed catalog.`
+      );
+      return false;
+    }
     if (exerciseEligibleForTrainingLevel(entry, level)) return true;
     warnings.push(
       sessionLabel
@@ -369,19 +512,26 @@ export function applyProgramRulesToSession(
     return false;
   });
   const usedIds = new Set(out.map((e) => e.exercise_id));
+  const specialtyFootwork = contextSpecialtyFootwork(options?.programContext);
+  const preferAvoidIds = avoidIdSet(options?.programContext);
 
   // "Core" = main block (not warm-up / cool-down). Ensure at least one main exercise.
   if (!sessionHasCoreBlock(out)) {
     const pick = pickFromCatalog(
       catalog,
       usedIds,
-      mainBlockScore,
+      (entry) => mainBlockScore(entry, specialtyFootwork),
       1,
       options?.locationSlug,
       level,
       {
+        preferAvoidIds,
         require: (e) =>
-          !catalogEntryHasTag(e, "mobility") || catalogEntryHasTag(e, "footwork") || exerciseIsStrength(e),
+          specialtyFootwork
+            ? catalogEntryHasTag(e, "footwork") || catalogEntryHasTag(e, "agility")
+            : !catalogEntryHasTag(e, "mobility") ||
+              catalogEntryHasTag(e, "footwork") ||
+              exerciseIsStrength(e),
       }
     )[0];
     if (pick) {
@@ -402,7 +552,7 @@ export function applyProgramRulesToSession(
   }
 
   const footworkCount = countTag(out, catalog, "footwork");
-  const minFootwork = options?.programContext?.minFootworkPerSession ?? 1;
+  const minFootwork = contextMinFootwork(options?.programContext);
   const footworkNeeded = Math.max(0, minFootwork - footworkCount);
   if (footworkNeeded > 0) {
     const picks = pickFromCatalog(
@@ -412,7 +562,10 @@ export function applyProgramRulesToSession(
       footworkNeeded,
       options?.locationSlug,
       level,
-      { require: (e) => catalogEntryHasTag(e, "footwork") }
+      {
+        require: (e) => catalogEntryHasTag(e, "footwork"),
+        preferAvoidIds,
+      }
     );
     if (picks.length > 0) {
       for (const pick of picks) {
@@ -421,8 +574,8 @@ export function applyProgramRulesToSession(
       }
       warnings.push(
         sessionLabel
-          ? `${sessionLabel}: Added ${picks.length} footwork exercise(s).`
-          : `Added ${picks.length} footwork exercise(s).`
+          ? `${sessionLabel}: Added ${picks.length} footwork exercise(s)${specialtyFootwork ? " (footwork specialty)" : ""}.`
+          : `Added ${picks.length} footwork exercise(s)${specialtyFootwork ? " (footwork specialty)" : ""}.`
       );
     } else {
       warnings.push(
@@ -433,6 +586,19 @@ export function applyProgramRulesToSession(
     }
   }
 
+  if (specialtyFootwork) {
+    out = densifyFootworkSpecialtyMain(
+      out,
+      catalog,
+      usedIds,
+      options?.locationSlug,
+      sessionLabel,
+      warnings,
+      level,
+      preferAvoidIds
+    );
+  }
+
   if (!sessionHasTag(out, catalog, "mobility", "cooldown")) {
     const pick = pickFromCatalog(
       catalog,
@@ -441,7 +607,10 @@ export function applyProgramRulesToSession(
       1,
       options?.locationSlug,
       level,
-      { require: (e) => catalogEntryHasTag(e, "mobility") }
+      {
+        require: (e) => catalogEntryHasTag(e, "mobility"),
+        preferAvoidIds,
+      }
     )[0];
     if (pick) {
       usedIds.add(pick.id);
@@ -479,7 +648,8 @@ export function applyProgramRulesToSession(
       options?.locationSlug,
       sessionLabel,
       warnings,
-      level
+      level,
+      preferAvoidIds
     );
   }
 
@@ -496,7 +666,8 @@ export function applyProgramRulesToSession(
     options?.locationSlug,
     sessionLabel,
     warnings,
-    level
+    level,
+    preferAvoidIds
   );
 
   return { exercises: out, warnings };

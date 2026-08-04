@@ -11,6 +11,7 @@ import {
 } from "@/lib/programs/profile-ai-context";
 import { generateProgramWithGemini, type AiProgramGenerateRequest } from "@/lib/programs/gemini-generate-program";
 import { filterCatalogByTrainingLevel, resolveExerciseLevelCap } from "@/lib/programs/exercise-level-eligibility";
+import { parseTrainingLevelFromBrief } from "@/lib/programs/program-prescription-rules";
 import { ensureGeminiDraftRotation } from "@/lib/programs/ensure-rotational-exercise";
 import { ensureGeminiDraftStructure, resolveSessionEnforcementOptions } from "@/lib/programs/ensure-session-structure";
 import { mapGeminiDraftToForm, type AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
@@ -49,7 +50,9 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
     const profileContext = input.targetUserId
       ? await loadProfileAiContext(auth.supabase, input.targetUserId)
       : null;
-    const adminTrainingLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
+    const dropdownLevel = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
+    const briefLevel = parseTrainingLevelFromBrief(input.brief);
+    const adminTrainingLevel = dropdownLevel ?? briefLevel;
     const userContextBlock = buildAdminAiAthleteContext(profileContext, adminTrainingLevel);
     const difficultySlug = input.difficultyLevelId
       ? ctx.difficulties.find((d) => d.id === input.difficultyLevelId)?.slug ?? null

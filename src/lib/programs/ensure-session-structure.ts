@@ -1,7 +1,7 @@
 import type { ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import type { OnboardingLevel } from "@/lib/member/onboarding";
 import { isOnboardingLevel } from "@/lib/programs/profile-ai-context";
-import { parseTrainingLevelFromAthleteContext } from "@/lib/programs/program-prescription-rules";
+import { parseTrainingLevelFromAthleteContext, detectFootworkSpecialtyFocus, resolveMinFootworkPerSession, parseTrainingLevelFromBrief } from "@/lib/programs/program-prescription-rules";
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
 import type { GeminiProgramDraft } from "@/lib/programs/gemini-generate-program";
 import { applyProgramRulesToSession, type ProgramRulesContext } from "@/lib/programs/ensure-program-rules";
@@ -31,19 +31,51 @@ export type SessionStructureOptions = {
   programContext?: ProgramRulesContext;
 };
 
+function enrichProgramContext(
+  ctx: ProgramRulesContext | undefined,
+  sessionCount: number,
+  sessionIndex: number
+): ProgramRulesContext {
+  const base: ProgramRulesContext = { ...ctx };
+  const specialty =
+    base.specialtyFootwork === true ||
+    detectFootworkSpecialtyFocus([base.title, base.description, base.goal].filter(Boolean).join(" "));
+  return {
+    ...base,
+    specialtyFootwork: specialty,
+    minFootworkPerSession: resolveMinFootworkPerSession({
+      sessionCount,
+      sessionIndex,
+      specialtyFootwork: specialty,
+    }),
+  };
+}
+
 export function resolveSessionEnforcementOptions(input: {
   locationSlug?: string;
   trainingLevel?: string | null;
   athleteContext?: string | null;
   goal?: string;
 }): Pick<SessionStructureOptions, "locationSlug" | "trainingLevel" | "programContext"> {
-  const trainingLevel = isOnboardingLevel(input.trainingLevel)
-    ? input.trainingLevel
-    : parseTrainingLevelFromAthleteContext(input.athleteContext);
+  const fromDropdown = isOnboardingLevel(input.trainingLevel) ? input.trainingLevel : null;
+  const fromProfile = parseTrainingLevelFromAthleteContext(input.athleteContext);
+  const fromBrief = parseTrainingLevelFromBrief(input.goal);
+  const trainingLevel = fromDropdown ?? fromProfile ?? fromBrief;
+  const specialtyFootwork = detectFootworkSpecialtyFocus(input.goal);
   return {
     locationSlug: input.locationSlug,
     trainingLevel,
-    programContext: input.goal ? { goal: input.goal } : undefined,
+    programContext: input.goal
+      ? {
+          goal: input.goal,
+          specialtyFootwork,
+          minFootworkPerSession: resolveMinFootworkPerSession({
+            sessionCount: 1,
+            sessionIndex: 0,
+            specialtyFootwork,
+          }),
+        }
+      : undefined,
   };
 }
 
@@ -148,19 +180,26 @@ function pickCatalogExercises(
   count: number,
   score: (entry: ExerciseCatalogEntry) => number,
   locationSlug?: string,
-  trainingLevel?: OnboardingLevel | null
+  trainingLevel?: OnboardingLevel | null,
+  preferAvoidIds?: ReadonlySet<string>
 ): ExerciseCatalogEntry[] {
   if (count <= 0) return [];
   const level = trainingLevel ?? "beginner";
-  const pool = catalog
-    .filter(
-      (e) =>
-        e.status === "published" &&
-        !excludeIds.has(e.id) &&
-        exerciseMatchesLocation(e, locationSlug) &&
-        exerciseEligibleForTrainingLevel(e, level)
-    )
-    .sort((a, b) => score(a) - score(b));
+  const eligible = catalog.filter(
+    (e) =>
+      e.status === "published" &&
+      !excludeIds.has(e.id) &&
+      exerciseMatchesLocation(e, locationSlug) &&
+      exerciseEligibleForTrainingLevel(e, level)
+  );
+  const fresh = preferAvoidIds
+    ? eligible.filter((e) => !preferAvoidIds.has(e.id))
+    : eligible;
+  const pool = (fresh.length >= count ? fresh : eligible).sort((a, b) => {
+    const sa = score(a) + (preferAvoidIds?.has(a.id) ? 500 : 0);
+    const sb = score(b) + (preferAvoidIds?.has(b.id) ? 500 : 0);
+    return sa - sb;
+  });
   return pool.slice(0, count);
 }
 
@@ -179,7 +218,15 @@ export function ensureSessionExerciseStructure(
 
   const eligibleExercises = exercises.filter((ex) => {
     const entry = catalog.find((c) => c.id === ex.exercise_id);
-    if (!entry) return true;
+    if (!entry) {
+      // Catalog is already level-filtered — drop IDs outside it (e.g. beginner picks).
+      warnings.push(
+        sessionLabel
+          ? `${sessionLabel}: Removed unknown exercise ${ex.exercise_id} — not in allowed catalog.`
+          : `Removed unknown exercise ${ex.exercise_id} — not in allowed catalog.`
+      );
+      return false;
+    }
     if (exerciseEligibleForTrainingLevel(entry, level)) return true;
     warnings.push(
       sessionLabel
@@ -195,6 +242,11 @@ export function ensureSessionExerciseStructure(
 
   let out = [...warmups, ...mains, ...cooldowns];
   const usedIds = new Set(out.map((e) => e.exercise_id));
+  const preferAvoidIds = (() => {
+    const raw = options?.programContext?.avoidExerciseIds;
+    if (!raw) return undefined;
+    return raw instanceof Set ? raw : new Set(raw);
+  })();
 
   const warmupNeeded = Math.max(0, MIN_WARMUP_EXERCISES_PER_SESSION - warmups.length);
   if (warmupNeeded > 0) {
@@ -204,7 +256,8 @@ export function ensureSessionExerciseStructure(
       warmupNeeded,
       warmupCandidateScore,
       options?.locationSlug,
-      level
+      level,
+      preferAvoidIds
     );
     if (picks.length === 0) {
       warnings.push(
@@ -237,7 +290,8 @@ export function ensureSessionExerciseStructure(
       cooldownNeeded,
       cooldownCandidateScore,
       options?.locationSlug,
-      level
+      level,
+      preferAvoidIds
     );
     if (picks.length === 0) {
       warnings.push(
@@ -310,14 +364,12 @@ export function ensureProgramProposalStructure(
     ...options?.programContext,
   };
 
-  // 3-day week: footwork distribution 2 / 1 / 2 across day templates.
-  const footworkTargets =
-    proposal.sessions.length === 3 ? ([2, 1, 2] as const) : null;
-
+  // Build days sequentially so fillers avoid mains already used earlier in the week.
+  const weekMainUsed = new Set<string>();
   const sessionsAfterRules = proposal.sessions.map((session, index) => {
-    const programContext: ProgramRulesContext = {
-      ...baseContext,
-      minFootworkPerSession: footworkTargets ? footworkTargets[index]! : 1,
+    const programContext = {
+      ...enrichProgramContext(baseContext, proposal.sessions.length, index),
+      avoidExerciseIds: new Set(weekMainUsed),
     };
     const result = ensureSessionExerciseStructure(session.exercises, catalog, {
       locationSlug,
@@ -326,6 +378,10 @@ export function ensureProgramProposalStructure(
       programContext,
     });
     warnings.push(...result.warnings);
+    for (const ex of result.exercises) {
+      if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
+      weekMainUsed.add(ex.exercise_id);
+    }
     return { ...session, exercises: result.exercises };
   });
 
@@ -335,11 +391,19 @@ export function ensureProgramProposalStructure(
   });
   warnings.push(...variety.warnings);
 
-  // Variety can disturb required tags — re-apply structure so final always passes hard rules.
+  // Variety can disturb required tags — re-apply structure with cross-day avoid sets.
   const sessions = variety.sessions.map((session, index) => {
-    const programContext: ProgramRulesContext = {
-      ...baseContext,
-      minFootworkPerSession: footworkTargets ? footworkTargets[index]! : 1,
+    const avoidFromOthers = new Set<string>();
+    for (let i = 0; i < variety.sessions.length; i++) {
+      if (i === index) continue;
+      for (const ex of variety.sessions[i]!.exercises) {
+        if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
+        avoidFromOthers.add(ex.exercise_id);
+      }
+    }
+    const programContext = {
+      ...enrichProgramContext(baseContext, variety.sessions.length, index),
+      avoidExerciseIds: avoidFromOthers,
     };
     const result = ensureSessionExerciseStructure(session.exercises, catalog, {
       locationSlug,
@@ -351,12 +415,19 @@ export function ensureProgramProposalStructure(
     return { ...session, exercises: result.exercises };
   });
 
+  // Final variety pass after repair so structure fillers don't re-clone days.
+  const varietyFinal = ensureWeeklyExerciseVariety(sessions, catalog, {
+    locationSlug,
+    trainingLevel: options?.trainingLevel,
+  });
+  warnings.push(...varietyFinal.warnings);
+
   // Force 8-week programs unless already set higher (never shrink below 8 for AI programs).
   const duration_weeks =
     proposal.duration_weeks >= 8 ? proposal.duration_weeks : 8;
 
   return {
-    proposal: { ...proposal, sessions, duration_weeks },
+    proposal: { ...proposal, sessions: varietyFinal.sessions, duration_weeks },
     warnings,
   };
 }
@@ -373,7 +444,8 @@ export function ensureGeminiDraftStructure(
     ...options?.programContext,
   };
   const tracks = draft.tracks.map((track) => {
-    const structuredSessions = track.sessions.map((session) => {
+    const weekMainUsed = new Set<string>();
+    const structuredSessions = track.sessions.map((session, index) => {
       const proposalExercises: WorkoutProposalExercise[] = session.exercises.map((ex) => ({
         exercise_id: ex.exercise_id,
         title: catalog.find((c) => c.id === ex.exercise_id)?.title ?? ex.exercise_id,
@@ -390,13 +462,21 @@ export function ensureGeminiDraftStructure(
         note: ex.note ?? undefined,
       }));
 
+      const dayContext = {
+        ...enrichProgramContext(programContext, track.sessions.length, index),
+        avoidExerciseIds: new Set(weekMainUsed),
+      };
       const result = ensureSessionExerciseStructure(proposalExercises, catalog, {
         locationSlug: track.location_slug,
         sessionLabel: session.name,
         trainingLevel: options?.trainingLevel,
-        programContext,
+        programContext: dayContext,
       });
       warnings.push(...result.warnings);
+      for (const ex of result.exercises) {
+        if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
+        weekMainUsed.add(ex.exercise_id);
+      }
 
       return { name: session.name, exercises: result.exercises, source: session };
     });
@@ -412,10 +492,17 @@ export function ensureGeminiDraftStructure(
     warnings.push(...variety.warnings);
 
     const repairedSessions = variety.sessions.map((session, index) => {
-      const programContextForDay: ProgramRulesContext = {
-        ...programContext,
-        minFootworkPerSession:
-          variety.sessions.length === 3 ? ([2, 1, 2] as const)[index]! : 1,
+      const avoidFromOthers = new Set<string>();
+      for (let i = 0; i < variety.sessions.length; i++) {
+        if (i === index) continue;
+        for (const ex of variety.sessions[i]!.exercises) {
+          if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
+          avoidFromOthers.add(ex.exercise_id);
+        }
+      }
+      const programContextForDay = {
+        ...enrichProgramContext(programContext, variety.sessions.length, index),
+        avoidExerciseIds: avoidFromOthers,
       };
       const result = ensureSessionExerciseStructure(session.exercises, catalog, {
         locationSlug: track.location_slug,
@@ -427,7 +514,13 @@ export function ensureGeminiDraftStructure(
       return { name: session.name, exercises: result.exercises };
     });
 
-    const sessions = repairedSessions.map((session, index) => {
+    const varietyFinal = ensureWeeklyExerciseVariety(repairedSessions, catalog, {
+      locationSlug: track.location_slug,
+      trainingLevel: options?.trainingLevel,
+    });
+    warnings.push(...varietyFinal.warnings);
+
+    const sessions = varietyFinal.sessions.map((session, index) => {
       const source = structuredSessions[index]?.source ?? track.sessions[index]!;
       const exercises = session.exercises.map((ex) => ({
         exercise_id: ex.exercise_id,

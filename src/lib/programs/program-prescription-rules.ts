@@ -195,6 +195,37 @@ export function detectRehabFocus(text: string | null | undefined): RehabFocus | 
   return null;
 }
 
+/**
+ * True when the brief asks for a footwork / agility / court-movement focused program
+ * (not just a general plan that happens to mention movement).
+ */
+export function detectFootworkSpecialtyFocus(text: string | null | undefined): boolean {
+  const t = text?.trim();
+  if (!t) return false;
+  if (
+    /\bfootwork\b/i.test(t) ||
+    /\b(agility|change[\s-]?of[\s-]?direction|\bcod\b|ladder\s+drills?|court\s+movement|first[\s-]?step|quick\s+feet|quickness|lateral\s+movement|shuffle\s+drills?)\b/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Per-session footwork floor: specialty programs need a heavy footwork main block. */
+export function resolveMinFootworkPerSession(opts: {
+  sessionCount: number;
+  sessionIndex: number;
+  specialtyFootwork: boolean;
+}): number {
+  if (opts.specialtyFootwork) return 4;
+  if (opts.sessionCount === 3) {
+    return ([2, 1, 2] as const)[opts.sessionIndex] ?? 1;
+  }
+  return 1;
+}
+
 export function kineticChainBodyParts(focus: RehabFocus): string[] {
   return KINETIC_CHAIN_PARTS[focus];
 }
@@ -216,5 +247,49 @@ export function parseTrainingLevelFromAthleteContext(text: string | null | undef
   if (admin) return admin[1]!.toLowerCase() as OnboardingLevel;
   const onboarding = text.match(/Onboarding level:\s*(beginner|intermediate|advanced)/i);
   if (onboarding) return onboarding[1]!.toLowerCase() as OnboardingLevel;
+  return null;
+}
+
+/**
+ * Infer athlete training level from a free-text brief / chat (when the admin dropdown is Auto).
+ * Prefers explicit athlete/player/level phrasing over bare adjectives.
+ */
+export function parseTrainingLevelFromBrief(text: string | null | undefined): OnboardingLevel | null {
+  const t = text?.trim();
+  if (!t) return null;
+
+  if (
+    /\b(elite)\s+(player|athlete|level|padel)?\b/i.test(t) ||
+    /\bfor\s+(an?\s+)?elite\b/i.test(t)
+  ) {
+    return "advanced";
+  }
+  if (
+    /\badvanced\s+(player|athlete|level|padel)\b/i.test(t) ||
+    /\bfor\s+(an?\s+)?advanced\b/i.test(t) ||
+    /\b(training\s+)?level[:\s]+advanced\b/i.test(t) ||
+    /\badvanced\s+level\b/i.test(t)
+  ) {
+    return "advanced";
+  }
+  if (
+    /\bintermediate\s+(player|athlete|level|padel)\b/i.test(t) ||
+    /\bfor\s+(an?\s+)?intermediate\b/i.test(t) ||
+    /\b(training\s+)?level[:\s]+intermediate\b/i.test(t)
+  ) {
+    return "intermediate";
+  }
+  if (
+    /\b(beginner|rookie|starter|novice)\s+(player|athlete|level|padel)\b/i.test(t) ||
+    /\bfor\s+(an?\s+)?(beginner|rookie|starter|novice)\b/i.test(t) ||
+    /\b(training\s+)?level[:\s]+(beginner|rookie|starter)\b/i.test(t)
+  ) {
+    return "beginner";
+  }
+
+  // Bare level words in a short brief (e.g. "advanced, gym, 45 min")
+  if (/\badvanced\b/i.test(t) || /\belite\b/i.test(t)) return "advanced";
+  if (/\bintermediate\b/i.test(t)) return "intermediate";
+  if (/\b(beginner|rookie|starter|novice)\b/i.test(t)) return "beginner";
   return null;
 }
