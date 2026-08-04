@@ -20,8 +20,7 @@ Rules for fields:
 - Put work, rest, load, and bilateral volume in structured fields — never hide them in \`note\`.
 - Catalog \`both_sides\`: \`reps\` = per side; \`duration_seconds\` = **total** work time for both sides (app splits evenly, e.g. 60s → 30s left + 30s right).
 - Match exercise difficulty to athlete/program level (beginner → Rookie/Starter only; intermediate → Rookie + Intermediate; advanced → all). The catalog you receive is already filtered.
-- \`note\`: admin-created programs only. Member sessions: omit \`note\`.
-- Never put progression text in \`note\` ("increase weight", "add a set", etc.).
+- \`note\`: technique/setup cues. For sets×reps with 2+ sets, include \`Rest 30 sec between sets\`. Member sessions may still carry that between-sets cue. Never put progression text in \`note\` ("increase weight", "add a set", etc.).
 
 ### Session shape (every session, this order)
 1. \`warmup\`: **exactly 5** exercises (mobility/activation/prep; timed).
@@ -52,7 +51,8 @@ Return exactly 3 week-1 templates:
 ### Rest
 - \`rest_between_sets_seconds\` = between sets of the same exercise.
 - \`rest_after_seconds\` = after the final set, before the next exercise.
-- Match rest to the exercise strength/tag band (endurance/stability 30–60s; hypertrophy 60–90s; max/explosive 120–180s; etc.).
+- **Sets×reps (sets >= 2):** set \`rest_between_sets_seconds\` to **30** and note \`Rest 30 sec between sets\`.
+- Timed intervals / strength bands: match rest to the exercise tag band (endurance/stability 30–60s; hypertrophy 60–90s; max/explosive 120–180s; etc.) for \`rest_after_seconds\` and timed-round rests.
 
 ### If a hard rule cannot be met
 Return a short validation error. Do not silently break a hard rule.

@@ -1,6 +1,9 @@
 # Supabase Auth email templates
 
-Branded templates for **Core Padel Workout** (dark `#0a0a0a`, accent `#ccff00`).
+Branded templates for **Core Padel Workout** (accent `#ccff00`).
+
+- Confirm signup & reset password: dark theme
+- Magic link: **light** theme (white card on light gray)
 
 Paste these into **Supabase Dashboard → Authentication → Email templates**.
 
@@ -9,6 +12,12 @@ Paste these into **Supabase Dashboard → Authentication → Email templates**.
 1. Open **Confirm signup**
 2. **Subject:** copy from `confirm-signup-subject.txt`
 3. **Body:** paste the full HTML from `confirm-signup.html`
+
+## Magic link
+
+1. Open **Magic Link**
+2. **Subject:** copy from `magic-link-subject.txt`
+3. **Body:** paste the full HTML from `magic-link.html`
 
 ## Reset password
 
@@ -20,7 +29,7 @@ Variables used (provided by Supabase — do not rename):
 
 | Variable | Purpose |
 |----------|---------|
-| `{{ .ConfirmationURL }}` | Confirm or reset link |
+| `{{ .ConfirmationURL }}` | Confirm, magic-link, or reset link |
 | `{{ .Email }}` | User email |
 | `{{ .SiteURL }}` | Site URL from project settings |
 

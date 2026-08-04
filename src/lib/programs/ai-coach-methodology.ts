@@ -90,6 +90,7 @@ Every workout must follow this order:
 - When prescribing progressive overload week-to-week, set week-1 **load_prescription** on weighted strength (e.g. \`12 kg\`). The app applies level-aware progression — do **not** put "increase load 5–10%" in \`note\`.
 - For catalog exercises tagged **both_sides** on **timed** prescriptions: set **duration_seconds** as the **total** work time for both sides (e.g. 60 → 30s left + 30s right). The app runs left → rest → right. Set **rest_between_sides_seconds** to 10–20s when supported (else 15s default).
 - For **both_sides** on sets & reps: **reps** are per side.
-- Use the per-exercise **note** field for admin technique/split cues only — never for values that belong in structured fields.
+- For **sets×reps** with 2+ sets: set \`rest_between_sets_seconds\` to **30** and include coach note \`Rest 30 sec between sets\` (athletes work at their pace; the note is the between-set cue).
+- Use the per-exercise **note** field for technique/split cues and that between-sets rest cue — never for weekly progression or load values.
 
 ${AI_COACH_WARMUP_RULES_BLOCK}`.trim();

@@ -102,7 +102,7 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
               "rest_between_sets_seconds": "number | null",
               "rest_after_seconds": "number | null",
               "load_prescription": "string | null (week-1 load e.g. \"12 kg\" — NOT in note)",
-              "note": "string | null (technique/setup only — never weekly increases)"
+              "note": "string | null (sets×reps with 2+ sets: include \"Rest 30 sec between sets\"; otherwise technique/setup only — never weekly increases)"
             }
           ]
         }

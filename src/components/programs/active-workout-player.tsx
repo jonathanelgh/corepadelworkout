@@ -484,7 +484,8 @@ export function ActiveWorkoutPlayer({
       : inSetRest && next && current && isBilateralPlaybackStep(current)
         ? next
         : current;
-  const displayNote = displayExercise?.note?.trim() || null;
+  const displayNote =
+    displayExercise?.bothSides ? null : displayExercise?.note?.trim() || null;
   const sideSwitchRest =
     inSetRest &&
     current != null &&
@@ -649,7 +650,7 @@ export function ActiveWorkoutPlayer({
                       {workoutSideLabel(current.workoutSide)}
                     </p>
                   )}
-                  {current.note?.trim() && (
+                  {current.note?.trim() && !current.bothSides && (
                     <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
                       {current.note.trim()}
                     </p>
@@ -673,7 +674,7 @@ export function ActiveWorkoutPlayer({
                       <BothSidesChip variant="dark" />
                     </div>
                   )}
-                  {next.note?.trim() && (
+                  {next.note?.trim() && !next.bothSides && (
                     <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
                       {next.note.trim()}
                     </p>
@@ -786,13 +787,7 @@ export function ActiveWorkoutPlayer({
                   </p>
                 )}
 
-                {currentIsTimed && showSetProgress && phase === "work" && current && (
-                  <p className="mt-2 text-sm text-white/60">
-                    {exerciseMeta(current)}
-                  </p>
-                )}
-
-                {!currentIsTimed && current && (
+                {!currentIsTimed && current && !current.bothSides && (
                   <p className="mt-3 text-lg font-medium text-[#ccff00]">
                     {formatSetsRepsLabel(current) ?? "Go at your pace"}
                   </p>

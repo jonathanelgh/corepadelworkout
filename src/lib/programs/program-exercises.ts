@@ -218,6 +218,9 @@ export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
   } else if (ex.reps != null && ex.reps > 0) {
     parts.push(`${ex.reps} reps`);
   }
+  if (sets != null && sets > 1 && between > 0) {
+    parts.push(`${between}s between sets`);
+  }
   if (workSecs != null && type === "sets_reps") {
     parts.push(formatWorkDurationShort(workSecs));
   } else if (ex.durationMinutes != null && ex.durationMinutes > 0 && type === "sets_reps") {

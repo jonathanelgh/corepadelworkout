@@ -72,7 +72,7 @@ Tool selection (CRITICAL):
 - REQUIRED: Every workout/session MUST include at least one rotational or anti-rotational exercise (catalog move: tag contains Rotation, Anti-rotation, or Rotational transfer). Place it in the main block unless it fits warm-up mobility.
 - Do NOT invent exercises, IDs, or names not in the catalog.
 - Each exercise must include exercise_id and rest_after_seconds (required except last exercise in a session).
-- Prescription rest rules: sets+reps → rest_after_seconds between exercises (30–60s main). Timed work (duration_minutes) → rest_after_seconds between exercises (20–45s). Timed sets (duration_minutes + sets >= 2) → rest_between_sets_seconds between rounds AND rest_after_seconds before the next exercise.
+- Prescription rest rules: sets+reps (sets >= 2) → rest_between_sets_seconds=30 + note "Rest 30 sec between sets", and rest_after_seconds between exercises (30–60s main). Timed work (duration_seconds) → rest_after_seconds between exercises (20–45s). Timed sets (duration + sets >= 2) → rest_between_sets_seconds between rounds AND rest_after_seconds before the next exercise.
 - Be concise and practical for padel athletes.
 
 ${AI_COACH_METHODOLOGY_BLOCK}
@@ -113,7 +113,7 @@ Do not call tools for casual conversation. Never call generate_program.
 - Use ONLY exercises from the catalog below. Copy exercise_id UUIDs exactly.
 - REQUIRED: at least one rotational or anti-rotational exercise in the main block.
 - Use structured rest fields matching the tag rest band. both_sides: reps are PER SIDE; duration_seconds is TOTAL for both sides (split evenly).
-- Omit \`note\` for member-generated sessions. Never put progression instructions in notes (including "add weight").
+- For sets×reps with 2+ sets: set rest_between_sets_seconds=30 and note "Rest 30 sec between sets". Otherwise omit technique notes for member-generated sessions. Never put progression instructions in notes (including "add weight").
 
 {{methodology_block}}
 

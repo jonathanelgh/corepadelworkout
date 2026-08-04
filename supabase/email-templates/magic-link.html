@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <meta name="supported-color-schemes" content="light" />
+  <title>Your login link</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;color:#171717;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f4f5;">
+    <tr>
+      <td align="center" style="padding:40px 16px 48px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:16px;border:1px solid #e5e5e5;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 28px 24px;border-bottom:1px solid #ececec;">
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#111111;">
+                Core Padel<span style="color:#84cc00;">.</span>
+              </p>
+              <p style="margin:14px 0 0;font-size:24px;font-weight:600;line-height:1.25;color:#111111;">Your login link</p>
+              <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#525252;">
+                Use this secure link to sign in to Core Padel Workout
+                {{ if .Email }}as <span style="color:#171717;font-weight:600;">{{ .Email }}</span>{{ end }}.
+                No password needed.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 16px;font-size:13px;font-weight:600;color:#171717;">Continue to your account</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 24px;">
+                <tr>
+                  <td style="border-radius:999px;background-color:#ccff00;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#0a0a0a;text-decoration:none;border-radius:999px;">Log in</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 20px;font-size:12px;line-height:1.5;color:#737373;">
+                Button not working? Paste this link into your browser:<br />
+                <span style="color:#525252;word-break:break-all;">{{ .ConfirmationURL }}</span>
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#fafafa;border-radius:12px;border:1px solid #ececec;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#84cc00;">Quick tip</p>
+                    <p style="margin:0;font-size:14px;line-height:1.55;color:#404040;">This link expires after a short time and can only be used once. After you tap it, you will be signed in and taken to your dashboard.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 28px 28px;border-top:1px solid #ececec;">
+              <p style="margin:0;font-size:11px;line-height:1.5;color:#a3a3a3;">You are receiving this because a login link was requested for your Core Padel Workout account. If you did not ask for this, you can ignore this email.</p>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:20px 0 0;font-size:11px;line-height:1.5;color:#a3a3a3;">Core Padel Workout</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

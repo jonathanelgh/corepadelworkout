@@ -50,7 +50,35 @@ const DEFAULT_REST_AFTER: Record<SessionPhase, number> = {
 
 const DEFAULT_REST_AFTER_TIMED = 30;
 const DEFAULT_REST_BETWEEN_SETS = 30;
+/** Fixed between-set rest for sets×reps prescriptions (shown as coach note + structured field). */
+export const SETS_REPS_REST_BETWEEN_SETS_SECONDS = 30;
+export const SETS_REPS_BETWEEN_SETS_NOTE = "Rest 30 sec between sets";
 const DEFAULT_REST_BETWEEN_SIDES = DEFAULT_REST_BETWEEN_SIDES_SECONDS;
+
+const BETWEEN_SETS_NOTE_RE = /rest\s+\d+\s*sec(?:onds)?\s+between\s+sets/i;
+
+/** True when this is sets×reps work with multiple sets (not timed). */
+export function isMultiSetSetsReps(ex: AiExerciseFields): boolean {
+  const type = inferAiPrescriptionType(ex);
+  const sets = ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : 1;
+  return type === "sets_reps" && sets > 1;
+}
+
+/** Ensure sets×reps multi-set exercises carry the between-sets rest coach note. Skip both_sides. */
+export function ensureSetsRepsBetweenSetsNote(
+  note: string | null | undefined,
+  ex: AiExerciseFields,
+  opts?: { bothSides?: boolean }
+): string | null {
+  if (opts?.bothSides || !isMultiSetSetsReps(ex)) {
+    const trimmed = note?.trim();
+    return trimmed || null;
+  }
+  const existing = note?.trim() || "";
+  if (BETWEEN_SETS_NOTE_RE.test(existing)) return existing || null;
+  if (!existing) return SETS_REPS_BETWEEN_SETS_NOTE;
+  return `${existing} ${SETS_REPS_BETWEEN_SETS_NOTE}`;
+}
 
 /** Rest between left and right on bilateral timed exercises. */
 export function defaultRestBetweenSidesSeconds(
@@ -79,7 +107,7 @@ export function defaultRestAfterSeconds(
   return DEFAULT_REST_AFTER[ex.phase] ?? 45;
 }
 
-/** Rest between timed sets/rounds when sets > 1 with a work duration. */
+/** Rest between sets/rounds when sets > 1 (timed intervals or sets×reps). */
 export function defaultRestBetweenSetsSeconds(ex: AiExerciseFields): number | null {
   const explicit = parseNonNegInt(ex.rest_between_sets_seconds);
   if (explicit != null && explicit > 0) return explicit;
@@ -87,6 +115,7 @@ export function defaultRestBetweenSetsSeconds(ex: AiExerciseFields): number | nu
   const type = inferAiPrescriptionType(ex);
   const sets = ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : 1;
   if (type === "timed_intervals" && sets > 1) return DEFAULT_REST_BETWEEN_SETS;
+  if (type === "sets_reps" && sets > 1) return SETS_REPS_REST_BETWEEN_SETS_SECONDS;
   return null;
 }
 
@@ -114,21 +143,35 @@ export function aiExerciseToProgramPayload(
     durationSeconds = WARMUP_DURATION_SECONDS;
   }
 
+  const sets =
+    ex.phase === "warmup" ? null : ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null;
+  const reps =
+    ex.phase === "warmup" ? null : ex.reps != null && ex.reps > 0 ? Math.ceil(ex.reps) : null;
+  const forNote: AiExerciseFields = {
+    ...ex,
+    duration_seconds: durationSeconds,
+    duration_minutes: null,
+    sets,
+    reps,
+  };
+
   return {
     exercise_id: ex.exercise_id,
     duration_minutes: null,
     duration_seconds: durationSeconds,
-    sets: ex.phase === "warmup" ? null : ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null,
-    reps: ex.phase === "warmup" ? null : ex.reps != null && ex.reps > 0 ? Math.ceil(ex.reps) : null,
-    rest_between_sets_seconds: defaultRestBetweenSetsSeconds(ex),
-    rest_between_sides_seconds: defaultRestBetweenSidesSeconds(ex, {
+    sets,
+    reps,
+    rest_between_sets_seconds: defaultRestBetweenSetsSeconds(forNote),
+    rest_between_sides_seconds: defaultRestBetweenSidesSeconds(forNote, {
       bothSides: opts.bothSides,
     }),
-    rest_after_seconds: defaultRestAfterSeconds(ex, opts),
+    rest_after_seconds: defaultRestAfterSeconds(forNote, opts),
     load_prescription: cleaned.load_prescription,
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
-    note: cleaned.note,
+    note: ensureSetsRepsBetweenSetsNote(cleaned.note, forNote, {
+      bothSides: opts.bothSides,
+    }),
   };
 }
 
@@ -143,11 +186,16 @@ export function normalizeAiExerciseRest<T extends AiExerciseFields>(
       note: ex.note ?? null,
       load_prescription: ex.load_prescription ?? null,
     });
+    const restBetween = defaultRestBetweenSetsSeconds(ex) ?? undefined;
+    const withRest: AiExerciseFields = {
+      ...ex,
+      rest_between_sets_seconds: restBetween ?? null,
+    };
     return {
       ...ex,
-      note: cleaned.note ?? undefined,
+      note: ensureSetsRepsBetweenSetsNote(cleaned.note, withRest, { bothSides }) ?? undefined,
       load_prescription: cleaned.load_prescription ?? undefined,
-      rest_between_sets_seconds: defaultRestBetweenSetsSeconds(ex) ?? undefined,
+      rest_between_sets_seconds: restBetween,
       rest_between_sides_seconds:
         defaultRestBetweenSidesSeconds(ex, { bothSides }) ?? undefined,
       rest_after_seconds: defaultRestAfterSeconds(ex, {

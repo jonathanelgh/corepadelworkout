@@ -198,16 +198,38 @@ function applyMainRest(
   const fallback = defaultRestForEntry(entry, "main", level);
   const targetAfter =
     ex.rest_after_seconds > 0 ? clampRestToBand(ex.rest_after_seconds, band) : fallback;
-  const targetBetween =
-    ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
+
+  const hasDuration =
+    (ex.duration_seconds != null && ex.duration_seconds > 0) ||
+    (ex.duration_minutes != null && ex.duration_minutes > 0);
+  const isSetsRepsMulti =
+    !hasDuration && ex.sets != null && ex.sets > 1 && ex.reps != null && ex.reps > 0;
+
+  // Sets×reps: fixed 30s between sets (coach cue) — do not clamp up to strength bands.
+  const targetBetween = isSetsRepsMulti
+    ? ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
+      ? ex.rest_between_sets_seconds
+      : 30
+    : ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
       ? clampRestToBand(ex.rest_between_sets_seconds, band)
       : ex.sets != null && ex.sets > 1
         ? fallback
         : ex.rest_between_sets_seconds;
+
+  const note =
+    isSetsRepsMulti &&
+    !entry.bothSides &&
+    !(ex.note && /rest\s+\d+\s*sec(?:onds)?\s+between\s+sets/i.test(ex.note))
+      ? ex.note?.trim()
+        ? `${ex.note.trim()} Rest 30 sec between sets`
+        : "Rest 30 sec between sets"
+      : ex.note;
+
   return {
     ...ex,
     rest_after_seconds: targetAfter,
     rest_between_sets_seconds: targetBetween,
+    note,
   };
 }
 

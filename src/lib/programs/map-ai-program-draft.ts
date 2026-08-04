@@ -13,6 +13,10 @@ import {
   clampProgramPrescriptionType,
 } from "@/lib/exercises/program-prescription-mode";
 import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
+import {
+  defaultRestBetweenSetsSeconds,
+  ensureSetsRepsBetweenSetsNote,
+} from "@/lib/programs/normalize-ai-exercise-prescription";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
 export type AiProgramExerciseRow = {
@@ -186,6 +190,25 @@ export function mapGeminiDraftToForm(
           note: ex.note,
           load_prescription: ex.load_prescription,
         });
+        const aiFields = {
+          phase: ex.phase,
+          duration_seconds: workSeconds,
+          duration_minutes: workSeconds != null ? Math.ceil(workSeconds / 60) : ex.duration_minutes,
+          sets: ex.sets,
+          reps: ex.reps,
+          rest_between_sets_seconds: ex.rest_between_sets_seconds,
+          rest_after_seconds: ex.rest_after_seconds,
+          note: cleaned.note,
+        };
+        const restBetween = defaultRestBetweenSetsSeconds(aiFields) ?? ex.rest_between_sets_seconds;
+        const noteWithRest = ensureSetsRepsBetweenSetsNote(
+          cleaned.note,
+          {
+            ...aiFields,
+            rest_between_sets_seconds: restBetween,
+          },
+          { bothSides: catalogEntry?.bothSides ?? false }
+        );
 
         exercises.push({
           exerciseId: ex.exercise_id,
@@ -196,7 +219,7 @@ export function mapGeminiDraftToForm(
           durationUnit: hasSeconds ? "sec" : "min",
           sets: intToField(ex.sets),
           reps: intToField(ex.reps),
-          restBetweenSetsSeconds: intToField(ex.rest_between_sets_seconds),
+          restBetweenSetsSeconds: intToField(restBetween),
           restBetweenSidesSeconds: intToField(
             "rest_between_sides_seconds" in ex
               ? (ex as { rest_between_sides_seconds?: number | null }).rest_between_sides_seconds
@@ -204,7 +227,7 @@ export function mapGeminiDraftToForm(
           ),
           restAfterSeconds: intToField(ex.rest_after_seconds),
           loadPrescription: cleaned.load_prescription?.trim() ?? "",
-          note: cleaned.note?.trim() ?? "",
+          note: noteWithRest?.trim() ?? "",
         });
       }
 

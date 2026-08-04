@@ -213,7 +213,7 @@ const TOOLS: FunctionDeclaration[] = [
               rest_between_sets_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Rest between sets of the same exercise. Match tag band (e.g. hypertrophy 60–90s, max strength 120–180s).",
+                  "Rest between sets of the same exercise. For sets×reps with sets >= 2 use 30. For timed intervals match tag band.",
               },
               rest_after_seconds: {
                 type: SchemaType.NUMBER,
@@ -232,7 +232,7 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Admin coach note only (technique/split rationale). Never put progression, rest, or load values here.",
+                  "Coach note shown in-workout. For sets×reps with sets >= 2 include exactly: Rest 30 sec between sets. Otherwise technique/split only — never progression or load.",
               },
               load_prescription: {
                 type: SchemaType.STRING,
@@ -287,7 +287,8 @@ const TOOLS: FunctionDeclaration[] = [
               },
               rest_between_sets_seconds: {
                 type: SchemaType.NUMBER,
-                description: "Rest between sets of the same exercise (match tag rest band).",
+                description:
+                  "Rest between sets. For sets×reps with sets >= 2 use 30. For timed intervals match tag rest band.",
               },
               rest_after_seconds: {
                 type: SchemaType.NUMBER,
@@ -306,7 +307,7 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Admin coach note only. Never put progression, rest, or load values here. Omit for member sessions.",
+                  "Coach note shown in-workout. For sets×reps with sets >= 2 include: Rest 30 sec between sets. Otherwise technique only (omit if none). Never progression or load.",
               },
               load_prescription: {
                 type: SchemaType.STRING,
@@ -657,7 +658,7 @@ export async function chatWithAiCoach(params: {
     let history = initialHistory;
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
-      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
+      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), rest_between_sets_seconds=30 for sets×reps with sets >= 2 (plus note "Rest 30 sec between sets"), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
       `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs at least 5 warmup exercises (duration_seconds: 60 each), main (include rotation or anti-rotation), and cooldown (≥5 at 60s).`,
       `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
     ];

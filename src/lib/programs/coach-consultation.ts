@@ -1065,7 +1065,7 @@ export function formatGenerationCoachBrief(
 - Use consultation values above for duration, frequency, location_slug, equipment, and movement limits.
 - Copy exercise_id UUIDs exactly from the catalog (square brackets). Do not invent IDs.
 - **Warm-up (mandatory every session):** at least 5 exercises with phase=warmup before main work. Each warm-up exercise: duration_seconds=60, rest_after_seconds=15. No sets/reps or duration_minutes on warm-up.
-- Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds (between exercises; omit or 0 on the last exercise). Use rest_between_sets_seconds when prescribing timed intervals in main/cool-down (duration + sets >= 2).
+- Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds (between exercises; omit or 0 on the last exercise). For sets×reps with sets >= 2: rest_between_sets_seconds=30 and note "Rest 30 sec between sets". Use rest_between_sets_seconds when prescribing timed intervals in main/cool-down (duration + sets >= 2).
 ${
   isProgram
     ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block. Each template day must include the full warm-up block.
