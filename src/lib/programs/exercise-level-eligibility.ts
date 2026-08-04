@@ -10,11 +10,16 @@ const EXERCISE_LEVEL_RANK: Record<string, number> = {
   elite: 4,
 };
 
-/** Max exercise rank allowed for each athlete / program training level. */
-const TRAINING_MAX_EXERCISE_RANK: Record<OnboardingLevel, number> = {
-  beginner: 1,
-  intermediate: 2,
-  advanced: 4,
+/**
+ * Allowed exercise ranks per athlete / program training level.
+ * - beginner → beginner only
+ * - intermediate → beginner + intermediate
+ * - advanced → intermediate + advanced (+ elite); not beginner
+ */
+const TRAINING_ALLOWED_EXERCISE_RANKS: Record<OnboardingLevel, ReadonlySet<number>> = {
+  beginner: new Set([1]),
+  intermediate: new Set([1, 2]),
+  advanced: new Set([2, 3, 4]),
 };
 
 export function normalizeExerciseLevelSlug(
@@ -42,18 +47,17 @@ export function exerciseLevelRank(
 
 /**
  * Whether an exercise may appear in a program/workout for this training level.
- * Untagged exercises (no level) are allowed — only tagged harder levels are blocked.
- * Higher athlete levels may use easier exercises.
+ * Untagged exercises (no level) are allowed — only mismatched tagged levels are blocked.
  */
 export function exerciseEligibleForTrainingLevel(
   entry: Pick<ExerciseCatalogEntry, "levelSlug" | "levelName">,
   trainingLevel: OnboardingLevel | null | undefined
 ): boolean {
   if (!trainingLevel) return true;
-  const maxRank = TRAINING_MAX_EXERCISE_RANK[trainingLevel];
+  const allowed = TRAINING_ALLOWED_EXERCISE_RANKS[trainingLevel];
   const rank = exerciseLevelRank(entry);
   if (rank == null) return true;
-  return rank <= maxRank;
+  return allowed.has(rank);
 }
 
 export function filterCatalogByTrainingLevel<

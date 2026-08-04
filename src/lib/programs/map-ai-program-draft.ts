@@ -164,7 +164,7 @@ export function mapGeminiDraftToForm(
         const levelCap = scheduleHints?.trainingLevel ?? "beginner";
         if (catalogEntry && !exerciseEligibleForTrainingLevel(catalogEntry, levelCap)) {
           warnings.push(
-            `Removed "${catalogEntry.title}" from "${sess.name}" — above ${levelCap} exercise level.`
+            `Removed "${catalogEntry.title}" from "${sess.name}" — not eligible for ${levelCap} exercise level.`
           );
           continue;
         }

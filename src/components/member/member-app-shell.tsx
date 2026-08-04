@@ -30,7 +30,7 @@ type Profile = {
 const desktopNav: { tab: MemberTab; label: string; icon: typeof Home }[] = [
   { tab: "home", label: "Dashboard", icon: LayoutDashboard },
   { tab: "workouts", label: "Programs", icon: Dumbbell },
-  { tab: "custom", label: "Custom", icon: Sparkles },
+  { tab: "custom", label: "Coach", icon: Sparkles },
   { tab: "profile", label: "Profile", icon: User },
 ];
 

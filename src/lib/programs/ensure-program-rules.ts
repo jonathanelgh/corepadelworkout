@@ -363,8 +363,8 @@ export function applyProgramRulesToSession(
     if (exerciseEligibleForTrainingLevel(entry, level)) return true;
     warnings.push(
       sessionLabel
-        ? `${sessionLabel}: Removed ${entry.title} — above ${level} exercise level.`
-        : `Removed ${entry.title} — above ${level} exercise level.`
+        ? `${sessionLabel}: Removed ${entry.title} — not eligible for ${level} exercise level.`
+        : `Removed ${entry.title} — not eligible for ${level} exercise level.`
     );
     return false;
   });
