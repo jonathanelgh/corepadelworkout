@@ -21,7 +21,7 @@ Rules for fields:
 - Leave \`load_prescription\` **blank**. Athletes choose a weight that fits their strength — never invent kg/lb amounts (in \`load_prescription\` or \`note\`).
 - **both_sides is catalog-only**: ONLY when the catalog line includes the \`both_sides\` tag may you treat the exercise as bilateral (\`reps\` = per side; timed \`duration_seconds\` = **total** for both sides, app splits evenly). If the tag is absent, do **not** invent both-sides work — never write “both sides”, “each side”, “per side”, or “left then right” in \`note\`, and never assume the athlete must switch sides.
 - Match exercise difficulty to athlete/program level (beginner → Rookie/Starter only; intermediate → Rookie/Starter + Intermediate; advanced → Intermediate + Advanced + Elite — **never** Rookie/Starter). The catalog you receive is already filtered — do not use exercise IDs outside it.
-- \`note\`: technique/setup cues only. For sets×reps with 2+ sets, include \`Rest 30 sec between sets\`. Never put progression text in \`note\` ("increase weight", "add a set", etc.). Never put both-sides instructions in \`note\` for exercises without the catalog \`both_sides\` tag.
+- \`note\`: technique/setup cues only. For sets×reps with 2+ sets, include \`Rest {N} sec between sets\` using the strength-tag rest band. Never put progression text in \`note\` ("increase weight", "add a set", etc.). Never put both-sides instructions in \`note\` for exercises without the catalog \`both_sides\` tag.
 
 ### Session shape (every session, this order)
 1. \`warmup\`: **exactly 5** exercises (mobility/activation/prep; timed).
@@ -31,7 +31,7 @@ Rules for fields:
 - Include rotation or anti-rotation in main.
 - Sequence explosive/jump/sprint/shuffle only **after** at least one low-intensity movement-prep drill in main.
 - Do not place fatiguing conditioning before power, speed, plyometrics, or maximum strength.
-- **Main timed exercises** (footwork, holds, timed conditioning, etc.): always use **timed intervals** — \`duration_seconds\` + \`sets\` of **2 or 3 rounds** (never a single one-shot timer). Set \`rest_between_sets_seconds\` between rounds (typically 30). Warm-up and cool-down stay single timed blocks.
+- **Main timed exercises** (footwork, holds, timed conditioning, etc.): always use **timed intervals** — \`duration_seconds\` + \`sets\` of **2 or 3 rounds** (never a single one-shot timer). Set \`rest_between_sets_seconds\` between rounds from the rest matrix. Warm-up and cool-down stay single timed blocks.
 
 ### Weekly split (when \`sessions_per_week\` = 3)
 Default general S&C template (when the brief is NOT a specialty focus) — return exactly 3 week-1 templates:
@@ -62,11 +62,12 @@ When the athlete/admin brief asks for a **focused** program (especially **footwo
 - Per session template: plan exactly one non-compound add OR related variant from week 5 (app retains identity; describe intent in admin \`note\` if needed).
 
 ### Rest
-- \`rest_between_sets_seconds\` = between sets of the same exercise.
+- \`rest_between_sets_seconds\` = between sets/rounds of the same exercise.
 - \`rest_after_seconds\` = after the final set, before the next exercise.
-- **Sets×reps (sets >= 2):** set \`rest_between_sets_seconds\` to **30** and note \`Rest 30 sec between sets\`.
-- Timed intervals / strength bands: match rest to the exercise tag band (endurance/stability 30–60s; hypertrophy 60–90s; max/explosive 120–180s; etc.) for \`rest_after_seconds\` and timed-round rests.
-- **Main timed work:** \`sets\` must be **2 or 3** (rounds). Never leave main timed exercises as a single duration with no rounds.
+- Use the **Strength prescription / Central rest matrix** (by catalog strength tag and phase). Never invent rests outside those bands.
+- **Sets×reps (sets >= 2):** set \`rest_between_sets_seconds\` from the matching strength tag and note \`Rest {N} sec between sets\`.
+- Timed intervals in main: 2–3 rounds; between-round rest from the same matrix as the exercise tag.
+- Warm-up / cool-down: follow the warm-up and cool-down rows of the rest matrix (cool-down after typically 10–15s).
 
 ### If a hard rule cannot be met
 Return a short validation error. Do not silently break a hard rule.

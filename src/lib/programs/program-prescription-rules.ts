@@ -153,6 +153,51 @@ export function defaultStrengthSetsReps(): Pick<WorkoutProposalExercise, "sets" 
   return { sets: 3, reps: 10 };
 }
 
+/**
+ * Sets/reps defaults from catalog strength tags (matches AI strength prescription matrix).
+ * When multiple tags exist, prefer the highest-specificity match in STRENGTH_PRESCRIPTION_PRIORITY order.
+ */
+const STRENGTH_PRESCRIPTION_PRIORITY: {
+  match: RegExp;
+  sets: number;
+  reps: number;
+  minLevel?: OnboardingLevel;
+}[] = [
+  { match: /supramaximal/, sets: 4, reps: 2, minLevel: "advanced" },
+  { match: /maximalstrength|maximal-strength/, sets: 4, reps: 5, minLevel: "intermediate" },
+  { match: /speedstrength|speed-strength/, sets: 4, reps: 4, minLevel: "intermediate" },
+  { match: /explosive/, sets: 4, reps: 4, minLevel: "intermediate" },
+  { match: /plyometric/, sets: 4, reps: 4, minLevel: "intermediate" },
+  { match: /hypertrofy|hypertrophy/, sets: 3, reps: 10 },
+  { match: /specific|sport-specific/, sets: 3, reps: 8 },
+  { match: /stability/, sets: 3, reps: 10 },
+  { match: /endurance/, sets: 3, reps: 15 },
+  { match: /strength/, sets: 3, reps: 10 },
+];
+
+function levelRank(level: OnboardingLevel): number {
+  if (level === "advanced") return 2;
+  if (level === "intermediate") return 1;
+  return 0;
+}
+
+export function defaultStrengthSetsRepsForEntry(
+  entry: ExerciseCatalogEntry,
+  level: OnboardingLevel = "beginner"
+): Pick<WorkoutProposalExercise, "sets" | "reps"> {
+  const types = entry.categoryTypes.map(normalizeToken).join(" ");
+  for (const row of STRENGTH_PRESCRIPTION_PRIORITY) {
+    if (!row.match.test(types)) continue;
+    if (row.minLevel && levelRank(level) < levelRank(row.minLevel)) {
+      // Fall through to a safer lower-intensity default for this athlete.
+      continue;
+    }
+    return { sets: row.sets, reps: row.reps };
+  }
+  return defaultStrengthSetsReps();
+}
+
+
 export type RehabFocus =
   | "elbow"
   | "wrist"

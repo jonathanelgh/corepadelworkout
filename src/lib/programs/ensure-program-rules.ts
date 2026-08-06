@@ -5,7 +5,7 @@ import {
   catalogEntryHasTag,
   clampRestToBand,
   defaultRestForEntry,
-  defaultStrengthSetsReps,
+  defaultStrengthSetsRepsForEntry,
   detectFootworkSpecialtyFocus,
   detectRehabFocus,
   exerciseIsHighIntensityStart,
@@ -149,14 +149,19 @@ function safeMainStartScore(entry: ExerciseCatalogEntry): number {
   return score;
 }
 
-function defaultMainExercise(pick: ExerciseCatalogEntry): WorkoutProposalExercise {
+function defaultMainExercise(
+  pick: ExerciseCatalogEntry,
+  level: OnboardingLevel = "beginner"
+): WorkoutProposalExercise {
+  const band = resolveRestBand(pick, "main");
   if (exerciseIsStrength(pick)) {
     return {
       exercise_id: pick.id,
       title: pick.title,
       phase: "main",
-      ...defaultStrengthSetsReps(),
-      rest_after_seconds: 45,
+      ...defaultStrengthSetsRepsForEntry(pick, level),
+      rest_between_sets_seconds: band.default,
+      rest_after_seconds: band.default,
     };
   }
   return {
@@ -165,8 +170,8 @@ function defaultMainExercise(pick: ExerciseCatalogEntry): WorkoutProposalExercis
     phase: "main",
     duration_seconds: 45,
     sets: 3,
-    rest_between_sets_seconds: 30,
-    rest_after_seconds: 45,
+    rest_between_sets_seconds: band.default,
+    rest_after_seconds: band.default,
   };
 }
 
@@ -217,9 +222,13 @@ function insertIntoMain(
   return out;
 }
 
-function normalizeStrengthExercise(ex: WorkoutProposalExercise, entry: ExerciseCatalogEntry): WorkoutProposalExercise {
+function normalizeStrengthExercise(
+  ex: WorkoutProposalExercise,
+  entry: ExerciseCatalogEntry,
+  level: OnboardingLevel = "beginner"
+): WorkoutProposalExercise {
   if (ex.phase !== "main" || !exerciseIsStrength(entry)) return ex;
-  const defaults = defaultStrengthSetsReps();
+  const defaults = defaultStrengthSetsRepsForEntry(entry, level);
   return {
     ...ex,
     duration_seconds: undefined,
@@ -278,24 +287,27 @@ function applyMainRest(
   const isSetsRepsMulti =
     !hasDuration && ex.sets != null && ex.sets > 1 && ex.reps != null && ex.reps > 0;
 
-  // Sets×reps: fixed 30s between sets (coach cue) — do not clamp up to strength bands.
-  const targetBetween = isSetsRepsMulti
-    ? ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
-      ? ex.rest_between_sets_seconds
-      : 30
-    : ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
-      ? clampRestToBand(ex.rest_between_sets_seconds, band)
-      : ex.sets != null && ex.sets > 1
-        ? fallback
-        : ex.rest_between_sets_seconds;
+  // Sets×reps and timed rounds: rest between from strength-tag matrix.
+  const targetBetween =
+    ex.sets != null && ex.sets > 1
+      ? ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
+        ? clampRestToBand(ex.rest_between_sets_seconds, band)
+        : fallback
+      : ex.rest_between_sets_seconds;
+
+  const betweenNote =
+    targetBetween != null && targetBetween > 0
+      ? `Rest ${Math.round(targetBetween)} sec between sets`
+      : null;
 
   const note =
     isSetsRepsMulti &&
     !entry.bothSides &&
+    betweenNote &&
     !(ex.note && /rest\s+\d+\s*sec(?:onds)?\s+between\s+sets/i.test(ex.note))
       ? ex.note?.trim()
-        ? `${ex.note.trim()} Rest 30 sec between sets`
-        : "Rest 30 sec between sets"
+        ? `${ex.note.trim()} ${betweenNote}`
+        : betweenNote
       : ex.note;
 
   return {
@@ -370,7 +382,7 @@ function ensureSafeMainStart(
       ? `${sessionLabel}: Added ${pick.title} before main work — never start with sprint/shuffle/jump.`
       : `Added ${pick.title} before main work — never start with sprint/shuffle/jump.`
   );
-  return insertIntoMain(exercises, [defaultMainExercise(pick)]);
+  return insertIntoMain(exercises, [defaultMainExercise(pick, trainingLevel ?? "beginner")]);
 }
 
 function ensureKineticChain(
@@ -411,7 +423,7 @@ function ensureKineticChain(
     }
 
     usedIds.add(pick.id);
-    out = insertIntoMain(out, [defaultMainExercise(pick)]);
+    out = insertIntoMain(out, [defaultMainExercise(pick, trainingLevel ?? "beginner")]);
     warnings.push(
       sessionLabel
         ? `${sessionLabel}: Added ${pick.title} for ${part} (rehab kinetic chain).`
@@ -484,7 +496,7 @@ function densifyFootworkSpecialtyMain(
     usedIds.delete(candidate.ex.exercise_id);
     usedIds.add(pick.id);
     out[candidate.index] = {
-      ...defaultMainExercise(pick),
+      ...defaultMainExercise(pick, trainingLevel ?? "beginner"),
       // Preserve position; defaultMainExercise already phase=main
     };
     swapped += 1;
@@ -560,7 +572,7 @@ export function applyProgramRulesToSession(
     )[0];
     if (pick) {
       usedIds.add(pick.id);
-      out = insertIntoMain(out, [defaultMainExercise(pick)]);
+      out = insertIntoMain(out, [defaultMainExercise(pick, level)]);
       warnings.push(
         sessionLabel
           ? `${sessionLabel}: Added ${pick.title} to the main (core) block.`
@@ -594,7 +606,7 @@ export function applyProgramRulesToSession(
     if (picks.length > 0) {
       for (const pick of picks) {
         usedIds.add(pick.id);
-        out = insertIntoMain(out, [defaultMainExercise(pick)]);
+        out = insertIntoMain(out, [defaultMainExercise(pick, level)]);
       }
       warnings.push(
         sessionLabel
@@ -680,7 +692,7 @@ export function applyProgramRulesToSession(
   out = out.map((ex) => {
     const entry = catalogById(catalog, ex.exercise_id);
     if (!entry) return ex;
-    return applyMainRest(normalizeMainTimedRounds(normalizeStrengthExercise(ex, entry)), entry, level);
+    return applyMainRest(normalizeMainTimedRounds(normalizeStrengthExercise(ex, entry, level)), entry, level);
   });
 
   out = ensureSafeMainStart(
