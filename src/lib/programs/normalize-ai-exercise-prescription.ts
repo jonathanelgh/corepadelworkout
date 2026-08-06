@@ -8,6 +8,7 @@ import { WARMUP_DURATION_SECONDS } from "@/lib/programs/warmup-prescription";
 import { DEFAULT_REST_BETWEEN_SIDES_SECONDS } from "@/lib/programs/program-exercises";
 import {
   promoteProgressionOutOfNote,
+  clearAiLoadPrescription,
   sanitizeBothSidesCoachNote,
 } from "@/lib/programs/sanitize-coach-note";
 
@@ -58,7 +59,43 @@ export const SETS_REPS_REST_BETWEEN_SETS_SECONDS = 30;
 export const SETS_REPS_BETWEEN_SETS_NOTE = "Rest 30 sec between sets";
 const DEFAULT_REST_BETWEEN_SIDES = DEFAULT_REST_BETWEEN_SIDES_SECONDS;
 
+/** Main-block timed work must be multi-round (timed intervals), not a single timer. */
+export const MAIN_TIMED_MIN_ROUNDS = 2;
+export const MAIN_TIMED_MAX_ROUNDS = 3;
+export const MAIN_TIMED_DEFAULT_ROUNDS = 3;
+export const MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS = 30;
+
 const BETWEEN_SETS_NOTE_RE = /rest\s+\d+\s*sec(?:onds)?\s+between\s+sets/i;
+
+function hasTimedDuration(ex: AiExerciseFields): boolean {
+  return (
+    (ex.duration_seconds != null && ex.duration_seconds > 0) ||
+    (ex.duration_minutes != null && ex.duration_minutes > 0)
+  );
+}
+
+/**
+ * Main timed exercises always use timed intervals: duration work × 2–3 rounds.
+ * Warm-up / cool-down stay single timed blocks.
+ */
+export function ensureMainTimedRounds<T extends AiExerciseFields>(ex: T): T {
+  if (ex.phase !== "main" || !hasTimedDuration(ex)) return ex;
+
+  let sets =
+    ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : MAIN_TIMED_DEFAULT_ROUNDS;
+  sets = Math.min(MAIN_TIMED_MAX_ROUNDS, Math.max(MAIN_TIMED_MIN_ROUNDS, sets));
+
+  const restBetween =
+    ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
+      ? Math.ceil(ex.rest_between_sets_seconds)
+      : MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS;
+
+  return {
+    ...ex,
+    sets,
+    rest_between_sets_seconds: restBetween,
+  };
+}
 
 /** True when this is sets×reps work with multiple sets (not timed). */
 export function isMultiSetSetsReps(ex: AiExerciseFields): boolean {
@@ -130,10 +167,12 @@ export function aiExerciseToProgramPayload(
   },
   opts: { isLastInSession: boolean; bothSides?: boolean }
 ): ProgramExercisePayload {
-  const cleaned = promoteProgressionOutOfNote({
-    note: ex.note ?? null,
-    load_prescription: ex.load_prescription ?? null,
-  });
+  const cleaned = clearAiLoadPrescription(
+    promoteProgressionOutOfNote({
+      note: ex.note ?? null,
+      load_prescription: ex.load_prescription ?? null,
+    })
+  );
   const noteSansBothSides = sanitizeBothSidesCoachNote(cleaned.note, {
     bothSides: opts.bothSides,
   });
@@ -149,12 +188,26 @@ export function aiExerciseToProgramPayload(
     durationSeconds = WARMUP_DURATION_SECONDS;
   }
 
-  const sets =
-    ex.phase === "warmup" ? null : ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null;
-  const reps =
-    ex.phase === "warmup" ? null : ex.reps != null && ex.reps > 0 ? Math.ceil(ex.reps) : null;
-  const forNote: AiExerciseFields = {
+  const withRounds = ensureMainTimedRounds({
     ...ex,
+    duration_seconds: durationSeconds,
+    duration_minutes: null,
+  });
+
+  const sets =
+    withRounds.phase === "warmup"
+      ? null
+      : withRounds.sets != null && withRounds.sets > 0
+        ? Math.ceil(withRounds.sets)
+        : null;
+  const reps =
+    withRounds.phase === "warmup"
+      ? null
+      : withRounds.reps != null && withRounds.reps > 0
+        ? Math.ceil(withRounds.reps)
+        : null;
+  const forNote: AiExerciseFields = {
+    ...withRounds,
     duration_seconds: durationSeconds,
     duration_minutes: null,
     sets,
@@ -188,24 +241,28 @@ export function normalizeAiExerciseRest<T extends AiExerciseFields>(
   return exercises.map((ex, index) => {
     const exerciseId = "exercise_id" in ex && typeof ex.exercise_id === "string" ? ex.exercise_id : "";
     const bothSides = opts?.bothSidesByExerciseId?.get(exerciseId) ?? false;
-    const cleaned = promoteProgressionOutOfNote({
-      note: ex.note ?? null,
-      load_prescription: ex.load_prescription ?? null,
-    });
+    const cleaned = clearAiLoadPrescription(
+      promoteProgressionOutOfNote({
+        note: ex.note ?? null,
+        load_prescription: ex.load_prescription ?? null,
+      })
+    );
     const noteSansBothSides = sanitizeBothSidesCoachNote(cleaned.note, { bothSides });
-    const restBetween = defaultRestBetweenSetsSeconds(ex) ?? undefined;
+    const withRounds = ensureMainTimedRounds(ex);
+    const restBetween = defaultRestBetweenSetsSeconds(withRounds) ?? undefined;
     const withRest: AiExerciseFields = {
-      ...ex,
+      ...withRounds,
       rest_between_sets_seconds: restBetween ?? null,
     };
     return {
       ...ex,
+      ...withRounds,
       note: ensureSetsRepsBetweenSetsNote(noteSansBothSides, withRest, { bothSides }) ?? undefined,
-      load_prescription: cleaned.load_prescription ?? undefined,
+      load_prescription: undefined,
       rest_between_sets_seconds: restBetween,
       rest_between_sides_seconds:
-        defaultRestBetweenSidesSeconds(ex, { bothSides }) ?? undefined,
-      rest_after_seconds: defaultRestAfterSeconds(ex, {
+        defaultRestBetweenSidesSeconds(withRounds, { bothSides }) ?? undefined,
+      rest_after_seconds: defaultRestAfterSeconds(withRounds, {
         isLastInSession: index === exercises.length - 1,
       }),
     };

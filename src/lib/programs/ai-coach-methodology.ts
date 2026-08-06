@@ -148,7 +148,7 @@ Every workout must follow this order:
 
 ### Coach notes and bilateral exercises
 
-- When prescribing progressive overload week-to-week, set week-1 **load_prescription** on weighted strength (e.g. \`12 kg\`). The app applies level-aware progression — do **not** put "increase load 5–10%" in \`note\`.
+- When prescribing progressive overload week-to-week, leave \`load_prescription\` **blank**. Athletes choose a weight that fits their strength — never invent kg/lb values. The app progresses **reps** on sets×reps and **duration_seconds** on timed main work (same weekly step pattern). Do **not** put "increase load 5–10%" or weight amounts in \`note\`.
 - For catalog exercises tagged **both_sides** on **timed** prescriptions: set **duration_seconds** as the **total** work time for both sides (e.g. 60 → 30s left + 30s right). The app runs left → rest → right. Set **rest_between_sides_seconds** to 10–20s when supported (else 15s default).
 - For catalog **both_sides** on sets & reps: **reps** are per side.
 - If the catalog line does **not** include \`both_sides\`, treat the exercise as a single prescription — do not add “both sides” / “per side” / “each side” instructions in notes.

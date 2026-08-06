@@ -12,6 +12,8 @@ export type ProgramExerciseItem = {
   image_url: string | null;
   video_url: string | null;
   bothSides: boolean;
+  /** True when the catalog exercise uses loadable weight equipment (DB, KB, bar, etc.). */
+  usesExternalLoad: boolean;
   sessionPhase: SessionPhase;
   choiceGroup: string | null;
   durationMinutes: number | null;
@@ -25,12 +27,37 @@ export type ProgramExerciseItem = {
   note: string | null;
 };
 
+/** Shown under sets/reps when the exercise uses external load and no fixed weight is prescribed. */
+export const CHOOSE_WEIGHT_HINT = "Choose a weight that fits your strength";
+
+const EXTERNAL_LOAD_EQUIPMENT = new Set([
+  "ankle weights",
+  "barbell",
+  "dumbbells",
+  "kettlebell",
+  "medicine ball",
+  "pulley",
+  "slam ball",
+  "squat rack",
+  "weight plate",
+]);
+
+export function equipmentUsesExternalLoad(titles: string[] | null | undefined): boolean {
+  if (!titles?.length) return false;
+  return titles.some((t) => EXTERNAL_LOAD_EQUIPMENT.has(t.trim().toLowerCase()));
+}
+
+type ExerciseEquipmentJoin = {
+  equipment?: { title: string } | { title: string }[] | null;
+};
+
 type ExerciseNested = {
   id: string;
   title: string;
   image_url: string | null;
   video_url: string | null;
   both_sides: boolean | null;
+  exercise_equipment?: ExerciseEquipmentJoin | ExerciseEquipmentJoin[] | null;
 };
 
 type ProgramExerciseNested = {
@@ -208,9 +235,7 @@ export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
   }
 
   const parts: string[] = [];
-  if (ex.loadPrescription?.trim()) {
-    parts.push(ex.loadPrescription.trim());
-  }
+  // Athletes choose their own weight — do not surface AI/admin kg/lb in the prescription line.
   if (sets != null && sets > 0 && ex.reps != null && ex.reps > 0) {
     parts.push(`${sets} sets · ${ex.reps} reps`);
   } else if (sets != null && sets > 0) {
@@ -235,6 +260,58 @@ export function formatExerciseMeta(ex: ProgramExerciseItem): string {
   if (getExercisePrescriptionType(ex) === "sets_reps") return "Go at your pace";
   return formatWorkDurationShort(workDurationSeconds(ex));
 }
+
+function equipmentTitlesFromExercise(ex: ExerciseNested): string[] {
+  const raw = ex.exercise_equipment;
+  const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const titles: string[] = [];
+  for (const row of rows) {
+    const eq = row.equipment;
+    if (!eq) continue;
+    if (Array.isArray(eq)) {
+      for (const item of eq) {
+        if (item?.title?.trim()) titles.push(item.title.trim());
+      }
+    } else if (eq.title?.trim()) {
+      titles.push(eq.title.trim());
+    }
+  }
+  return titles;
+}
+
+function toProgramExerciseItem(pe: ProgramExerciseNested, ex: ExerciseNested): ProgramExerciseItem {
+  return {
+    id: pe.id,
+    exerciseId: ex.id,
+    title: ex.title,
+    image_url: ex.image_url?.trim() || null,
+    video_url: ex.video_url?.trim() || null,
+    bothSides: Boolean(ex.both_sides),
+    usesExternalLoad: equipmentUsesExternalLoad(equipmentTitlesFromExercise(ex)),
+    sessionPhase: pe.session_phase ?? "main",
+    choiceGroup: pe.choice_group?.trim() || null,
+    durationMinutes: pe.duration_minutes,
+    durationSeconds: pe.duration_seconds,
+    sets: pe.sets,
+    reps: pe.reps,
+    restBetweenSetsSeconds: pe.rest_between_sets_seconds,
+    restBetweenSidesSeconds: pe.rest_between_sides_seconds,
+    restAfterSeconds: pe.rest_after_seconds,
+    loadPrescription: pe.load_prescription?.trim() || null,
+    note: pe.note?.trim() || null,
+  };
+}
+
+const EXERCISE_SELECT = `
+  id,
+  title,
+  image_url,
+  video_url,
+  both_sides,
+  exercise_equipment (
+    equipment ( title )
+  )
+`;
 
 export async function fetchProgramExercises(
   supabase: SupabaseClient,
@@ -262,11 +339,7 @@ export async function fetchProgramExercises(
           choice_group,
           note,
           exercises (
-            id,
-            title,
-            image_url,
-            video_url,
-            both_sides
+            ${EXERCISE_SELECT}
           )
         )
       )
@@ -298,25 +371,7 @@ export async function fetchProgramExercises(
 
         flat.push({
           order: track.sort_order * 10_000 + session.sort_order * 100 + pe.sort_order,
-          item: {
-            id: pe.id,
-            exerciseId: ex.id,
-            title: ex.title,
-            image_url: ex.image_url?.trim() || null,
-            video_url: ex.video_url?.trim() || null,
-            bothSides: Boolean(ex.both_sides),
-            sessionPhase: pe.session_phase ?? "main",
-            choiceGroup: pe.choice_group?.trim() || null,
-            durationMinutes: pe.duration_minutes,
-            durationSeconds: pe.duration_seconds,
-            sets: pe.sets,
-            reps: pe.reps,
-            restBetweenSetsSeconds: pe.rest_between_sets_seconds,
-            restBetweenSidesSeconds: pe.rest_between_sides_seconds,
-            restAfterSeconds: pe.rest_after_seconds,
-            loadPrescription: pe.load_prescription?.trim() || null,
-            note: pe.note?.trim() || null,
-          },
+          item: toProgramExerciseItem(pe, ex),
         });
       }
     }
@@ -347,13 +402,16 @@ export async function fetchProgramSessionExercises(
       session_phase,
       choice_group,
       note,
-      exercises (
-        id,
-        title,
-        image_url,
-        video_url,
-        both_sides
-      )
+          exercises (
+            id,
+            title,
+            image_url,
+            video_url,
+            both_sides,
+            exercise_equipment (
+              equipment ( title )
+            )
+          )
     `
     )
     .eq("session_id", sessionId)
@@ -367,25 +425,7 @@ export async function fetchProgramSessionExercises(
     const exRaw = row.exercises;
     const ex = Array.isArray(exRaw) ? exRaw[0] : exRaw;
     if (!ex?.id || !ex.title) continue;
-    items.push({
-      id: row.id,
-      exerciseId: ex.id,
-      title: ex.title,
-      image_url: ex.image_url?.trim() || null,
-      video_url: ex.video_url?.trim() || null,
-      bothSides: Boolean(ex.both_sides),
-      sessionPhase: row.session_phase ?? "main",
-      choiceGroup: row.choice_group?.trim() || null,
-      durationMinutes: row.duration_minutes,
-      durationSeconds: row.duration_seconds,
-      sets: row.sets,
-      reps: row.reps,
-      restBetweenSetsSeconds: row.rest_between_sets_seconds,
-      restBetweenSidesSeconds: row.rest_between_sides_seconds,
-      restAfterSeconds: row.rest_after_seconds,
-      loadPrescription: row.load_prescription?.trim() || null,
-      note: row.note?.trim() || null,
-    });
+    items.push(toProgramExerciseItem(row, ex));
   }
   return items;
 }

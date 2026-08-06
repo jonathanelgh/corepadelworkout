@@ -21,8 +21,15 @@ export type WeeklyProgressionOptions = {
 /**
  * Beginner reps-only offsets from week-1 baseline (weekIndex 0 = week 1).
  * Matches: hold / hold / +1 / hold / +2 / hold / +3 / +4
+ * Timed main work uses the same offsets in **seconds** (× SECONDS_PER_PROGRESS_STEP).
  */
 const BEGINNER_REP_OFFSETS = [0, 0, 1, 1, 2, 2, 3, 4] as const;
+
+/** Each progression step adds this many seconds to timed main work (mirrors +1 rep). */
+const SECONDS_PER_PROGRESS_STEP = 5;
+
+/** Soft cap so short drills don't balloon (e.g. 30s → max ~90s over the block). */
+const MAX_TIMED_DURATION_MULTIPLIER = 3;
 
 /** Intermediate/Advanced: weeks 1–4 accumulate +0..+3 reps; weeks 5–8 reset reps. */
 function intermediateRepOffset(weekIndex: number): number {
@@ -42,6 +49,17 @@ function isStrengthSetsRepsExercise(ex: ProgressableExercise): boolean {
   const hasReps = ex.reps != null && ex.reps > 0;
   const hasSets = ex.sets != null && ex.sets > 0;
   return timed == null && (hasReps || hasSets);
+}
+
+function isTimedMainExercise(ex: ProgressableExercise): boolean {
+  return timedWorkSeconds(ex) != null;
+}
+
+function applyTimedDurationOffset(baselineSeconds: number, offsetSteps: number): number {
+  if (offsetSteps <= 0) return baselineSeconds;
+  const next = baselineSeconds + offsetSteps * SECONDS_PER_PROGRESS_STEP;
+  const cap = Math.max(baselineSeconds, baselineSeconds * MAX_TIMED_DURATION_MULTIPLIER);
+  return Math.min(cap, Math.max(baselineSeconds, next));
 }
 
 function parseLoadNumber(value: string): {
@@ -168,7 +186,8 @@ function applyIntermediateLoad(
 /**
  * Apply Core Padel weekly progression from the week-1 template.
  * Week index 0 = week 1 baseline.
- * Sets are never auto-progressed. Warm-up / cool-down are never progressed.
+ * Sets (and timed rounds) are never auto-progressed. Warm-up / cool-down are never progressed.
+ * Main timed work progresses **duration_seconds** with the same step pattern as reps.
  */
 export function applyWeeklyProgressionToExercise<T extends ProgressableExercise>(
   exercise: T,
@@ -196,8 +215,22 @@ export function applyWeeklyProgressionToExercise<T extends ProgressableExercise>
     return ex;
   }
 
+  if (isTimedMainExercise(ex)) {
+    const baseline = timedWorkSeconds(ex);
+    if (baseline == null) return ex;
+
+    const offsetSteps =
+      level === "beginner"
+        ? (BEGINNER_REP_OFFSETS[Math.min(weekIndex, BEGINNER_REP_OFFSETS.length - 1)] ?? 0)
+        : intermediateRepOffset(weekIndex);
+
+    const nextSeconds = applyTimedDurationOffset(baseline, offsetSteps);
+    ex.duration_seconds = nextSeconds;
+    ex.duration_minutes = null;
+    return ex;
+  }
+
   if (!isStrengthSetsRepsExercise(ex)) {
-    // Timed / non-strength main work: keep week-1 values (no auto duration creep).
     return ex;
   }
 
@@ -224,9 +257,11 @@ export const AI_COACH_WEEKLY_PROGRESSION_BLOCK = `### Weekly progression (automa
 
 - Programs are **8 weeks**. Return **week-1 templates only** (\`sessions_per_week\` entries). The app expands to 8 weeks and writes each week's prescription.
 - Never return all 24 sessions for an 8×3 program.
-- **Sets never auto-progress** — keep sets fixed across the block.
-- **Beginner:** progress **reps only** (hold / +1 pattern). Sets and load stay fixed.
-- **Intermediate / Advanced:** weeks 1–4 = reps only; **week 5** reset reps to week-1 and start **load** increases (~2.5–5% steps); weeks 5–8 = load only.
-- Set numeric week-1 \`load_prescription\` on weighted strength (e.g. \`"12 kg"\`) so load weeks can run.
+- **Sets / timed rounds never auto-progress** — keep sets fixed across the block.
+- **Sets×reps (main):**
+  - **Beginner:** progress **reps only** (hold / +1 pattern). Sets stay fixed. Leave \`load_prescription\` blank.
+  - **Intermediate / Advanced:** weeks 1–4 reps only; **week 5** reset reps to week-1; weeks 5–8 load only if an admin set a numeric \`load_prescription\` (otherwise reps stay at week-1).
+- **Timed main work** (duration + rounds): progress **duration_seconds** with the **same weekly step pattern** as reps (+5 seconds per step). Rounds (\`sets\`) stay fixed. Warm-up and cool-down: no duration progression.
+- Leave \`load_prescription\` **blank** — athletes choose a weight that fits their strength. Never invent kg/lb values.
 - Warm-up and cool-down: **no** progressive overload.
 - Never put progression instructions in \`note\`.`.trim();

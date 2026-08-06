@@ -12,11 +12,12 @@ import {
 import {
   clampProgramPrescriptionType,
 } from "@/lib/exercises/program-prescription-mode";
-import { promoteProgressionOutOfNote, sanitizeBothSidesCoachNote } from "@/lib/programs/sanitize-coach-note";
+import { promoteProgressionOutOfNote, clearAiLoadPrescription, sanitizeBothSidesCoachNote } from "@/lib/programs/sanitize-coach-note";
 import {
   defaultRestBetweenSetsSeconds,
   defaultRestBetweenSidesSeconds,
   ensureSetsRepsBetweenSetsNote,
+  ensureMainTimedRounds,
 } from "@/lib/programs/normalize-ai-exercise-prescription";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
@@ -187,15 +188,17 @@ export function mapGeminiDraftToForm(
         });
         const mode = catalogEntry?.programPrescriptionMode ?? "all";
         const hasSeconds = ex.duration_seconds != null && ex.duration_seconds > 0;
-        const cleaned = promoteProgressionOutOfNote({
-          note: ex.note,
-          load_prescription: ex.load_prescription,
-        });
+        const cleaned = clearAiLoadPrescription(
+          promoteProgressionOutOfNote({
+            note: ex.note,
+            load_prescription: ex.load_prescription,
+          })
+        );
         const isBothSides = catalogEntry?.bothSides ?? false;
         const noteSansBothSides = sanitizeBothSidesCoachNote(cleaned.note, {
           bothSides: isBothSides,
         });
-        const aiFields = {
+        const aiFields = ensureMainTimedRounds({
           phase: ex.phase,
           duration_seconds: workSeconds,
           duration_minutes: workSeconds != null ? Math.ceil(workSeconds / 60) : ex.duration_minutes,
@@ -204,7 +207,7 @@ export function mapGeminiDraftToForm(
           rest_between_sets_seconds: ex.rest_between_sets_seconds,
           rest_after_seconds: ex.rest_after_seconds,
           note: noteSansBothSides,
-        };
+        });
         const restBetween = defaultRestBetweenSetsSeconds(aiFields) ?? ex.rest_between_sets_seconds;
         const noteWithRest = ensureSetsRepsBetweenSetsNote(
           noteSansBothSides,
@@ -232,11 +235,11 @@ export function mapGeminiDraftToForm(
           prescriptionType: clampProgramPrescriptionType(mode, inferred),
           durationValue: hasSeconds ? String(ex.duration_seconds) : intToField(ex.duration_minutes),
           durationUnit: hasSeconds ? "sec" : "min",
-          sets: intToField(ex.sets),
-          reps: intToField(ex.reps),
+          sets: intToField(aiFields.sets),
+          reps: intToField(aiFields.reps),
           restBetweenSetsSeconds: intToField(restBetween),
           restBetweenSidesSeconds: intToField(restBetweenSides),
-          restAfterSeconds: intToField(ex.rest_after_seconds),
+          restAfterSeconds: intToField(aiFields.rest_after_seconds),
           loadPrescription: cleaned.load_prescription?.trim() ?? "",
           note: noteWithRest?.trim() ?? "",
         });

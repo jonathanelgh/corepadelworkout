@@ -102,7 +102,7 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
               "reps": "number | null",
               "rest_between_sets_seconds": "number | null",
               "rest_after_seconds": "number | null",
-              "load_prescription": "string | null (week-1 load e.g. \"12 kg\" — NOT in note)",
+              "load_prescription": "null — leave blank; athletes choose their own weight (never invent kg/lb)",
               "note": "string | null (sets×reps with 2+ sets: include \"Rest 30 sec between sets\"; otherwise technique/setup only — never weekly increases)"
             }
           ]
@@ -136,10 +136,7 @@ function parseExerciseRow(row: unknown): GeminiProgramExercise | null {
     reps: parseOptionalInt(r.reps),
     rest_between_sets_seconds: parseOptionalInt(r.rest_between_sets_seconds),
     rest_after_seconds: parseOptionalInt(r.rest_after_seconds),
-    load_prescription:
-      typeof r.load_prescription === "string" && r.load_prescription.trim()
-        ? r.load_prescription.trim()
-        : null,
+    load_prescription: null,
     note: typeof r.note === "string" && r.note.trim() ? r.note.trim() : null,
   };
 }

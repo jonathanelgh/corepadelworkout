@@ -8,6 +8,7 @@ import {
   exerciseUsesTimedPlayback,
   formatExerciseMeta,
   formatSetsRepsLabel,
+  CHOOSE_WEIGHT_HINT,
   hasTimedSets,
   hasRestBetweenSets,
   restBetweenSetsSeconds,
@@ -800,6 +801,9 @@ export function ActiveWorkoutPlayer({
                   <p className="mt-3 text-lg font-medium text-[#ccff00]">
                     {formatSetsRepsLabel(current) ?? "Go at your pace"}
                   </p>
+                )}
+                {!inRest && current?.usesExternalLoad && (
+                  <p className="mt-1 text-sm text-white/55">{CHOOSE_WEIGHT_HINT}</p>
                 )}
                 {!currentIsTimed && (
                   <p className="mt-2 text-sm text-white/60">Tap Next when you finish this exercise.</p>

@@ -29,7 +29,11 @@ const EXERCISE_PROPERTIES = {
       "Timed work in seconds. For both_sides catalog exercises this is TOTAL for both sides (app splits evenly). Warm-up/cool-down typically 30–60s.",
   },
   duration_minutes: { type: "number", description: "Avoid — prefer duration_seconds" },
-  sets: { type: "number", description: "Sets (fixed across the 8-week block)" },
+  sets: {
+    type: "number",
+    description:
+      "Sets (fixed across the 8-week block). For main timed work use 2 or 3 rounds with duration_seconds.",
+  },
   reps: {
     type: "number",
     description: "Reps per set. For both_sides: reps PER SIDE.",
@@ -60,7 +64,7 @@ const EXERCISE_PROPERTIES = {
   },
   load_prescription: {
     type: "string",
-    description: 'Week-1 numeric load when relevant (e.g. "12 kg").',
+    description: "Leave blank. Athletes choose their own weight — never invent kg/lb amounts.",
   },
 } as const;
 

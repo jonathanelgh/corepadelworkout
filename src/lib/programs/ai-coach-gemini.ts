@@ -196,7 +196,11 @@ const TOOLS: FunctionDeclaration[] = [
                   "Timed work in seconds. For both_sides catalog exercises this is TOTAL for both sides (app splits evenly, e.g. 60 → 30s each). Warm-up/cool-down typically 30–60s.",
               },
               duration_minutes: { type: SchemaType.NUMBER, description: "Avoid — prefer duration_seconds" },
-              sets: { type: SchemaType.NUMBER, description: "Sets (fixed across the 8-week block — do not plan set progression)" },
+              sets: {
+                type: SchemaType.NUMBER,
+                description:
+                  "Sets (fixed across the 8-week block). For main timed work use 2 or 3 rounds with duration_seconds.",
+              },
               reps: {
                 type: SchemaType.NUMBER,
                 description: "Reps per set. For both_sides: reps PER SIDE.",
@@ -228,7 +232,7 @@ const TOOLS: FunctionDeclaration[] = [
               load_prescription: {
                 type: SchemaType.STRING,
                 description:
-                  "Week-1 numeric load for weighted strength (e.g. \"12 kg\"). Required for Intermediate/Advanced load progression from week 5.",
+                  "Leave blank. Athletes choose their own weight — never invent kg/lb amounts.",
               },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
@@ -271,7 +275,11 @@ const TOOLS: FunctionDeclaration[] = [
                   "Timed work in seconds. For both_sides: TOTAL for both sides (split evenly). Warm-up/cool-down typically 30–60s.",
               },
               duration_minutes: { type: SchemaType.NUMBER, description: "Avoid — prefer duration_seconds" },
-              sets: { type: SchemaType.NUMBER, description: "Sets for strength work" },
+              sets: {
+                type: SchemaType.NUMBER,
+                description:
+                  "Sets for strength, or 2–3 rounds for main timed intervals (with duration_seconds).",
+              },
               reps: {
                 type: SchemaType.NUMBER,
                 description: "Reps per set. For both_sides: reps PER SIDE.",
@@ -302,7 +310,8 @@ const TOOLS: FunctionDeclaration[] = [
               },
               load_prescription: {
                 type: SchemaType.STRING,
-                description: 'Numeric load when relevant (e.g. "12 kg").',
+                description:
+                  "Leave blank. Athletes choose their own weight — never invent kg/lb amounts.",
               },
             },
             required: ["exercise_id", "rest_after_seconds", "phase"],
@@ -361,7 +370,6 @@ function parseExerciseList(
 
     const restAfter = parseNonNegInt(ex.rest_after_seconds);
     const restBetween = parseNonNegInt(ex.rest_between_sets_seconds);
-    const loadRaw = ex.load_prescription;
 
     exercises.push({
       exercise_id,
@@ -369,8 +377,7 @@ function parseExerciseList(
       phase: parseSessionPhase(ex.phase),
       choice_group: parseChoiceGroup(ex.choice_group) ?? undefined,
       note: typeof ex.note === "string" && ex.note.trim() ? ex.note.trim() : undefined,
-      load_prescription:
-        typeof loadRaw === "string" && loadRaw.trim() ? loadRaw.trim() : undefined,
+      load_prescription: undefined,
       duration_seconds:
         typeof ex.duration_seconds === "number" && Number.isFinite(ex.duration_seconds)
           ? Math.ceil(ex.duration_seconds)

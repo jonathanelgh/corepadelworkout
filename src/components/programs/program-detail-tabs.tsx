@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ProgramExerciseItem } from "@/lib/programs/program-exercises";
-import { formatSetsRepsLabel } from "@/lib/programs/program-exercises";
+import { formatSetsRepsLabel, CHOOSE_WEIGHT_HINT } from "@/lib/programs/program-exercises";
 
 const COVER_FALLBACK = "/Padel_coach_standing.webp";
 
@@ -61,6 +61,9 @@ export function ProgramDetailTabs({
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-gray-900">{ex.title}</p>
                     {meta && <p className="mt-0.5 text-xs text-gray-500">{meta}</p>}
+                    {ex.usesExternalLoad && (
+                      <p className="mt-0.5 text-xs text-gray-400">{CHOOSE_WEIGHT_HINT}</p>
+                    )}
                   </div>
                 </li>
               );

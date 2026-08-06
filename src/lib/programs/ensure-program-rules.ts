@@ -164,6 +164,8 @@ function defaultMainExercise(pick: ExerciseCatalogEntry): WorkoutProposalExercis
     title: pick.title,
     phase: "main",
     duration_seconds: 45,
+    sets: 3,
+    rest_between_sets_seconds: 30,
     rest_after_seconds: 45,
   };
 }
@@ -224,6 +226,28 @@ function normalizeStrengthExercise(ex: WorkoutProposalExercise, entry: ExerciseC
     duration_minutes: undefined,
     sets: ex.sets != null && ex.sets > 0 ? ex.sets : defaults.sets,
     reps: ex.reps != null && ex.reps > 0 ? ex.reps : defaults.reps,
+  };
+}
+
+/** Main timed work must be timed intervals with 2–3 rounds (not a single continuous timer). */
+function normalizeMainTimedRounds(ex: WorkoutProposalExercise): WorkoutProposalExercise {
+  if (ex.phase !== "main") return ex;
+  const hasDuration =
+    (ex.duration_seconds != null && ex.duration_seconds > 0) ||
+    (ex.duration_minutes != null && ex.duration_minutes > 0);
+  if (!hasDuration) return ex;
+
+  let sets = ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : 3;
+  sets = Math.min(3, Math.max(2, sets));
+  const restBetween =
+    ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
+      ? ex.rest_between_sets_seconds
+      : 30;
+
+  return {
+    ...ex,
+    sets,
+    rest_between_sets_seconds: restBetween,
   };
 }
 
@@ -656,7 +680,7 @@ export function applyProgramRulesToSession(
   out = out.map((ex) => {
     const entry = catalogById(catalog, ex.exercise_id);
     if (!entry) return ex;
-    return applyMainRest(normalizeStrengthExercise(ex, entry), entry, level);
+    return applyMainRest(normalizeMainTimedRounds(normalizeStrengthExercise(ex, entry)), entry, level);
   });
 
   out = ensureSafeMainStart(

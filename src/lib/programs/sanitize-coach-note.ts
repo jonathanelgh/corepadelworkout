@@ -1,5 +1,6 @@
 /**
- * Progression belongs in structured fields (sets, reps, load_prescription, duration).
+ * Progression belongs in structured fields (sets, reps, duration).
+ * Athletes choose their own weight — do not invent numeric load_prescription from notes.
  * Strip coach-note text that tells the athlete to increase load/reps/sets week to week.
  */
 
@@ -37,6 +38,8 @@ const BOTH_SIDES_NOTE_PATTERNS: RegExp[] = [
   /\bleft\s*(?:then|&|\/|,)\s*right\.?/gi,
   /\bL\s*[/|]\s*R\.?/gi,
 ];
+
+const NUMERIC_LOAD_IN_NOTE = /\b\d+(?:\.\d+)?\s*(kg|kilo|kilos|lb|lbs)\b/gi;
 
 /** Detect a numeric load mention like "12 kg" or "25lb" in free text. */
 export function extractLoadFromText(text: string | null | undefined): string | null {
@@ -77,6 +80,19 @@ export function sanitizeCoachNote(note: string | null | undefined): string | nul
   return out || null;
 }
 
+/** Remove numeric kg/lb mentions from coach notes (athletes choose their own load). */
+export function stripNumericLoadFromNote(note: string | null | undefined): string | null {
+  const raw = note?.trim();
+  if (!raw) return null;
+  const out = raw
+    .replace(NUMERIC_LOAD_IN_NOTE, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/^[.,;:\s]+|[.,;:\s]+$/g, "")
+    .trim();
+  return out || null;
+}
+
 /**
  * Remove both-sides instructional language from notes.
  * Always strip invented bilateral cues; the catalog `both_sides` flag owns that UX.
@@ -107,20 +123,26 @@ export type PrescriptionFields = {
 };
 
 /**
- * Move progression out of notes into load_prescription when possible; strip progression prose.
+ * Strip progression prose and numeric load mentions from notes.
+ * Preserves an explicit load_prescription when already set (admin edits).
  */
 export function promoteProgressionOutOfNote<T extends PrescriptionFields>(ex: T): T {
-  const cleanedNote = sanitizeCoachNote(ex.note);
-  let load = ex.load_prescription?.trim() || null;
-
-  if (!load && ex.note?.trim()) {
-    const extracted = extractLoadFromText(ex.note);
-    if (extracted) load = extracted;
-  }
+  const cleanedNote = stripNumericLoadFromNote(sanitizeCoachNote(ex.note));
+  const load = ex.load_prescription?.trim() || null;
 
   return {
     ...ex,
     note: cleanedNote,
     load_prescription: load,
+  };
+}
+
+/**
+ * AI generation never sets a specific weight — athletes choose a load that fits.
+ */
+export function clearAiLoadPrescription<T extends PrescriptionFields>(ex: T): T {
+  return {
+    ...ex,
+    load_prescription: null,
   };
 }
