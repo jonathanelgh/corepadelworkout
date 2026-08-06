@@ -10,7 +10,7 @@ import {
   type ExercisePrescriptionType,
 } from "@/lib/programs/program-exercises";
 import {
-  clampProgramPrescriptionType,
+  clampProgramPrescriptionTypeForPhase,
 } from "@/lib/exercises/program-prescription-mode";
 import { promoteProgressionOutOfNote, clearAiLoadPrescription, sanitizeBothSidesCoachNote } from "@/lib/programs/sanitize-coach-note";
 import {
@@ -179,13 +179,6 @@ export function mapGeminiDraftToForm(
             : ex.duration_minutes != null && ex.duration_minutes > 0
               ? ex.duration_minutes * 60
               : null;
-        const inferred = inferExercisePrescriptionType({
-          durationSeconds: workSeconds,
-          durationMinutes:
-            workSeconds != null ? Math.ceil(workSeconds / 60) : ex.duration_minutes,
-          sets: ex.sets,
-          restBetweenSetsSeconds: ex.rest_between_sets_seconds,
-        });
         const mode = catalogEntry?.programPrescriptionMode ?? "all";
         const hasSeconds = ex.duration_seconds != null && ex.duration_seconds > 0;
         const cleaned = clearAiLoadPrescription(
@@ -208,6 +201,20 @@ export function mapGeminiDraftToForm(
           rest_after_seconds: ex.rest_after_seconds,
           note: noteSansBothSides,
         });
+        const inferred = inferExercisePrescriptionType({
+          durationSeconds: aiFields.duration_seconds ?? workSeconds,
+          durationMinutes:
+            aiFields.duration_seconds != null
+              ? Math.ceil(aiFields.duration_seconds / 60)
+              : ex.duration_minutes,
+          sets: aiFields.sets,
+          restBetweenSetsSeconds: aiFields.rest_between_sets_seconds,
+        });
+        const prescriptionType = clampProgramPrescriptionTypeForPhase(
+          mode,
+          inferred,
+          ex.phase
+        );
         const restBetween = defaultRestBetweenSetsSeconds(aiFields) ?? ex.rest_between_sets_seconds;
         const noteWithRest = ensureSetsRepsBetweenSetsNote(
           noteSansBothSides,
@@ -232,7 +239,7 @@ export function mapGeminiDraftToForm(
           exerciseId: ex.exercise_id,
           sessionPhase: ex.phase,
           choiceGroup: ex.choice_group ?? "",
-          prescriptionType: clampProgramPrescriptionType(mode, inferred),
+          prescriptionType,
           durationValue: hasSeconds ? String(ex.duration_seconds) : intToField(ex.duration_minutes),
           durationUnit: hasSeconds ? "sec" : "min",
           sets: intToField(aiFields.sets),

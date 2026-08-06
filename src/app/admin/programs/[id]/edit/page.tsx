@@ -4,7 +4,10 @@ import { createClient } from "@/utils/supabase/server";
 import { inferExercisePrescriptionType } from "@/lib/programs/program-exercises";
 import { parseProgramFormat } from "@/lib/programs/program-format";
 import { loadProgramExerciseOptions } from "@/lib/exercises/program-exercise-options";
-import { clampProgramPrescriptionType } from "@/lib/exercises/program-prescription-mode";
+import { clampProgramPrescriptionTypeForPhase } from "@/lib/exercises/program-prescription-mode";
+import {
+  ensureMainTimedRounds,
+} from "@/lib/programs/normalize-ai-exercise-prescription";
 import { listMembersForAiPicker } from "@/lib/programs/profile-ai-context";
 import {
   CreateProgramForm,
@@ -68,27 +71,39 @@ function mapSessionRow(
       durationValue = String(e.duration_minutes);
       durationUnit = "min";
     }
-    const inferred = inferExercisePrescriptionType({
-      durationSeconds: e.duration_seconds,
-      durationMinutes: e.duration_minutes,
+    const sessionPhase = e.session_phase ?? "main";
+    const withRounds = ensureMainTimedRounds({
+      phase: sessionPhase,
+      duration_seconds: e.duration_seconds,
+      duration_minutes: e.duration_minutes,
       sets: e.sets,
-      restBetweenSetsSeconds: e.rest_between_sets_seconds,
+      reps: e.reps,
+      rest_between_sets_seconds: e.rest_between_sets_seconds,
+      rest_after_seconds: e.rest_after_seconds,
+      note: e.note,
+    });
+    const inferred = inferExercisePrescriptionType({
+      durationSeconds: withRounds.duration_seconds ?? e.duration_seconds,
+      durationMinutes: withRounds.duration_minutes ?? e.duration_minutes,
+      sets: withRounds.sets,
+      restBetweenSetsSeconds: withRounds.rest_between_sets_seconds,
     });
     const mode =
       exerciseOptions.find((x) => x.id === e.exercise_id)?.programPrescriptionMode ?? "all";
     return {
       key: randomUUID(),
       exerciseId: e.exercise_id,
-      sessionPhase: e.session_phase ?? "main",
+      sessionPhase,
       choiceGroup: e.choice_group?.trim() ?? "",
-      prescriptionType: clampProgramPrescriptionType(mode, inferred),
+      prescriptionType: clampProgramPrescriptionTypeForPhase(mode, inferred, sessionPhase),
       durationValue,
       durationUnit,
-      sets: e.sets != null && Number.isFinite(e.sets) ? String(e.sets) : "",
+      sets: withRounds.sets != null && Number.isFinite(withRounds.sets) ? String(withRounds.sets) : "",
       reps: e.reps != null && Number.isFinite(e.reps) ? String(e.reps) : "",
       restBetweenSetsSeconds:
-        e.rest_between_sets_seconds != null && Number.isFinite(e.rest_between_sets_seconds)
-          ? String(e.rest_between_sets_seconds)
+        withRounds.rest_between_sets_seconds != null &&
+        Number.isFinite(withRounds.rest_between_sets_seconds)
+          ? String(withRounds.rest_between_sets_seconds)
           : "",
       restBetweenSidesSeconds:
         e.rest_between_sides_seconds != null && Number.isFinite(e.rest_between_sides_seconds)

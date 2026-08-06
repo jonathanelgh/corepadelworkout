@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import type { ExercisePrescriptionType } from "@/lib/programs/program-exercises";
 import {
-  allowedProgramPrescriptionTypes,
-  clampProgramPrescriptionType,
-  defaultProgramPrescriptionType,
+  allowedProgramPrescriptionTypesForPhase,
+  clampProgramPrescriptionTypeForPhase,
+  defaultProgramPrescriptionTypeForPhase,
   type ExerciseProgramPrescriptionMode,
 } from "@/lib/exercises/program-prescription-mode";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import type { SessionPhase } from "@/lib/programs/session-phase";
 import type { ProgramFormat } from "@/lib/programs/program-format";
+import { MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS } from "@/lib/programs/normalize-ai-exercise-prescription";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -80,8 +81,11 @@ function exerciseBothSides(exercises: ExerciseOption[], exerciseId: string): boo
   return exercises.find((e) => e.id === exerciseId)?.bothSides ?? false;
 }
 
-function prescriptionOptionsForMode(mode: ExerciseProgramPrescriptionMode) {
-  const allowed = new Set(allowedProgramPrescriptionTypes(mode));
+function prescriptionOptionsForMode(
+  mode: ExerciseProgramPrescriptionMode,
+  phase: SessionPhase | string | null | undefined
+) {
+  const allowed = new Set(allowedProgramPrescriptionTypesForPhase(mode, phase));
   return PRESCRIPTION_OPTIONS.filter((opt) => allowed.has(opt.id));
 }
 
@@ -407,7 +411,11 @@ export function CreateProgramForm({
             exerciseId: ex.exerciseId,
             sessionPhase: ex.sessionPhase,
             choiceGroup: ex.choiceGroup,
-            prescriptionType: clampProgramPrescriptionType(mode, ex.prescriptionType),
+            prescriptionType: clampProgramPrescriptionTypeForPhase(
+              mode,
+              ex.prescriptionType,
+              ex.sessionPhase
+            ),
             durationValue: ex.durationValue,
             durationUnit: ex.durationUnit,
             sets: ex.sets,
@@ -756,7 +764,7 @@ export function CreateProgramForm({
                   exerciseId: pick,
                   sessionPhase: "main",
                   choiceGroup: "",
-                  prescriptionType: defaultProgramPrescriptionType(mode),
+                  prescriptionType: defaultProgramPrescriptionTypeForPhase(mode, "main"),
                   durationValue: "",
                   durationUnit: "sec",
                   sets: "",
@@ -1056,9 +1064,10 @@ export function CreateProgramForm({
             if (Number.isFinite(n) && n >= 0) duration_minutes = n;
           }
           const exerciseRows = sessionExercises.map((e) => {
-            const prescriptionType = clampProgramPrescriptionType(
+            const prescriptionType = clampProgramPrescriptionTypeForPhase(
               exerciseProgramMode(exercises, e.exerciseId),
-              e.prescriptionType
+              e.prescriptionType,
+              e.sessionPhase
             );
             let duration_seconds: number | null = null;
             let duration_minutes: number | null = null;
@@ -1093,9 +1102,15 @@ export function CreateProgramForm({
                 const n = Number.parseInt(e.sets, 10);
                 if (Number.isFinite(n) && n > 0) sets = n;
               }
+              // Main never saves bare one-shot time — require at least 2 timed rounds.
+              if (e.sessionPhase === "main" && (sets == null || sets < 2)) {
+                sets = 2;
+              }
               if (e.restBetweenSetsSeconds.trim() !== "") {
                 const n = Number.parseInt(e.restBetweenSetsSeconds, 10);
                 if (Number.isFinite(n) && n > 0) rest_between_sets_seconds = n;
+              } else if (e.sessionPhase === "main" && sets != null && sets >= 2) {
+                rest_between_sets_seconds = MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS;
               }
             }
 
@@ -2252,10 +2267,14 @@ export function CreateProgramForm({
                                 const exerciseMeta = exercises.find((e) => e.id === entry.exerciseId);
                                 const programMode = exerciseProgramMode(exercises, entry.exerciseId);
                                 const entryBothSides = exerciseBothSides(exercises, entry.exerciseId);
-                                const prescriptionOptions = prescriptionOptionsForMode(programMode);
-                                const activeType = clampProgramPrescriptionType(
+                                const prescriptionOptions = prescriptionOptionsForMode(
                                   programMode,
-                                  entry.prescriptionType
+                                  entry.sessionPhase
+                                );
+                                const activeType = clampProgramPrescriptionTypeForPhase(
+                                  programMode,
+                                  entry.prescriptionType,
+                                  entry.sessionPhase
                                 );
 
                                 return (

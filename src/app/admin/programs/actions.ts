@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseChoiceGroup, parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
+import { ensureMainTimedRounds } from "@/lib/programs/normalize-ai-exercise-prescription";
 import {
   insertProgramCurriculum,
   type TrackPayload,
@@ -105,17 +106,28 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
     load_prescription:
       typeof loadRaw === "string" && loadRaw.trim().length > 0 ? String(loadRaw).trim() : null,
   });
+  const session_phase = parseSessionPhase(row.session_phase ?? row.sessionPhase);
+  const withRounds = ensureMainTimedRounds({
+    phase: session_phase,
+    duration_seconds,
+    duration_minutes,
+    sets,
+    reps,
+    rest_between_sets_seconds,
+    rest_after_seconds,
+    note: promoted.note,
+  });
   return {
     exercise_id,
     duration_minutes,
     duration_seconds,
-    sets,
+    sets: withRounds.sets,
     reps,
-    rest_between_sets_seconds,
+    rest_between_sets_seconds: withRounds.rest_between_sets_seconds,
     rest_between_sides_seconds,
     load_prescription: promoted.load_prescription,
     rest_after_seconds,
-    session_phase: parseSessionPhase(row.session_phase ?? row.sessionPhase),
+    session_phase,
     choice_group: parseChoiceGroup(row.choice_group ?? row.choiceGroup),
     note: promoted.note,
   };

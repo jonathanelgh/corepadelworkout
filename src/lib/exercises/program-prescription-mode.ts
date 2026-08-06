@@ -1,4 +1,5 @@
 import type { ExercisePrescriptionType } from "@/lib/programs/program-exercises";
+import { parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 
 export type ExerciseProgramPrescriptionMode = "all" | "time_only" | "sets_reps_only";
 
@@ -44,10 +45,33 @@ export function allowedProgramPrescriptionTypes(
   }
 }
 
+/**
+ * Main block never uses a single continuous timer — only timed sets (intervals) or sets×reps.
+ * Warm-up / cool-down may still use single `time`.
+ */
+export function allowedProgramPrescriptionTypesForPhase(
+  mode: ExerciseProgramPrescriptionMode,
+  phase: SessionPhase | string | null | undefined
+): ExercisePrescriptionType[] {
+  const allowed = allowedProgramPrescriptionTypes(mode);
+  if (parseSessionPhase(phase) !== "main") return allowed;
+  return allowed.filter((t) => t !== "time");
+}
+
 export function defaultProgramPrescriptionType(
   mode: ExerciseProgramPrescriptionMode
 ): ExercisePrescriptionType {
   return allowedProgramPrescriptionTypes(mode)[0] ?? "sets_reps";
+}
+
+export function defaultProgramPrescriptionTypeForPhase(
+  mode: ExerciseProgramPrescriptionMode,
+  phase: SessionPhase | string | null | undefined
+): ExercisePrescriptionType {
+  return (
+    allowedProgramPrescriptionTypesForPhase(mode, phase)[0] ??
+    defaultProgramPrescriptionType(mode)
+  );
 }
 
 export function isProgramPrescriptionTypeAllowed(
@@ -64,6 +88,23 @@ export function clampProgramPrescriptionType(
 ): ExercisePrescriptionType {
   if (isProgramPrescriptionTypeAllowed(mode, preferred)) return preferred;
   return defaultProgramPrescriptionType(mode);
+}
+
+/**
+ * Like clampProgramPrescriptionType, but upgrades bare `time` → `timed_intervals` in main.
+ */
+export function clampProgramPrescriptionTypeForPhase(
+  mode: ExerciseProgramPrescriptionMode,
+  preferred: ExercisePrescriptionType,
+  phase: SessionPhase | string | null | undefined
+): ExercisePrescriptionType {
+  const allowed = allowedProgramPrescriptionTypesForPhase(mode, phase);
+  let preferredForPhase = preferred;
+  if (parseSessionPhase(phase) === "main" && preferred === "time") {
+    preferredForPhase = "timed_intervals";
+  }
+  if (allowed.includes(preferredForPhase)) return preferredForPhase;
+  return allowed[0] ?? defaultProgramPrescriptionType(mode);
 }
 
 export function programPrescriptionModeLabel(mode: ExerciseProgramPrescriptionMode): string {
