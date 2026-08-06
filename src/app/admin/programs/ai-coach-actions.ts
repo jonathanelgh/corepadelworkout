@@ -10,6 +10,11 @@ import {
   type ProgramProposal,
   type WorkoutProposal,
 } from "@/lib/programs/ai-coach-gemini";
+import { chatWithAiCoachOpenAI } from "@/lib/programs/ai-coach-openai";
+import {
+  resolveAiCoachProvider,
+  type AiCoachProvider,
+} from "@/lib/programs/ai-coach-provider";
 import {
   catalogForAiPayload,
   fetchProgramsCatalog,
@@ -126,9 +131,14 @@ export async function sendAiCoachMessage(input: {
   targetUserId?: string | null;
   /** Admin override for workout structure level; omit to use member onboarding when personalized. */
   trainingLevel?: string | null;
+  /** LLM provider for generation / chat. Defaults to Gemini. */
+  provider?: AiCoachProvider | null;
 }): Promise<SendAiCoachMessageResult> {
   const auth = await requireAdmin();
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
+
+  const provider = resolveAiCoachProvider(input.provider);
+  const runCoach = provider === "openai" ? chatWithAiCoachOpenAI : chatWithAiCoach;
 
   const userMessage = input.userMessage.trim();
   if (!userMessage) return { error: "Message cannot be empty." };
@@ -275,7 +285,7 @@ export async function sendAiCoachMessage(input: {
           ]
         : fullHistory;
 
-    let result = await chatWithAiCoach({
+    let result = await runCoach({
       history: generationHistory,
       ...coachParams,
       consultationBrief: generationBrief,
@@ -288,7 +298,7 @@ export async function sendAiCoachMessage(input: {
       result.type === "functionCall" &&
       (result.name === "generate_program" || result.name === "generate_workout")
     ) {
-      result = await chatWithAiCoach({
+      result = await runCoach({
         history: fullHistory,
         ...coachParams,
         toolsEnabled: false,
@@ -301,7 +311,7 @@ export async function sendAiCoachMessage(input: {
       consultationComplete &&
       result.type === "text"
     ) {
-      result = await chatWithAiCoach({
+      result = await runCoach({
         history: [
           ...generationHistory,
           { role: "model", parts: [{ text: result.text }] },

@@ -36,7 +36,7 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/free-warmup" className="text-gray-300 transition hover:text-[#ccff00]">
+                <Link href="/court-warm-up" className="text-gray-300 transition hover:text-[#ccff00]">
                   Free warmup
                 </Link>
               </li>

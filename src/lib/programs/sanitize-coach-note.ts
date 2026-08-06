@@ -21,6 +21,23 @@ const PROGRESSION_NOTE_PATTERNS: RegExp[] = [
   /^\s*add\s+weight\.?\s*$/i,
 ];
 
+/**
+ * Both-sides behavior is driven ONLY by `exercises.both_sides`.
+ * Strip AI coach-note cues that invent bilateral work for unmarked exercises.
+ * Also drop redundant "both sides" cues when the catalog flag already handles it.
+ */
+const BOTH_SIDES_NOTE_PATTERNS: RegExp[] = [
+  /\bperform\s+\d+\s+reps?\s+per\s+side\.?/gi,
+  /\b(do|perform|complete|repeat)\s+(on\s+)?both\s+sides\.?/gi,
+  /\b\d+\s+reps?\s+(per|each)\s+side\.?/gi,
+  /\breps?\s+(per|each)\s+side\.?/gi,
+  /\b(per|each)\s+side\.?/gi,
+  /\bon\s+both\s+sides\.?/gi,
+  /\bboth\s+sides\.?/gi,
+  /\bleft\s*(?:then|&|\/|,)\s*right\.?/gi,
+  /\bL\s*[/|]\s*R\.?/gi,
+];
+
 /** Detect a numeric load mention like "12 kg" or "25lb" in free text. */
 export function extractLoadFromText(text: string | null | undefined): string | null {
   if (!text?.trim()) return null;
@@ -57,6 +74,30 @@ export function sanitizeCoachNote(note: string | null | undefined): string | nul
   }
 
   const out = kept.join(" ").trim();
+  return out || null;
+}
+
+/**
+ * Remove both-sides instructional language from notes.
+ * Always strip invented bilateral cues; the catalog `both_sides` flag owns that UX.
+ */
+export function sanitizeBothSidesCoachNote(
+  note: string | null | undefined,
+  _opts?: { bothSides?: boolean }
+): string | null {
+  const raw = note?.trim();
+  if (!raw) return null;
+
+  let out = raw;
+  for (const re of BOTH_SIDES_NOTE_PATTERNS) {
+    out = out.replace(re, " ");
+  }
+  out = out
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/^[.,;:\s]+|[.,;:\s]+$/g, "")
+    .trim();
+
   return out || null;
 }
 

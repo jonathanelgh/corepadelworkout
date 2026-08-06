@@ -6,7 +6,10 @@ import {
 import { parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 import { WARMUP_DURATION_SECONDS } from "@/lib/programs/warmup-prescription";
 import { DEFAULT_REST_BETWEEN_SIDES_SECONDS } from "@/lib/programs/program-exercises";
-import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
+import {
+  promoteProgressionOutOfNote,
+  sanitizeBothSidesCoachNote,
+} from "@/lib/programs/sanitize-coach-note";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
@@ -80,14 +83,14 @@ export function ensureSetsRepsBetweenSetsNote(
   return `${existing} ${SETS_REPS_BETWEEN_SETS_NOTE}`;
 }
 
-/** Rest between left and right on bilateral timed exercises. */
+/** Rest between left and right on bilateral timed exercises. Catalog both_sides only. */
 export function defaultRestBetweenSidesSeconds(
   ex: AiExerciseFields,
   opts?: { bothSides?: boolean }
 ): number | null {
+  if (!opts?.bothSides) return null;
   const explicit = parseNonNegInt(ex.rest_between_sides_seconds);
   if (explicit != null && explicit > 0) return explicit;
-  if (!opts?.bothSides) return null;
   const type = inferAiPrescriptionType(ex);
   if (type === "time" || type === "timed_intervals") return DEFAULT_REST_BETWEEN_SIDES;
   return null;
@@ -131,6 +134,9 @@ export function aiExerciseToProgramPayload(
     note: ex.note ?? null,
     load_prescription: ex.load_prescription ?? null,
   });
+  const noteSansBothSides = sanitizeBothSidesCoachNote(cleaned.note, {
+    bothSides: opts.bothSides,
+  });
 
   let durationSeconds =
     ex.duration_seconds != null && ex.duration_seconds > 0
@@ -169,7 +175,7 @@ export function aiExerciseToProgramPayload(
     load_prescription: cleaned.load_prescription,
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
-    note: ensureSetsRepsBetweenSetsNote(cleaned.note, forNote, {
+    note: ensureSetsRepsBetweenSetsNote(noteSansBothSides, forNote, {
       bothSides: opts.bothSides,
     }),
   };
@@ -186,6 +192,7 @@ export function normalizeAiExerciseRest<T extends AiExerciseFields>(
       note: ex.note ?? null,
       load_prescription: ex.load_prescription ?? null,
     });
+    const noteSansBothSides = sanitizeBothSidesCoachNote(cleaned.note, { bothSides });
     const restBetween = defaultRestBetweenSetsSeconds(ex) ?? undefined;
     const withRest: AiExerciseFields = {
       ...ex,
@@ -193,7 +200,7 @@ export function normalizeAiExerciseRest<T extends AiExerciseFields>(
     };
     return {
       ...ex,
-      note: ensureSetsRepsBetweenSetsNote(cleaned.note, withRest, { bothSides }) ?? undefined,
+      note: ensureSetsRepsBetweenSetsNote(noteSansBothSides, withRest, { bothSides }) ?? undefined,
       load_prescription: cleaned.load_prescription ?? undefined,
       rest_between_sets_seconds: restBetween,
       rest_between_sides_seconds:

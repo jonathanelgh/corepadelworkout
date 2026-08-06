@@ -18,6 +18,10 @@ import {
   type MemberPickerOption,
 } from "@/lib/programs/profile-ai-context";
 import type { ChatHistoryMessage, ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
+import {
+  AI_COACH_PROVIDERS,
+  type AiCoachProvider,
+} from "@/lib/programs/ai-coach-provider";
 import type { ConsultationPrompt } from "@/lib/programs/coach-consultation";
 import {
   groupExercisesByPhase,
@@ -265,6 +269,7 @@ export function AiCoachClient({
   const [catalog] = useState(initialCatalog);
   const [targetUserId, setTargetUserId] = useState("");
   const [trainingLevel, setTrainingLevel] = useState("");
+  const [provider, setProvider] = useState<AiCoachProvider>("gemini");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -339,6 +344,7 @@ export function AiCoachClient({
       programsCatalog: catalog,
       targetUserId: targetUserId || null,
       trainingLevel: trainingLevel || null,
+      provider,
     });
     setPending(false);
 
@@ -568,6 +574,21 @@ export function AiCoachClient({
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-gray-500 whitespace-nowrap">Model</span>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as AiCoachProvider)}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+              title="LLM used to chat and generate programs/workouts"
+            >
+              {AI_COACH_PROVIDERS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-sm">
             <span className="text-gray-500 whitespace-nowrap">Training level</span>
             <select

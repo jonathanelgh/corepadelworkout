@@ -301,7 +301,7 @@ function LoginForm() {
                 <div className="mt-6 flex flex-col items-center gap-2 text-center text-xs text-white/60">
                   <p>
                     Want to explore first?{" "}
-                    <Link href="/free-warmup" className="text-white underline underline-offset-4 hover:text-white/80">
+                    <Link href="/court-warm-up" className="text-white underline underline-offset-4 hover:text-white/80">
                       Free 15-min warmup
                     </Link>
                   </p>

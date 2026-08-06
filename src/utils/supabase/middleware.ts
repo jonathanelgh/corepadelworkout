@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { attachPromoCookieFromRequest } from '@/lib/billing/promo-cookie'
+import { isCourtWarmupFunnelPath } from '@/lib/programs/court-warmup-funnel'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -90,7 +91,9 @@ export async function updateSession(request: NextRequest) {
 
     const target = profile?.onboarding_completed_at
       ? safeNext ?? "/member"
-      : "/onboarding"
+      : safeNext && isCourtWarmupFunnelPath(safeNext)
+        ? safeNext
+        : "/onboarding"
 
     return withSessionCookies(NextResponse.redirect(new URL(target, request.url)))
   }

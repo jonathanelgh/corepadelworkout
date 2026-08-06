@@ -1,8 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { enrollInPublishedProgram } from "@/app/programs/enroll-actions";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 import { redeemEarlyAccessPro } from "@/lib/pre-launch/early-access";
+import {
+  COURT_WARMUP_PROGRAM_SLUG,
+  isCourtWarmupFunnelPath,
+} from "@/lib/programs/court-warmup-funnel";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -50,6 +55,11 @@ export async function GET(request: Request) {
           : next.startsWith("/") && !next.startsWith("//")
             ? next
             : "/onboarding";
+
+      if (user && isCourtWarmupFunnelPath(safeNext)) {
+        await enrollInPublishedProgram(COURT_WARMUP_PROGRAM_SLUG);
+      }
+
       return NextResponse.redirect(`${origin}${safeNext}`);
     }
   }

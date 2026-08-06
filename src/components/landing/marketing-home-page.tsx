@@ -529,7 +529,7 @@ export function MarketingHomePage({
                   </li>
                 </ul>
               </div>
-              <Link href="/free-warmup" className="w-full mt-auto bg-black text-white py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors text-center block">
+              <Link href="/court-warm-up" className="w-full mt-auto bg-black text-white py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors text-center block">
                 Try free warmup
               </Link>
             </div>

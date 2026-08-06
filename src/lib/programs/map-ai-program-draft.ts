@@ -12,9 +12,10 @@ import {
 import {
   clampProgramPrescriptionType,
 } from "@/lib/exercises/program-prescription-mode";
-import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
+import { promoteProgressionOutOfNote, sanitizeBothSidesCoachNote } from "@/lib/programs/sanitize-coach-note";
 import {
   defaultRestBetweenSetsSeconds,
+  defaultRestBetweenSidesSeconds,
   ensureSetsRepsBetweenSetsNote,
 } from "@/lib/programs/normalize-ai-exercise-prescription";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
@@ -190,6 +191,10 @@ export function mapGeminiDraftToForm(
           note: ex.note,
           load_prescription: ex.load_prescription,
         });
+        const isBothSides = catalogEntry?.bothSides ?? false;
+        const noteSansBothSides = sanitizeBothSidesCoachNote(cleaned.note, {
+          bothSides: isBothSides,
+        });
         const aiFields = {
           phase: ex.phase,
           duration_seconds: workSeconds,
@@ -198,16 +203,26 @@ export function mapGeminiDraftToForm(
           reps: ex.reps,
           rest_between_sets_seconds: ex.rest_between_sets_seconds,
           rest_after_seconds: ex.rest_after_seconds,
-          note: cleaned.note,
+          note: noteSansBothSides,
         };
         const restBetween = defaultRestBetweenSetsSeconds(aiFields) ?? ex.rest_between_sets_seconds;
         const noteWithRest = ensureSetsRepsBetweenSetsNote(
-          cleaned.note,
+          noteSansBothSides,
           {
             ...aiFields,
             rest_between_sets_seconds: restBetween,
           },
-          { bothSides: catalogEntry?.bothSides ?? false }
+          { bothSides: isBothSides }
+        );
+        const restBetweenSides = defaultRestBetweenSidesSeconds(
+          {
+            ...aiFields,
+            rest_between_sides_seconds:
+              "rest_between_sides_seconds" in ex
+                ? (ex as { rest_between_sides_seconds?: number | null }).rest_between_sides_seconds
+                : null,
+          },
+          { bothSides: isBothSides }
         );
 
         exercises.push({
@@ -220,11 +235,7 @@ export function mapGeminiDraftToForm(
           sets: intToField(ex.sets),
           reps: intToField(ex.reps),
           restBetweenSetsSeconds: intToField(restBetween),
-          restBetweenSidesSeconds: intToField(
-            "rest_between_sides_seconds" in ex
-              ? (ex as { rest_between_sides_seconds?: number | null }).rest_between_sides_seconds
-              : null
-          ),
+          restBetweenSidesSeconds: intToField(restBetweenSides),
           restAfterSeconds: intToField(ex.rest_after_seconds),
           loadPrescription: cleaned.load_prescription?.trim() ?? "",
           note: noteWithRest?.trim() ?? "",

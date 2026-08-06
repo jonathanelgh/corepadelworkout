@@ -80,7 +80,7 @@ export type AiCoachChatResult =
 
 export type AiCoachToolName = "recommend_programs" | "generate_workout" | "generate_program";
 
-function buildSystemInstruction(
+export function buildSystemInstruction(
   template: string,
   params: {
     programsCatalog: ProgramCatalogForAI[];
@@ -389,7 +389,7 @@ function parseExerciseList(
   return normalizeAiExerciseRest(exercises, { bothSidesByExerciseId });
 }
 
-function parseWorkoutProposal(
+export function parseWorkoutProposal(
   args: Record<string, unknown>,
   catalogById: Map<string, string>,
   bothSidesByExerciseId: Map<string, boolean>
@@ -405,7 +405,7 @@ function parseWorkoutProposal(
   return { title, description, exercises, design_rationale };
 }
 
-function parseProgramProposal(
+export function parseProgramProposal(
   args: Record<string, unknown>,
   catalogById: Map<string, string>,
   bothSidesByExerciseId: Map<string, boolean>
@@ -461,7 +461,7 @@ function parseProgramProposal(
   };
 }
 
-function parseRecommendPrograms(args: Record<string, unknown>): RecommendProgramsArgs | null {
+export function parseRecommendPrograms(args: Record<string, unknown>): RecommendProgramsArgs | null {
   const intro_text = typeof args.intro_text === "string" ? args.intro_text.trim() : "";
   if (!intro_text) return null;
   const program_ids: string[] = [];
@@ -476,7 +476,7 @@ function parseRecommendPrograms(args: Record<string, unknown>): RecommendProgram
   return { intro_text, program_ids: program_ids.slice(0, 5) };
 }
 
-class IncompleteToolCallError extends Error {
+export class IncompleteToolCallError extends Error {
   constructor(readonly toolName: string) {
     super(`Incomplete ${toolName} tool call`);
     this.name = "IncompleteToolCallError";
