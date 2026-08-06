@@ -719,6 +719,9 @@ export function ActiveWorkoutPlayer({
               {phase === "work" && !inPrep && currentIsTimed && secondsLeft != null && (
                 <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-6 text-center">
                   <p className="font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                  {current && (
+                    <p className="mt-2 text-sm text-white/80">{exerciseMeta(current)}</p>
+                  )}
                   {current?.workoutSide && (
                     <p className="mt-1 text-sm font-semibold text-[#ccff00]">
                       {workoutSideLabel(current.workoutSide)}
@@ -784,6 +787,12 @@ export function ActiveWorkoutPlayer({
                 {!inRest && displayNote && (
                   <p className="mt-3 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-sm leading-relaxed text-white/90">
                     {displayNote}
+                  </p>
+                )}
+
+                {currentIsTimed && !inRest && phase === "work" && current && (
+                  <p className="mt-3 text-lg font-medium text-[#ccff00]">
+                    {exerciseMeta(current)}
                   </p>
                 )}
 
