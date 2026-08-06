@@ -11,7 +11,7 @@ import {
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import type { SessionPhase } from "@/lib/programs/session-phase";
 import type { ProgramFormat } from "@/lib/programs/program-format";
-import { MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS } from "@/lib/programs/normalize-ai-exercise-prescription";
+import { MAIN_TIMED_HOLD_DEFAULT_SECONDS, MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS } from "@/lib/programs/normalize-ai-exercise-prescription";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1083,6 +1083,15 @@ export function CreateProgramForm({
                   if (e.durationUnit === "sec") duration_seconds = n;
                   else duration_minutes = n;
                 }
+              }
+              // Catalog time_only holds in main must never save without a duration.
+              if (
+                e.sessionPhase === "main" &&
+                exerciseProgramMode(exercises, e.exerciseId) === "time_only" &&
+                (duration_seconds == null || duration_seconds <= 0) &&
+                (duration_minutes == null || duration_minutes <= 0)
+              ) {
+                duration_seconds = MAIN_TIMED_HOLD_DEFAULT_SECONDS;
               }
             }
 

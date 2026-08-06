@@ -20,6 +20,11 @@ import {
   type RehabFocus,
 } from "@/lib/programs/program-prescription-rules";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
+import {
+  ensureTimeOnlyMainPrescription,
+  MAIN_TIMED_DEFAULT_ROUNDS,
+  MAIN_TIMED_HOLD_DEFAULT_SECONDS,
+} from "@/lib/programs/normalize-ai-exercise-prescription";
 
 export type ProgramRulesContext = {
   trainingLevel?: OnboardingLevel | null;
@@ -154,6 +159,17 @@ function defaultMainExercise(
   level: OnboardingLevel = "beginner"
 ): WorkoutProposalExercise {
   const band = resolveRestBand(pick, "main");
+  if (pick.programPrescriptionMode === "time_only") {
+    return {
+      exercise_id: pick.id,
+      title: pick.title,
+      phase: "main",
+      duration_seconds: MAIN_TIMED_HOLD_DEFAULT_SECONDS,
+      sets: MAIN_TIMED_DEFAULT_ROUNDS,
+      rest_between_sets_seconds: band.default,
+      rest_after_seconds: band.default,
+    };
+  }
   if (exerciseIsStrength(pick)) {
     return {
       exercise_id: pick.id,
@@ -227,7 +243,48 @@ function normalizeStrengthExercise(
   entry: ExerciseCatalogEntry,
   level: OnboardingLevel = "beginner"
 ): WorkoutProposalExercise {
-  if (ex.phase !== "main" || !exerciseIsStrength(entry)) return ex;
+  if (ex.phase !== "main") return ex;
+
+  // time_only catalog holds (e.g. Pallof Press Hold) must keep duration — never convert to sets×reps.
+  if (entry.programPrescriptionMode === "time_only") {
+    const band = resolveRestBand(entry, "main");
+    const filled = ensureTimeOnlyMainPrescription(
+      {
+        phase: "main",
+        duration_seconds: ex.duration_seconds,
+        duration_minutes: ex.duration_minutes,
+        sets: ex.sets,
+        reps: ex.reps,
+        rest_between_sets_seconds: ex.rest_between_sets_seconds ?? band.default,
+        rest_after_seconds: ex.rest_after_seconds,
+      },
+      "time_only"
+    );
+    return {
+      ...ex,
+      duration_seconds: filled.duration_seconds ?? MAIN_TIMED_HOLD_DEFAULT_SECONDS,
+      duration_minutes: undefined,
+      sets: filled.sets,
+      reps: undefined,
+      rest_between_sets_seconds: filled.rest_between_sets_seconds,
+    };
+  }
+
+  if (!exerciseIsStrength(entry)) return ex;
+
+  const hasDuration =
+    (ex.duration_seconds != null && ex.duration_seconds > 0) ||
+    (ex.duration_minutes != null && ex.duration_minutes > 0);
+
+  // AI prescribed a timed hold on a strength exercise — keep duration, drop reps.
+  if (hasDuration && entry.programPrescriptionMode !== "sets_reps_only") {
+    return {
+      ...ex,
+      duration_minutes: undefined,
+      reps: undefined,
+    };
+  }
+
   const defaults = defaultStrengthSetsRepsForEntry(entry, level);
   return {
     ...ex,

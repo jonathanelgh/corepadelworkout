@@ -17,7 +17,7 @@ import {
   defaultRestBetweenSetsSeconds,
   defaultRestBetweenSidesSeconds,
   ensureSetsRepsBetweenSetsNote,
-  ensureMainTimedRounds,
+  ensureTimeOnlyMainPrescription,
 } from "@/lib/programs/normalize-ai-exercise-prescription";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
@@ -180,7 +180,6 @@ export function mapGeminiDraftToForm(
               ? ex.duration_minutes * 60
               : null;
         const mode = catalogEntry?.programPrescriptionMode ?? "all";
-        const hasSeconds = ex.duration_seconds != null && ex.duration_seconds > 0;
         const cleaned = clearAiLoadPrescription(
           promoteProgressionOutOfNote({
             note: ex.note,
@@ -191,22 +190,27 @@ export function mapGeminiDraftToForm(
         const noteSansBothSides = sanitizeBothSidesCoachNote(cleaned.note, {
           bothSides: isBothSides,
         });
-        const aiFields = ensureMainTimedRounds({
-          phase: ex.phase,
-          duration_seconds: workSeconds,
-          duration_minutes: workSeconds != null ? Math.ceil(workSeconds / 60) : ex.duration_minutes,
-          sets: ex.sets,
-          reps: ex.reps,
-          rest_between_sets_seconds: ex.rest_between_sets_seconds,
-          rest_after_seconds: ex.rest_after_seconds,
-          note: noteSansBothSides,
-        });
+        const aiFields = ensureTimeOnlyMainPrescription(
+          {
+            phase: ex.phase,
+            duration_seconds: workSeconds,
+            duration_minutes: workSeconds != null ? Math.ceil(workSeconds / 60) : ex.duration_minutes,
+            sets: ex.sets,
+            reps: ex.reps,
+            rest_between_sets_seconds: ex.rest_between_sets_seconds,
+            rest_after_seconds: ex.rest_after_seconds,
+            note: noteSansBothSides,
+          },
+          mode
+        );
+        const workSecsOut =
+          aiFields.duration_seconds != null && aiFields.duration_seconds > 0
+            ? aiFields.duration_seconds
+            : workSeconds;
         const inferred = inferExercisePrescriptionType({
-          durationSeconds: aiFields.duration_seconds ?? workSeconds,
+          durationSeconds: workSecsOut,
           durationMinutes:
-            aiFields.duration_seconds != null
-              ? Math.ceil(aiFields.duration_seconds / 60)
-              : ex.duration_minutes,
+            workSecsOut != null ? Math.ceil(workSecsOut / 60) : ex.duration_minutes,
           sets: aiFields.sets,
           restBetweenSetsSeconds: aiFields.rest_between_sets_seconds,
         });
@@ -240,10 +244,16 @@ export function mapGeminiDraftToForm(
           sessionPhase: ex.phase,
           choiceGroup: ex.choice_group ?? "",
           prescriptionType,
-          durationValue: hasSeconds ? String(ex.duration_seconds) : intToField(ex.duration_minutes),
-          durationUnit: hasSeconds ? "sec" : "min",
+          durationValue:
+            workSecsOut != null
+              ? String(workSecsOut)
+              : intToField(ex.duration_minutes),
+          durationUnit: workSecsOut != null ? "sec" : "min",
           sets: intToField(aiFields.sets),
-          reps: intToField(aiFields.reps),
+          reps:
+            prescriptionType === "timed_intervals" || prescriptionType === "time"
+              ? ""
+              : intToField(aiFields.reps),
           restBetweenSetsSeconds: intToField(restBetween),
           restBetweenSidesSeconds: intToField(restBetweenSides),
           restAfterSeconds: intToField(aiFields.rest_after_seconds),

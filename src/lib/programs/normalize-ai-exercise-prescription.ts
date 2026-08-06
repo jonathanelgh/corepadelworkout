@@ -64,6 +64,8 @@ export const MAIN_TIMED_MIN_ROUNDS = 2;
 export const MAIN_TIMED_MAX_ROUNDS = 3;
 export const MAIN_TIMED_DEFAULT_ROUNDS = 3;
 export const MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS = 30;
+/** Default hold length when catalog is time_only and AI/admin omit duration (e.g. Pallof Press Hold). */
+export const MAIN_TIMED_HOLD_DEFAULT_SECONDS = 30;
 
 const BETWEEN_SETS_NOTE_RE = /rest\s+\d+\s*sec(?:onds)?\s+between\s+sets/i;
 
@@ -72,6 +74,16 @@ function hasTimedDuration(ex: AiExerciseFields): boolean {
     (ex.duration_seconds != null && ex.duration_seconds > 0) ||
     (ex.duration_minutes != null && ex.duration_minutes > 0)
   );
+}
+
+function resolveWorkSeconds(ex: AiExerciseFields): number | null {
+  if (ex.duration_seconds != null && ex.duration_seconds > 0) {
+    return Math.ceil(ex.duration_seconds);
+  }
+  if (ex.duration_minutes != null && ex.duration_minutes > 0) {
+    return Math.ceil(ex.duration_minutes) * 60;
+  }
+  return null;
 }
 
 /**
@@ -95,6 +107,27 @@ export function ensureMainTimedRounds<T extends AiExerciseFields>(ex: T): T {
     sets,
     rest_between_sets_seconds: restBetween,
   };
+}
+
+/**
+ * Catalog `time_only` main exercises (holds, timed drills) must keep a duration.
+ * Fills a default hold when missing and clears sets×reps-style reps.
+ */
+export function ensureTimeOnlyMainPrescription<T extends AiExerciseFields>(
+  ex: T,
+  mode: string | null | undefined
+): T {
+  if (mode !== "time_only" || ex.phase !== "main") {
+    return ensureMainTimedRounds(ex);
+  }
+
+  const durationSeconds = resolveWorkSeconds(ex) ?? MAIN_TIMED_HOLD_DEFAULT_SECONDS;
+  return ensureMainTimedRounds({
+    ...ex,
+    duration_seconds: durationSeconds,
+    duration_minutes: null,
+    reps: null,
+  });
 }
 
 /** True when this is sets×reps work with multiple sets (not timed). */
