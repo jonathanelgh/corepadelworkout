@@ -133,7 +133,7 @@ Tools are OFF this turn — reply with plain text only. Do not call generate_wor
 
 ## CRITICAL — this message is a creation request
 ${who} asked you to build or find something. Use generate_workout for a custom session${options.audience === "member" ? " or recommend_programs for multi-week library programs" : " or generate_program for a multi-week plan"}.
-${options.audience === "admin" ? "Do NOT use recommend_programs when building something new." : "Do NOT invent multi-week programs — use recommend_programs for structured plans from the catalog."}
+${options.audience === "admin" ? "Do NOT use recommend_programs when building something new." : "Do NOT invent multi-week programs — use recommend_programs for structured plans from the catalog. For rehab / injury programs: recommend pre-made rehab programs from the catalog and say custom AI rehab programs are coming soon."}
 When the consultation block says CONSULTATION COMPLETE, you MUST call the tool in this turn — never reply with prose only.
 During consultation: 1–2 short sentences + one question. No praise filler, never expose consultation_state.`;
     }

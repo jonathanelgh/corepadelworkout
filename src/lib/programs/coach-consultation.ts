@@ -1036,6 +1036,21 @@ export function formatGenerationCoachBrief(
   const quickWorkout = Boolean(state.goal && isQuickSingleWorkoutRequest(state.goal));
 
   if (toolName === "recommend_programs") {
+    const goal = (state.goal ?? "").toLowerCase();
+    const rehabRequest =
+      /\b(rehab|prehab|pre-hab|rehabilitation)\b/.test(goal) ||
+      (/\b(injury|return[- ]to[- ]play)\b/.test(goal) &&
+        /\b(program|plan|routine)\b/.test(goal));
+
+    if (rehabRequest) {
+      return `${base}
+
+## RECOMMEND — rehab program request — call recommend_programs now
+- Prefer published **rehab / injury / recovery** programs from the catalog that match the body part or issue.
+- Use program IDs from the catalog JSON only — never invent IDs.
+- In intro_text: tell the athlete to use our **pre-made rehab programs** in the library, and that **soon this coach will also be able to create custom rehab programs**. Keep it warm and brief — do not invent a custom multi-week rehab plan.`;
+    }
+
     return `${base}
 
 ## RECOMMEND — call recommend_programs now

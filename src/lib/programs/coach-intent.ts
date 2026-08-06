@@ -10,6 +10,30 @@ export function coachShouldRecommendCatalogOnly(userMessage: string): boolean {
   );
 }
 
+/**
+ * Member asked for a rehab / injury recovery program (or to create one).
+ * Members should get pre-made catalog rehab programs — not a custom multi-week plan.
+ */
+export function coachWantsRehabProgram(userMessage: string): boolean {
+  const msg = userMessage.trim().toLowerCase();
+  const mentionsRehab = /\b(rehab|prehab|pre-hab|rehabilitation)\b/.test(msg);
+  const injuryPlan =
+    /\b(injury|return[- ]to[- ]play)\b/.test(msg) &&
+    /\b(program|plan|routine)\b/.test(msg);
+
+  if (!mentionsRehab && !injuryPlan) return false;
+
+  if (/\b(program|plan|routine|block|mesocycle)\b/.test(msg)) return true;
+  if (
+    /\b(create|build|make|generate|draft|design|write|get|give|want|need|start|find|recommend|suggest)\b/.test(
+      msg
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Single-session warm-up or pre-match routine — not a multi-week program. */
 export function isQuickSingleWorkoutRequest(message: string): boolean {
   const msg = message.trim().toLowerCase();

@@ -50,7 +50,7 @@ export function CourtWarmupSignUpForm() {
         <h3 className="text-xl font-semibold text-white">Check your email</h3>
         <p className="text-sm leading-relaxed text-white/70">
           We sent a confirmation link to <span className="text-white">{email}</span>. After you confirm,
-          you&apos;ll land in the free court warm-up.
+          you&apos;ll unlock all free warm-up programs.
         </p>
         <Link
           href={`/login?next=${encodeURIComponent(COURT_WARMUP_DEST_PATH)}`}
@@ -118,7 +118,7 @@ export function CourtWarmupSignUpForm() {
         disabled={pending}
         className="w-full rounded-full bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-60"
       >
-        {pending ? "Creating account…" : "Start free warm-up"}
+        {pending ? "Creating account…" : "Get free warm-ups"}
       </button>
 
       <p className="text-center text-xs leading-relaxed text-white/50">

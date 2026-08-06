@@ -1,4 +1,4 @@
-/** Dedicated landing funnel for the free Court warm-up dynamic program. */
+/** Dedicated landing funnel for free court warm-up programs. */
 
 export const COURT_WARMUP_PROGRAM_SLUG = "court-warm-up";
 
@@ -7,6 +7,15 @@ export const COURT_WARMUP_DEST_PATH = `/programs/${COURT_WARMUP_PROGRAM_SLUG}`;
 
 /** Marketing landing URL (not the in-app program page). */
 export const COURT_WARMUP_LANDING_PATH = "/court-warm-up";
+
+export type FreeWarmupProgramCard = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  minutesPerSession: number | null;
+};
 
 export function isCourtWarmupFunnelPath(path: string | null | undefined): boolean {
   const trimmed = path?.trim() ?? "";

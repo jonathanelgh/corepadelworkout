@@ -27,6 +27,14 @@ export const AI_COACH_TOOL_ROUTING_BLOCK = `## Tool routing (hard constraints)
 - **Never** call \`generate_program\` — members cannot author new catalog programs.
 - Do not call tools for casual conversation.
 
+### Member coach — rehab programs (hard rule)
+- If the athlete asks for a **rehab / prehab / injury / recovery / return-to-play program** (including "create", "build", "make", or "generate" one):
+  - Do **not** invent a multi-week rehab plan.
+  - Do **not** use \`generate_workout\` as a stand-in for a rehab program.
+  - Call **\`recommend_programs\`** and prefer matching **pre-made rehab programs** from the published catalog (e.g. elbow rehab).
+  - In \`intro_text\` (or your reply), say clearly that they should use our **pre-made rehab programs** in the library, and that **soon this coach will also be able to create custom rehab programs**.
+- General rehab education, pain questions, or a single non-program session can still be answered in text / \`generate_workout\` when appropriate and safe.
+
 ### When consultation is complete
 If a consultation / creation brief says CONSULTATION COMPLETE (or tools are enabled for a create turn), you MUST call the appropriate tool this turn — do not reply with prose only.`.trim();
 

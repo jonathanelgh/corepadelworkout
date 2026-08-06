@@ -25,7 +25,7 @@ import {
   loadMemberCoachTrainingContext,
   memberTrainingContextBlock,
 } from "@/lib/programs/load-member-coach-context";
-import { coachShouldCreateNew, coachShouldRecommendCatalogOnly } from "@/lib/programs/coach-intent";
+import { coachShouldCreateNew, coachShouldRecommendCatalogOnly, coachWantsRehabProgram } from "@/lib/programs/coach-intent";
 import {
   buildConsultationState,
   buildConsultationPrompt,
@@ -159,8 +159,9 @@ export async function sendMemberCoachMessage(input: {
     userTexts.push(userMessage);
 
     const wantsProgram = coachWantsProgram(userTexts);
+    const wantsRehab = userTexts.some((t) => coachWantsRehabProgram(t));
     const wantsRecommend =
-      coachShouldRecommendCatalogOnly(userMessage) || wantsProgram;
+      coachShouldRecommendCatalogOnly(userMessage) || wantsProgram || wantsRehab;
     const wantsWorkoutCreate =
       !wantsRecommend &&
       (userTexts.some((t) => coachShouldCreateNew(t)) ||
