@@ -250,6 +250,8 @@ export async function chatWithAiCoachOpenAI(params: {
       }
     );
 
+    // gpt-5.6+ defaults to reasoning on chat.completions; function tools require
+    // reasoning_effort: "none" (or migrating to /v1/responses).
     const response = await client.chat.completions.create({
       model,
       messages: [{ role: "system", content: system }, ...toOpenAiMessages(history)],
@@ -259,10 +261,10 @@ export async function chatWithAiCoachOpenAI(params: {
             tool_choice: params.forcedTool
               ? { type: "function" as const, function: { name: params.forcedTool } }
               : ("auto" as const),
+            reasoning_effort: "none" as const,
           }
         : {}),
       max_completion_tokens: turnToolsEnabled ? 32768 : 8192,
-      temperature: params.forcedTool ? 0.4 : undefined,
     });
 
     const message = response.choices[0]?.message;

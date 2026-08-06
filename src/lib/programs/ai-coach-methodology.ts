@@ -46,6 +46,67 @@ When building for a beginner or deconditioned athlete (e.g. older, little traini
 - **Member AI coach** — use **Onboarding level** from the athlete's own profile (set during onboarding).
 - **Admin AI coach** — when the athlete profile includes **Training level (admin)**, that value overrides everything and determines the mandatory workout structure and level engine. When only **Onboarding level** is present (member personalized, no admin override), use that. If neither is set, infer conservatively from consultation; when unsure, default to Beginner.
 
+### Goal ranking (do not treat every goal equally)
+
+Rank the brief's goals and weaknesses. Build the foundation before stacking advanced plyometrics, maximal sprinting, or high-volume conditioning.
+
+Example: weak legs + weak hips + weak lower back + wants explosiveness + tires after one hour of padel → prioritize (1) foundational lower-body strength, (2) hip and trunk stability, (3) unilateral strength and deceleration, (4) aerobic capacity, (5) repeated high-intensity endurance, (6) explosive strength last.
+
+When the primary weakness is lower body, put most main-block volume on lower body and trunk (roughly half or more), not upper-body bodybuilding.
+
+### Exercise selection by movement function
+
+Select from the catalog by **movement function**, not muscle names alone. Prefer padel transfer: accelerations, decelerations, lateral movement, split-step, COD, unilateral force absorption, rotational transfer, repeated efforts.
+
+For a general lower-body / S&C week, cover across sessions (not all in one day):
+- One squat / knee-dominant bilateral pattern
+- One hinge / hip-dominant pattern
+- One unilateral knee-dominant pattern
+- One calf or ankle pattern
+- One hip-stability pattern
+- Anti-extension **and** anti-rotation (or controlled rotation) core work
+
+**Avoid unnecessary duplication** of the same pattern (e.g. bodyweight squat + goblet squat + sumo squat + ballerina squat in one week). Different patterns beat near-identical variations.
+
+Do not select an exercise only because its catalog level matches the athlete — it must also match the ranked goals and movement need.
+
+### Plyometric progression ladder
+
+Progress plyometrics in this order; skip ahead only when the athlete's level engine has earned it:
+1. Landing and holding
+2. Low bilateral jumps
+3. Repeated bilateral jumps
+4. Lateral bounds with controlled landing
+5. Unilateral jumps
+6. Reactive and multi-directional jumps
+
+Do **not** raise plyometric intensity and volume at the same time. Cap power/plyo density (quality first, full recovery between efforts). Stop prescribing higher rungs when landing quality, alignment, or pain is a concern in the brief.
+
+### Conditioning (aerobic vs high-intensity)
+
+Distinguish purpose — do not make every conditioning block maximal.
+
+- **Aerobic** — recovery between points/rallies and sessions; longer intervals (~60s–4 min), RPE ~5–7, controlled breathing; gradual total work.
+- **High-intensity padel conditioning** — repeated accelerations and footwork quality under fatigue; shorter efforts (~15–45s work / similar rest), shuffles/COD/court patterns; keep total high-intensity work modest.
+
+For a default 3-day week (non-specialty): aim for one aerobic emphasis, one speed/repeated-sprint or power emphasis, and one padel-specific intermittent emphasis across the week — still obeying session order (power/speed before fatiguing conditioning).
+
+When padel play is frequent (3+ times/week), reduce conditioning volume before cutting strength quality.
+
+### Fatigue and match scheduling
+
+Use match/training days from the brief when present:
+- Avoid a demanding lower-body session within ~24 hours before an important match.
+- Avoid intense plyometrics on already fatigued legs.
+- Prefer ~48 hours between demanding lower-body strength days when the schedule allows.
+- Not every session needs to be exhausting.
+
+### Pain and lower-back heuristics
+
+When the brief reports a weak, sensitive, or sore lower back (or similar), prioritize hinge technique, glutes/hamstrings, anti-extension, anti-rotation, side-plank variations, carries, bird-dog / dead-bug patterns. Avoid unnecessary high-volume spinal flexion, fast loaded spinal rotation, and heavy loading before hinge control is solid.
+
+If sharp/radiating pain, numbness, weakness, or worsening symptoms are reported: recommend medical clearance, avoid high-risk methods, and do not train through that presentation. Never prescribe blood-flow-restriction for vascular or clotting-related conditions.
+
 ### Mandatory workout structure — BEGINNER
 
 Every workout must follow this order:
