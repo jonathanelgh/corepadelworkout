@@ -10,6 +10,7 @@ import {
 } from "@/lib/exercises/program-prescription-mode";
 import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import type { SessionPhase } from "@/lib/programs/session-phase";
+import { SESSION_PHASE_LABELS } from "@/lib/programs/session-phase";
 import type { ProgramFormat } from "@/lib/programs/program-format";
 import { MAIN_TIMED_HOLD_DEFAULT_SECONDS, MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS } from "@/lib/programs/normalize-ai-exercise-prescription";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
@@ -843,6 +844,54 @@ export function CreateProgramForm({
     );
   }
 
+  function setSessionExercisePhase(
+    trackKey: string,
+    sessionKey: string,
+    entryKey: string,
+    sessionPhase: SessionPhase
+  ) {
+    setTracks((prev) =>
+      prev.map((t) => {
+        if (t.key !== trackKey) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.key !== sessionKey) return s;
+            return {
+              ...s,
+              exercises: s.exercises.map((e) => {
+                if (e.key !== entryKey) return e;
+                const mode = exerciseProgramMode(exercises, e.exerciseId);
+                const prescriptionType = clampProgramPrescriptionTypeForPhase(
+                  mode,
+                  e.prescriptionType,
+                  sessionPhase
+                );
+                const next: SessionExerciseEntry = {
+                  ...e,
+                  sessionPhase,
+                  prescriptionType,
+                };
+                // Main timed work needs rounds; warm-up/cool-down single time can clear sets.
+                if (
+                  sessionPhase === "main" &&
+                  (prescriptionType === "timed_intervals" || prescriptionType === "time")
+                ) {
+                  const setsN = Number.parseInt(e.sets, 10);
+                  if (!Number.isFinite(setsN) || setsN < 2) next.sets = "2";
+                  if (!e.restBetweenSetsSeconds.trim()) {
+                    next.restBetweenSetsSeconds = String(MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS);
+                  }
+                }
+                return next;
+              }),
+            };
+          }),
+        };
+      })
+    );
+  }
+
   function setSessionExercisePrescriptionType(
     trackKey: string,
     sessionKey: string,
@@ -858,9 +907,16 @@ export function CreateProgramForm({
             if (s.key !== sessionKey) return s;
             return {
               ...s,
-              exercises: s.exercises.map((e) =>
-                e.key === entryKey ? { ...e, prescriptionType } : e
-              ),
+              exercises: s.exercises.map((e) => {
+                if (e.key !== entryKey) return e;
+                const mode = exerciseProgramMode(exercises, e.exerciseId);
+                const clamped = clampProgramPrescriptionTypeForPhase(
+                  mode,
+                  prescriptionType,
+                  e.sessionPhase
+                );
+                return { ...e, prescriptionType: clamped };
+              }),
             };
           }),
         };
@@ -2378,6 +2434,35 @@ export function CreateProgramForm({
                                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
                                           <div>
                                             <label
+                                              htmlFor={`ex-phase-${entry.key}`}
+                                              className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
+                                            >
+                                              Section
+                                            </label>
+                                            <select
+                                              id={`ex-phase-${entry.key}`}
+                                              value={entry.sessionPhase}
+                                              onChange={(e) =>
+                                                setSessionExercisePhase(
+                                                  activeTrack.key,
+                                                  session.key,
+                                                  entry.key,
+                                                  e.target.value as SessionPhase
+                                                )
+                                              }
+                                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                            >
+                                              {(Object.keys(SESSION_PHASE_LABELS) as SessionPhase[]).map(
+                                                (phase) => (
+                                                  <option key={phase} value={phase}>
+                                                    {SESSION_PHASE_LABELS[phase]}
+                                                  </option>
+                                                )
+                                              )}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <label
                                               htmlFor={`ex-load-${entry.key}`}
                                               className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
                                             >
@@ -2426,12 +2511,20 @@ export function CreateProgramForm({
                                         <p className="mt-2 text-xs text-gray-500">
                                           Choose how this exercise runs in the workout player. Rest after applies
                                           before the next exercise.
+                                          {entry.sessionPhase === "main" &&
+                                          (programMode === "time_only" || programMode === "all")
+                                            ? " Main section uses timed sets (not a single timer)."
+                                            : null}
                                         </p>
                                         {prescriptionOptions.length === 1 ? (
                                           <p className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700">
                                             This exercise only supports{" "}
                                             <span className="font-medium">{prescriptionOptions[0]!.label}</span> in
-                                            programs.
+                                            {entry.sessionPhase === "main" ? " the main section" : " programs"}
+                                            {entry.sessionPhase === "main" &&
+                                            programMode === "time_only"
+                                              ? " — switch Section to Warm-up or Cool-down for a single Time block."
+                                              : "."}
                                           </p>
                                         ) : (
                                           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
