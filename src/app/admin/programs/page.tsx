@@ -1,4 +1,4 @@
-import { Bot, Plus, Search, Filter } from "lucide-react";
+import { Bot, Plus, Search, Filter, Tags } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { ProgramRowActions } from "./program-row-actions";
@@ -84,7 +84,7 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
       difficulty_levels ( name )
     `
     )
-    .order("updated_at", { ascending: false });
+    .order("created_at", { ascending: false });
 
   const programs: ProgramRow[] = (raw ?? []).map((row) => {
     const r = row as {
@@ -129,6 +129,13 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-8">
         <h1 className="text-lg font-semibold text-gray-900">Programs</h1>
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/programs/categories"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            <Tags className="w-4 h-4" />
+            Categories
+          </Link>
           <Link
             href="/admin/programs/ai"
             className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"

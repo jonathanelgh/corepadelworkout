@@ -19,7 +19,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   Bell,
-  User
+  User,
+  Tags
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
@@ -43,6 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Programs", href: "/admin/programs", icon: Dumbbell },
+    { name: "Categories", href: "/admin/programs/categories", icon: Tags },
     { name: "AI Coach", href: "/admin/programs/ai", icon: Bot },
     { name: "Exercises", href: "/admin/exercises", icon: Activity },
     { name: "Equipment", href: "/admin/exercises/equipment", icon: Package },
