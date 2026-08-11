@@ -31,11 +31,13 @@ const SECONDS_PER_PROGRESS_STEP = 5;
 /** Soft cap so short drills don't balloon (e.g. 30s → max ~90s over the block). */
 const MAX_TIMED_DURATION_MULTIPLIER = 3;
 
-/** Intermediate/Advanced: weeks 1–4 accumulate +0..+3 reps; weeks 5–8 reset reps. */
+/**
+ * Intermediate/Advanced: +1 rep (or +1 timed step) each week from week-1 baseline.
+ * Never resets — load bumps (when set) are additive, not a replacement for reps.
+ */
 function intermediateRepOffset(weekIndex: number): number {
   if (weekIndex <= 0) return 0;
-  if (weekIndex <= 3) return weekIndex; // weeks 2–4 → +1..+3
-  return 0; // weeks 5–8 reset to baseline
+  return weekIndex;
 }
 
 function timedWorkSeconds(ex: ProgressableExercise): number | null {
@@ -160,12 +162,12 @@ function applyIntermediateReps(
   const offset = intermediateRepOffset(weekIndex);
   let next = baselineReps + offset;
   if (maxReps != null && maxReps > 0) next = Math.min(next, maxReps);
-  return Math.max(1, next);
+  return Math.max(baselineReps, next);
 }
 
 /**
- * Load phase starts at week index 4 (calendar week 5).
- * Each load week bumps vs the previous week's load.
+ * Optional load bumps when an admin set a numeric load_prescription.
+ * Starts at week index 4 (calendar week 5) and stacks on top of continued rep progression.
  */
 function applyIntermediateLoad(
   baselineLoad: string | null | undefined,
@@ -260,7 +262,7 @@ export const AI_COACH_WEEKLY_PROGRESSION_BLOCK = `### Weekly progression (automa
 - **Sets / timed rounds never auto-progress** — keep sets fixed across the block.
 - **Sets×reps (main):**
   - **Beginner:** progress **reps only** (hold / +1 pattern). Sets stay fixed. Leave \`load_prescription\` blank.
-  - **Intermediate / Advanced:** weeks 1–4 reps only; **week 5** reset reps to week-1; weeks 5–8 load only if an admin set a numeric \`load_prescription\` (otherwise reps stay at week-1).
+  - **Intermediate / Advanced:** **+1 rep each week** from week-1 baseline through week 8 — never reset. If an admin set a numeric \`load_prescription\`, also bump load from week 5 onward (reps keep climbing).
 - **Timed main work** (duration + rounds): progress **duration_seconds** with the **same weekly step pattern** as reps (+5 seconds per step). Rounds (\`sets\`) stay fixed. Warm-up and cool-down: no duration progression.
 - Leave \`load_prescription\` **blank** — athletes choose a weight that fits their strength. Never invent kg/lb values.
 - Warm-up and cool-down: **no** progressive overload.

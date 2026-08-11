@@ -57,7 +57,7 @@ When the athlete/admin brief asks for a **focused** program (especially **footwo
 
 ### Progression (week-1 baseline only — app applies later weeks)
 - Beginner: sets + load fixed; **reps only** on sets×reps; **duration_seconds** on timed main (same step pattern).
-- Intermediate/Advanced: weeks 1–4 reps / timed-duration steps; week 5 reset to week-1; weeks 5–8 load only if \`load_prescription\` is set. **Sets / rounds stay fixed.**
+- Intermediate/Advanced: **+1 rep / timed step each week** through week 8 — never reset. Optional load bumps from week 5 only if \`load_prescription\` is set. **Sets / rounds stay fixed.**
 - Compound (primary multi-joint) IDs and placement stay the same all 8 weeks.
 - Per session template: plan exactly one non-compound add OR related variant from week 5 (app retains identity; describe intent in admin \`note\` if needed).
 

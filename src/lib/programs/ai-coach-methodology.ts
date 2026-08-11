@@ -131,7 +131,7 @@ Every workout must follow this order:
 5. **Accessory Strength & Injury Prevention** (5–8 min) — Shoulder health, core endurance, grip strength, hip stability.
 6. **Mobility & Recovery** (3–5 min) — Dynamic mobility, flexibility, controlled breathing.
 
-**Intermediate progressive overload:** Weeks 1–4 reps only; week 5 reset reps and start load increases; weeks 5–8 load only. Sets stay fixed.
+**Intermediate progressive overload:** +1 rep (or +1 timed duration step) each week from week-1 through week 8 — never reset. Sets stay fixed. Leave load blank for athletes to self-select.
 
 ### Mandatory workout structure — ADVANCED
 
