@@ -9,6 +9,7 @@ import type {
   MemberHubHomeProgram,
   QuickWorkoutSummary,
 } from "@/lib/member/load-member-hub-data";
+import { MemberFeedbackCard } from "@/components/member/member-feedback-card";
 
 const COVER_FALLBACK = "/Padel_coach_standing.webp";
 
@@ -259,6 +260,8 @@ export function MemberHomeTab({
           ))}
         </ul>
       </section>
+
+      <MemberFeedbackCard />
 
       <section>
         <div className="mb-4 flex items-end justify-between gap-4">

@@ -1,49 +1,62 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { fillPromptTemplate, loadAiPrompt } from "@/lib/programs/ai-prompts";
+import { requireOpenAiApiKey, resolveOpenAiImageModel } from "@/lib/openai-config";
 import { createServiceClient } from "@/utils/supabase/service";
 import { STORAGE_BUCKETS, publicObjectUrl } from "@/utils/supabase/storage";
 
-const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL?.trim() || "gemini-2.0-flash-preview-image-generation";
+/** Landscape covers for program cards (16:10-ish). Override via OPENAI_IMAGE_SIZE. */
+const IMAGE_SIZE =
+  (process.env.OPENAI_IMAGE_SIZE?.trim() as "1024x1024" | "1536x1024" | "1024x1536" | undefined) ||
+  "1536x1024";
 
+const IMAGE_QUALITY =
+  (process.env.OPENAI_IMAGE_QUALITY?.trim() as "low" | "medium" | "high" | undefined) || "medium";
+
+/**
+ * Generate a program cover with OpenAI GPT Image (`gpt-image-2` by default),
+ * upload to Supabase storage, and set `programs.cover_image_url`.
+ * Runs on the server (after AI program/workout save).
+ */
 export async function generateProgramCoverImage(params: {
   programId: string;
   title: string;
 }): Promise<{ imageUrl: string } | { error: string }> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
-    return { error: "GEMINI_API_KEY not configured" };
+  let apiKey: string;
+  try {
+    apiKey = requireOpenAiApiKey();
+  } catch {
+    return { error: "OPENAI_API_KEY not configured" };
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: IMAGE_MODEL });
+    const openai = new OpenAI({ apiKey });
+    const model = resolveOpenAiImageModel();
 
     const service = createServiceClient();
     const template = await loadAiPrompt(service, "ai_program_cover");
     const prompt = fillPromptTemplate(template, { program_title: params.title });
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE"] },
-    } as Parameters<typeof model.generateContent>[0]);
+    const result = await openai.images.generate({
+      model,
+      prompt,
+      n: 1,
+      size: IMAGE_SIZE,
+      quality: IMAGE_QUALITY,
+      output_format: "png",
+    });
 
-    const parts = result.response.candidates?.[0]?.content?.parts ?? [];
-    const imagePart = parts.find(
-      (p) => "inlineData" in p && p.inlineData?.mimeType?.startsWith("image/")
-    );
-    const inlineData = imagePart && "inlineData" in imagePart ? imagePart.inlineData : null;
-    if (!inlineData?.data) {
-      return { error: "No image returned from model" };
+    const b64 = result.data?.[0]?.b64_json;
+    if (!b64) {
+      return { error: "No image returned from OpenAI" };
     }
 
-    const buffer = Buffer.from(inlineData.data, "base64");
-    const ext = inlineData.mimeType?.includes("png") ? "png" : "jpeg";
-    const path = `covers/${params.programId}-${Date.now()}.${ext}`;
+    const buffer = Buffer.from(b64, "base64");
+    const path = `covers/${params.programId}-${Date.now()}.png`;
 
     const { error: uploadErr } = await service.storage
       .from(STORAGE_BUCKETS.programs)
       .upload(path, buffer, {
-        contentType: inlineData.mimeType ?? "image/jpeg",
+        contentType: "image/png",
         upsert: true,
       });
 

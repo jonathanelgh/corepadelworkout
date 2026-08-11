@@ -141,7 +141,7 @@ Rules:
   },
   ai_program_cover: {
     label: "AI program cover — image prompt",
-    description: "Cover image generation after saving a workout.",
+    description: "Cover image prompt for OpenAI gpt-image-2 after saving a workout/program.",
     body: `Cinematic wide shot of a padel athlete training, dynamic motion, professional sports photography, moody lighting, no text, no logos, no watermarks. Theme: {{program_title}}`,
   },
 };
