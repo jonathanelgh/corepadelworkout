@@ -199,14 +199,53 @@ function formatWorkDurationShort(secs: number): string {
   return `${secs}s`;
 }
 
-export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
+/** Playback steps may carry `workoutSide` after bilateral expand (duration already per-side). */
+export type ProgramExerciseLabelInput = ProgramExerciseItem & {
+  workoutSide?: "left" | "right" | null;
+  playbackKey?: string;
+};
+
+function isExpandedBilateralPlaybackStep(ex: ProgramExerciseLabelInput): boolean {
+  return ex.workoutSide === "left" || ex.workoutSide === "right";
+}
+
+/**
+ * Label for a timed both-sides step after playlist expand.
+ * `durationSeconds` on the step is already per-side — never halve it again.
+ */
+export function formatExpandedBothSidesWorkLabel(ex: ProgramExerciseLabelInput): string | null {
+  if (!isExpandedBilateralPlaybackStep(ex) || !exerciseUsesTimedPlayback(ex)) return null;
+  const workSecs = hasExplicitWorkDuration(ex) ? workDurationSeconds(ex) : null;
+  if (workSecs == null) return null;
+  const sets = ex.sets;
+  const between = restBetweenSetsSeconds(ex);
+  const rounds = sets != null && sets > 0 ? sets : 1;
+  const parts = [`${formatWorkDurationShort(workSecs)} per side`];
+  if (rounds > 1) {
+    parts.push(`${rounds} rounds`);
+    if (between > 0) parts.push(`${between}s between rounds`);
+  }
+  return parts.join(" · ");
+}
+
+export function formatSetsRepsLabel(ex: ProgramExerciseLabelInput): string | null {
   const type = getExercisePrescriptionType(ex);
   const workSecs = hasExplicitWorkDuration(ex) ? workDurationSeconds(ex) : null;
   const sets = ex.sets;
   const between = restBetweenSetsSeconds(ex);
   const sideRest = restBetweenSidesSeconds(ex);
 
-  if (ex.bothSides && exerciseUsesTimedPlayback(ex) && workSecs != null) {
+  // Expanded left/right step: durationSeconds is already per-side — do not split again.
+  const expandedLabel = formatExpandedBothSidesWorkLabel(ex);
+  if (expandedLabel) return expandedLabel;
+
+  // Unexpanded overview only (program detail / curriculum): duration is TOTAL for both sides.
+  if (
+    ex.bothSides &&
+    !isExpandedBilateralPlaybackStep(ex) &&
+    exerciseUsesTimedPlayback(ex) &&
+    workSecs != null
+  ) {
     const rounds = sets != null && sets > 0 ? sets : 1;
     const perSide = bothSidesPerSideWorkSeconds(workSecs);
     const parts = [
@@ -243,6 +282,9 @@ export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
   } else if (ex.reps != null && ex.reps > 0) {
     parts.push(`${ex.reps} reps`);
   }
+  if (ex.bothSides && parts.length > 0) {
+    parts.push("per side");
+  }
   if (sets != null && sets > 1 && between > 0) {
     parts.push(`${between}s between sets`);
   }
@@ -254,7 +296,7 @@ export function formatSetsRepsLabel(ex: ProgramExerciseItem): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-export function formatExerciseMeta(ex: ProgramExerciseItem): string {
+export function formatExerciseMeta(ex: ProgramExerciseLabelInput): string {
   const prescription = formatSetsRepsLabel(ex);
   if (prescription) return prescription;
   if (getExercisePrescriptionType(ex) === "sets_reps") return "Go at your pace";

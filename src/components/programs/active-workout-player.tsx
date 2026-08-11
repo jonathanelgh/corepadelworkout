@@ -7,6 +7,7 @@ import type { ProgramExerciseItem } from "@/lib/programs/program-exercises";
 import {
   exerciseUsesTimedPlayback,
   formatExerciseMeta,
+  formatExpandedBothSidesWorkLabel,
   formatSetsRepsLabel,
   CHOOSE_WEIGHT_HINT,
   hasTimedSets,
@@ -19,7 +20,6 @@ import {
 import {
   expandWorkoutPlaybackPlaylist,
   isBilateralPlaybackStep,
-  workoutSideLabel,
   type WorkoutPlaybackStep,
 } from "@/lib/programs/expand-workout-playlist";
 import { resolveExerciseVideoSource } from "@/lib/programs/exercise-video-url";
@@ -38,6 +38,7 @@ import { BackButton } from "@/components/navigation/back-button";
 import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 import { WorkoutCompletionOverlay } from "@/components/programs/workout-completion-overlay";
 import { BothSidesChip } from "@/components/programs/both-sides-chip";
+import { WorkoutSideBadge } from "@/components/programs/workout-side-badge";
 
 type Phase = "work" | "setRest" | "rest";
 
@@ -174,6 +175,11 @@ export function ActiveWorkoutPlayer({
   const [musicMuted, setMusicMuted] = useState(false);
   /** Non-null while counting down before the first exercise begins. */
   const [prepCountdown, setPrepCountdown] = useState<number | null>(null);
+  /**
+   * After sets×reps → timed: preview the timed exercise until the athlete taps Start now.
+   * Not used for timed→timed or first-exercise prep.
+   */
+  const [awaitingTimedStart, setAwaitingTimedStart] = useState(false);
   const [completionLogged, setCompletionLogged] = useState(false);
   const [startLogged, setStartLogged] = useState(false);
 
@@ -215,8 +221,11 @@ export function ActiveWorkoutPlayer({
   const isLast = len > 0 && currentIndex >= len - 1;
   const currentIsTimed = current != null && exerciseUsesTimedPlayback(current);
   const inPrep = workoutStarted && prepCountdown !== null && prepCountdown > 0;
-  const inSetRest = workoutStarted && !inPrep && currentIsTimed && phase === "setRest";
-  const inExerciseRest = workoutStarted && !inPrep && currentIsTimed && phase === "rest";
+  const inTimedPreview = workoutStarted && awaitingTimedStart && !inPrep;
+  const inSetRest =
+    workoutStarted && !inPrep && !inTimedPreview && currentIsTimed && phase === "setRest";
+  const inExerciseRest =
+    workoutStarted && !inPrep && !inTimedPreview && currentIsTimed && phase === "rest";
   const inRest = inSetRest || inExerciseRest;
   const totalSets = current
     ? isBilateralPlaybackStep(current)
@@ -246,7 +255,7 @@ export function ActiveWorkoutPlayer({
   const cover = coverImageUrl?.trim() || COVER_FALLBACK;
 
   useProgramWorkoutMusic(songUrl, {
-    enabled: workoutStarted && Boolean(songUrl?.trim()) && !inPrep,
+    enabled: workoutStarted && Boolean(songUrl?.trim()) && !inPrep && !inTimedPreview,
     muted: musicMuted,
     isRestPhase: inRest,
     isRunning,
@@ -272,13 +281,16 @@ export function ActiveWorkoutPlayer({
   const beginWorkForCurrent = useCallback(
     (index: number) => {
       const ex = playbackSteps[index]!;
+      setAwaitingTimedStart(false);
       setCurrentSet(isBilateralPlaybackStep(ex) ? ex.playbackSet : 1);
       setPhase("work");
       if (exerciseUsesTimedPlayback(ex)) {
         playExerciseStartBeeps();
         setSecondsLeft(workDurationSeconds(ex));
+        setIsRunning(true);
       } else {
         setSecondsLeft(null);
+        setIsRunning(true);
       }
     },
     [playbackSteps]
@@ -287,6 +299,7 @@ export function ActiveWorkoutPlayer({
   const advanceExercise = useCallback(() => {
     if (len === 0) return;
     if (currentIndex >= len - 1) {
+      setAwaitingTimedStart(false);
       setWorkoutFinished(true);
       setIsRunning(false);
       setSecondsLeft(null);
@@ -296,6 +309,30 @@ export function ActiveWorkoutPlayer({
     setCurrentIndex(nextIndex);
     beginWorkForCurrent(nextIndex);
   }, [len, currentIndex, beginWorkForCurrent]);
+
+  /** Sets×reps → timed: land on a preview with Start now (do not auto-start the timer). */
+  const advanceFromSetsReps = useCallback(() => {
+    if (len === 0) return;
+    if (currentIndex >= len - 1) {
+      setAwaitingTimedStart(false);
+      setWorkoutFinished(true);
+      setIsRunning(false);
+      setSecondsLeft(null);
+      return;
+    }
+    const nextIndex = currentIndex + 1;
+    const nextEx = playbackSteps[nextIndex]!;
+    setCurrentIndex(nextIndex);
+    if (exerciseUsesTimedPlayback(nextEx)) {
+      setAwaitingTimedStart(true);
+      setCurrentSet(isBilateralPlaybackStep(nextEx) ? nextEx.playbackSet : 1);
+      setPhase("work");
+      setSecondsLeft(null);
+      setIsRunning(false);
+      return;
+    }
+    beginWorkForCurrent(nextIndex);
+  }, [len, currentIndex, playbackSteps, beginWorkForCurrent]);
 
   const finishWorkPhase = useCallback(() => {
     if (!current) return;
@@ -359,7 +396,7 @@ export function ActiveWorkoutPlayer({
   }, [workoutStarted, prepCountdown]);
 
   useEffect(() => {
-    if (!workoutStarted || !currentIsTimed || inPrep || !isRunning) return;
+    if (!workoutStarted || !currentIsTimed || inPrep || inTimedPreview || !isRunning) return;
     if (phase !== "work" || !current) return;
     if (secondsLeft !== 3 || workCuePlayedRef.current) return;
     if (!workPeriodFollowedByRest(current, currentSet, isLast)) return;
@@ -369,6 +406,7 @@ export function ActiveWorkoutPlayer({
     workoutStarted,
     currentIsTimed,
     inPrep,
+    inTimedPreview,
     isRunning,
     phase,
     secondsLeft,
@@ -378,15 +416,15 @@ export function ActiveWorkoutPlayer({
   ]);
 
   useEffect(() => {
-    if (!workoutStarted || !currentIsTimed || inPrep || !isRunning) return;
+    if (!workoutStarted || !currentIsTimed || inPrep || inTimedPreview || !isRunning) return;
     if (phase !== "setRest" && phase !== "rest") return;
     if (secondsLeft !== 3 || restCuePlayedRef.current) return;
     restCuePlayedRef.current = true;
     playRestEndingCue();
-  }, [workoutStarted, currentIsTimed, inPrep, isRunning, phase, secondsLeft]);
+  }, [workoutStarted, currentIsTimed, inPrep, inTimedPreview, isRunning, phase, secondsLeft]);
 
   useEffect(() => {
-    if (!workoutStarted || !currentIsTimed || inPrep) return;
+    if (!workoutStarted || !currentIsTimed || inPrep || inTimedPreview) return;
     if (secondsLeft !== 0) return;
 
     if (phase === "work") {
@@ -414,6 +452,7 @@ export function ActiveWorkoutPlayer({
     workoutStarted,
     currentIsTimed,
     inPrep,
+    inTimedPreview,
     secondsLeft,
     phase,
     current,
@@ -422,13 +461,25 @@ export function ActiveWorkoutPlayer({
   ]);
 
   useEffect(() => {
-    if (!workoutStarted || !currentIsTimed || inPrep || !isRunning || secondsLeft === null) return;
+    if (
+      !workoutStarted ||
+      !currentIsTimed ||
+      inPrep ||
+      inTimedPreview ||
+      !isRunning ||
+      secondsLeft === null
+    )
+      return;
     if (secondsLeft <= 0) return;
     const t = window.setTimeout(() => setSecondsLeft((s) => (s == null ? s : s - 1)), 1000);
     return () => window.clearTimeout(t);
-  }, [workoutStarted, currentIsTimed, inPrep, isRunning, secondsLeft]);
+  }, [workoutStarted, currentIsTimed, inPrep, inTimedPreview, isRunning, secondsLeft]);
 
-  function exerciseMeta(ex: ProgramExerciseItem): string {
+  function exerciseMeta(ex: ProgramExerciseItem | WorkoutPlaybackStep): string {
+    // Bilateral playback steps already have per-side durationSeconds — never use the
+    // overview "total · /side" formatter (that would halve again, e.g. 15 → 7).
+    const perSide = formatExpandedBothSidesWorkLabel(ex);
+    if (perSide) return perSide;
     return formatExerciseMeta(ex);
   }
 
@@ -438,6 +489,7 @@ export function ActiveWorkoutPlayer({
     prepCuePlayedRef.current = false;
     restCuePlayedRef.current = false;
     workCuePlayedRef.current = false;
+    setAwaitingTimedStart(false);
     setWorkoutStarted(true);
     setPhase("work");
     setPrepCountdown(FIRST_EXERCISE_PREP_SECONDS);
@@ -449,6 +501,11 @@ export function ActiveWorkoutPlayer({
     }
   }
 
+  function startTimedFromPreview() {
+    if (!current || !awaitingTimedStart) return;
+    beginWorkForCurrent(currentIndex);
+  }
+
   function goPrev() {
     if (currentIndex <= 0) return;
     const prev = currentIndex - 1;
@@ -457,8 +514,12 @@ export function ActiveWorkoutPlayer({
   }
 
   function goNext() {
+    if (awaitingTimedStart) {
+      startTimedFromPreview();
+      return;
+    }
     if (!currentIsTimed) {
-      advanceExercise();
+      advanceFromSetsReps();
       return;
     }
     if (phase === "rest") {
@@ -510,7 +571,7 @@ export function ActiveWorkoutPlayer({
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col bg-zinc-950 text-white">
+    <div className="relative flex h-dvh max-h-dvh flex-col overflow-hidden bg-zinc-950 text-white">
       {!workoutStarted && (
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -601,11 +662,15 @@ export function ActiveWorkoutPlayer({
             <p className="mt-1 text-sm text-white/70">
               {playbackSteps[0] ? exerciseMeta(playbackSteps[0]) : ""}
             </p>
-            {playbackSteps[0]?.bothSides && (
+            {playbackSteps[0]?.workoutSide ? (
+              <div className="mt-3">
+                <WorkoutSideBadge side={playbackSteps[0].workoutSide} size="md" />
+              </div>
+            ) : playbackSteps[0]?.bothSides ? (
               <div className="mt-3">
                 <BothSidesChip variant="dark" />
               </div>
-            )}
+            ) : null}
           </div>
 
           <button
@@ -619,7 +684,7 @@ export function ActiveWorkoutPlayer({
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-28">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {showPhaseBanner && current && (
               <div className="relative z-20 mx-auto max-w-3xl px-4 pt-2 text-center">
                 <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
@@ -627,15 +692,15 @@ export function ActiveWorkoutPlayer({
                 </p>
               </div>
             )}
-            <ExerciseVideoFrame className="relative z-10">
+            <ExerciseVideoFrame className="relative z-10 max-h-[42dvh] !aspect-auto h-[min(100vw,42dvh)] sm:h-auto sm:max-h-none sm:!aspect-square">
               <WorkoutVideo
                 url={displayVideoUrl}
-                playing={!workoutFinished && (inPrep || isRunning)}
+                playing={!workoutFinished && (inPrep || inTimedPreview || isRunning)}
                 onReady={() => setVideoReady(true)}
               />
               <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
               {inPrep && current && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 px-6 text-center backdrop-blur-[2px]">
+                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/45 px-6 py-4 text-center backdrop-blur-[2px]">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready</p>
                   <p className="mt-2 text-2xl font-semibold">{current.title}</p>
                   <p className="mt-2 text-sm text-white/80">
@@ -647,9 +712,9 @@ export function ActiveWorkoutPlayer({
                     </div>
                   )}
                   {current.workoutSide && (
-                    <p className="mt-3 text-sm font-semibold text-[#ccff00]">
-                      {workoutSideLabel(current.workoutSide)}
-                    </p>
+                    <div className="mt-4">
+                      <WorkoutSideBadge side={current.workoutSide} />
+                    </div>
                   )}
                   {current.note?.trim() && !current.bothSides && (
                     <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
@@ -660,15 +725,38 @@ export function ActiveWorkoutPlayer({
                   <p className="mt-2 text-sm text-white/60">Starting in…</p>
                 </div>
               )}
+              {inTimedPreview && current && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/45 px-6 py-4 text-center backdrop-blur-[2px]">
+                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Up next</p>
+                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
+                  <p className="mt-2 text-sm text-white/80">{exerciseMeta(current)}</p>
+                  {current.bothSides && !current.workoutSide && (
+                    <div className="mt-3">
+                      <BothSidesChip variant="dark" />
+                    </div>
+                  )}
+                  {current.workoutSide && (
+                    <div className="mt-4">
+                      <WorkoutSideBadge side={current.workoutSide} />
+                    </div>
+                  )}
+                  {current.note?.trim() && !current.bothSides && (
+                    <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
+                      {current.note.trim()}
+                    </p>
+                  )}
+                  <p className="mt-6 text-sm text-white/60">Preview the demo, then start when ready.</p>
+                </div>
+              )}
               {inExerciseRest && next && secondsLeft != null && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready for</p>
                   <p className="mt-2 text-2xl font-semibold">{next.title}</p>
                   <p className="mt-2 text-sm text-white/80">{exerciseMeta(next)}</p>
                   {next.workoutSide && (
-                    <p className="mt-3 text-sm font-semibold text-[#ccff00]">
-                      {workoutSideLabel(next.workoutSide)}
-                    </p>
+                    <div className="mt-4">
+                      <WorkoutSideBadge side={next.workoutSide} />
+                    </div>
                   )}
                   {next.bothSides && !next.workoutSide && (
                     <div className="mt-3">
@@ -685,18 +773,22 @@ export function ActiveWorkoutPlayer({
                 </div>
               )}
               {inSetRest && current && secondsLeft != null && sideSwitchRest && next && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Switch sides</p>
                   <p className="mt-2 text-2xl font-semibold">{next.title}</p>
-                  <p className="mt-2 text-sm font-semibold text-[#ccff00]">
-                    {next.workoutSide ? workoutSideLabel(next.workoutSide) : exerciseMeta(next)}
-                  </p>
+                  {next.workoutSide ? (
+                    <div className="mt-4">
+                      <WorkoutSideBadge side={next.workoutSide} />
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-white/80">{exerciseMeta(next)}</p>
+                  )}
                   <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
                   <p className="mt-2 text-sm text-white/60">Rest</p>
                 </div>
               )}
               {inSetRest && current && secondsLeft != null && bilateralRoundRest && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Rest between rounds</p>
                   <p className="mt-2 text-2xl font-semibold">{current.title}</p>
                   <p className="mt-2 text-sm text-white/80">
@@ -707,7 +799,7 @@ export function ActiveWorkoutPlayer({
                 </div>
               )}
               {inSetRest && current && secondsLeft != null && !sideSwitchRest && !bilateralRoundRest && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Rest between sets</p>
                   <p className="mt-2 text-2xl font-semibold">{current.title}</p>
                   <p className="mt-2 text-sm text-white/80">
@@ -718,15 +810,15 @@ export function ActiveWorkoutPlayer({
                 </div>
               )}
               {phase === "work" && !inPrep && currentIsTimed && secondsLeft != null && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 px-6 text-center">
-                  <p className="font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
+                <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 px-6 text-center sm:bottom-6">
+                  <p className="font-mono text-6xl font-bold tabular-nums sm:text-7xl">{secondsLeft}</p>
                   {current && (
                     <p className="mt-2 text-sm text-white/80">{exerciseMeta(current)}</p>
                   )}
                   {current?.workoutSide && (
-                    <p className="mt-1 text-sm font-semibold text-[#ccff00]">
-                      {workoutSideLabel(current.workoutSide)}
-                    </p>
+                    <div className="mt-2">
+                      <WorkoutSideBadge side={current.workoutSide} size="md" />
+                    </div>
                   )}
                   {showSetProgress && current && (
                     <p className="mt-1 text-sm text-white/70">
@@ -748,7 +840,30 @@ export function ActiveWorkoutPlayer({
               </div>
             )}
 
-            {!inPrep && (
+            {inTimedPreview && current && (
+              <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
+                <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
+                  Timed exercise · step {currentIndex + 1} of {len}
+                </p>
+                <h2 className="mt-1 text-2xl font-semibold">{current.title}</h2>
+                {current.workoutSide && (
+                  <div className="mt-3">
+                    <WorkoutSideBadge side={current.workoutSide} />
+                  </div>
+                )}
+                <p className="mt-3 text-lg font-medium text-[#ccff00]">{exerciseMeta(current)}</p>
+                {displayNote && (
+                  <p className="mt-3 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-sm leading-relaxed text-white/90">
+                    {displayNote}
+                  </p>
+                )}
+                <p className="mt-3 text-sm text-white/60">
+                  Watch the demo, then tap Start now when you are ready.
+                </p>
+              </div>
+            )}
+
+            {!inPrep && !inTimedPreview && (
               <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
                 <div className="mb-4 flex gap-1">
                   {playbackSteps.map((_, i) => (
@@ -776,9 +891,9 @@ export function ActiveWorkoutPlayer({
                   <h2 className="mt-1 text-2xl font-semibold">{current?.title}</h2>
                 )}
                 {!inRest && current?.workoutSide && (
-                  <p className="mt-1 text-sm font-semibold text-[#ccff00]">
-                    {workoutSideLabel(current.workoutSide)}
-                  </p>
+                  <div className="mt-3">
+                    <WorkoutSideBadge side={current.workoutSide} />
+                  </div>
                 )}
                 {!inRest && displayExercise?.bothSides && !displayExercise.workoutSide && (
                   <div className="mt-2">
@@ -797,7 +912,7 @@ export function ActiveWorkoutPlayer({
                   </p>
                 )}
 
-                {!currentIsTimed && current && !current.bothSides && (
+                {!currentIsTimed && current && (
                   <p className="mt-3 text-lg font-medium text-[#ccff00]">
                     {formatSetsRepsLabel(current) ?? "Go at your pace"}
                   </p>
@@ -814,35 +929,56 @@ export function ActiveWorkoutPlayer({
 
           {!inPrep && (
             <nav
-              className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/80 px-4 py-4 backdrop-blur-md"
-              style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}
+              className="relative z-30 shrink-0 border-t border-white/10 bg-black/80 px-4 py-3 backdrop-blur-md"
+              style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
             >
-              <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={goPrev}
-                  disabled={currentIndex <= 0}
-                  className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold disabled:opacity-30"
-                >
-                  Prev
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsRunning((r) => !r)}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black"
-                  aria-label={isRunning ? "Pause" : "Play"}
-                >
-                  {isRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={goNext}
-                  className="inline-flex items-center gap-1 rounded-xl bg-[#ccff00] px-4 py-3 text-sm font-semibold text-black"
-                >
-                  {!currentIsTimed && isLast ? "Finish" : "Next"}
-                  <SkipForward className="h-4 w-4" />
-                </button>
-              </div>
+              {inTimedPreview ? (
+                <div className="mx-auto flex max-w-lg items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={currentIndex <= 0}
+                    className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold disabled:opacity-30"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startTimedFromPreview}
+                    disabled={!videoReady}
+                    className="flex-1 rounded-xl bg-[#ccff00] py-3 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-50"
+                  >
+                    {videoReady ? "Start now" : "Loading video…"}
+                  </button>
+                </div>
+              ) : (
+                <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={currentIndex <= 0}
+                    className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold disabled:opacity-30"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsRunning((r) => !r)}
+                    className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black"
+                    aria-label={isRunning ? "Pause" : "Play"}
+                  >
+                    {isRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    className="inline-flex items-center gap-1 rounded-xl bg-[#ccff00] px-4 py-3 text-sm font-semibold text-black"
+                  >
+                    {!currentIsTimed && isLast ? "Finish" : "Next"}
+                    <SkipForward className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </nav>
           )}
         </div>

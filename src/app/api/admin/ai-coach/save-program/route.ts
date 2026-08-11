@@ -5,6 +5,7 @@ import { saveAiProgram } from "@/lib/programs/save-ai-program";
 import { generateProgramCoverImage } from "@/lib/programs/generate-program-cover";
 import { isOnboardingLevel } from "@/lib/programs/profile-ai-context";
 import type { ProgramProposal } from "@/lib/programs/ai-coach-gemini";
+import { resolveProgramDurationWeeks } from "@/lib/programs/program-duration";
 import { revalidatePath } from "next/cache";
 
 export const maxDuration = 120;
@@ -21,7 +22,7 @@ function slimProposal(proposal: ProgramProposal): ProgramProposal {
     title: proposal.title,
     description: proposal.description,
     body: proposal.body,
-    duration_weeks: Math.max(8, Math.floor(proposal.duration_weeks || 8)),
+    duration_weeks: resolveProgramDurationWeeks(proposal.duration_weeks),
     sessions_per_week: Math.max(1, Math.floor(proposal.sessions_per_week || 3)),
     minutes_per_session: proposal.minutes_per_session,
     location_slug: proposal.location_slug,

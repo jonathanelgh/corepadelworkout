@@ -9,6 +9,7 @@ import {
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
 import { appendHardAiConstraints } from "@/lib/programs/ai-hard-constraints";
+import { resolveProgramDurationWeeks } from "@/lib/programs/program-duration";
 import {
   parseChoiceGroup,
   parseSessionPhase,
@@ -146,7 +147,7 @@ const TOOLS: FunctionDeclaration[] = [
   {
     name: "generate_program",
     description:
-      "Create an 8-week training program as week-1 session templates only (sessions_per_week entries). The app expands to 8 weeks and progresses prescriptions. Each session needs exactly 5 warmup, main (rotation/anti-rotation), and exactly 5 cooldown exercises. Never recommend existing published programs.",
+      "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). Default duration_weeks=8 unless the brief requests another length (e.g. 2 or 3). The app expands to duration_weeks and progresses prescriptions. Each session needs exactly 5 warmup, main (rotation/anti-rotation), and exactly 5 cooldown exercises. Never recommend existing published programs.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -160,7 +161,8 @@ const TOOLS: FunctionDeclaration[] = [
         },
         duration_weeks: {
           type: SchemaType.NUMBER,
-          description: "Always 8 for Core Padel programs unless admin explicitly requests another length.",
+          description:
+            "Program length in weeks. Default 8. Use 2, 3, etc. when the brief/admin explicitly asks for a shorter or different block (1–16).",
         },
         sessions_per_week: {
           type: SchemaType.NUMBER,
@@ -174,7 +176,7 @@ const TOOLS: FunctionDeclaration[] = [
         sessions: {
           type: SchemaType.ARRAY,
           description:
-            "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 for 3×/week). App expands to 8 weeks — do NOT return every week. Each session: exactly 5 warmup, main, exactly 5 cooldown.",
+            "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 for 3×/week). App expands to duration_weeks — do NOT return every week. Each session: exactly 5 warmup, main, exactly 5 cooldown.",
           items: {
             type: SchemaType.OBJECT,
             properties: {
@@ -419,7 +421,7 @@ export function parseProgramProposal(
 ): ProgramProposal | null {
   const title = typeof args.title === "string" ? args.title.trim() : "";
   const description = typeof args.description === "string" ? args.description.trim() : "";
-  const duration_weeks = Math.max(8, parseOptionalPositiveInt(args.duration_weeks) ?? 8);
+  const duration_weeks = resolveProgramDurationWeeks(args.duration_weeks);
   const sessions_per_week = parseOptionalPositiveInt(args.sessions_per_week) ?? 1;
   if (!title || !description) return null;
 

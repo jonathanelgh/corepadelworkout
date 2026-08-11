@@ -9,6 +9,7 @@ import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-
 import { ensureWeeklyExerciseVariety } from "@/lib/programs/ensure-weekly-exercise-variety";
 import { normalizeAiExerciseRest } from "@/lib/programs/normalize-ai-exercise-prescription";
 import type { SessionPhase } from "@/lib/programs/session-phase";
+import { resolveProgramDurationWeeks } from "@/lib/programs/program-duration";
 import {
   COOLDOWN_DURATION_SECONDS,
   COOLDOWN_REST_AFTER_SECONDS,
@@ -422,9 +423,8 @@ export function ensureProgramProposalStructure(
   });
   warnings.push(...varietyFinal.warnings);
 
-  // Force 8-week programs unless already set higher (never shrink below 8 for AI programs).
-  const duration_weeks =
-    proposal.duration_weeks >= 8 ? proposal.duration_weeks : 8;
+  // Honor requested length (default 8 when unset); do not force a minimum of 8.
+  const duration_weeks = resolveProgramDurationWeeks(proposal.duration_weeks);
 
   return {
     proposal: { ...proposal, sessions: varietyFinal.sessions, duration_weeks },
@@ -520,7 +520,30 @@ export function ensureGeminiDraftStructure(
     });
     warnings.push(...varietyFinal.warnings);
 
-    const sessions = varietyFinal.sessions.map((session, index) => {
+    // Final structure pass: variety swaps can leave incomplete prescriptions; normalize again.
+    const finalizedSessions = varietyFinal.sessions.map((session, index) => {
+      const avoidFromOthers = new Set<string>();
+      for (let i = 0; i < varietyFinal.sessions.length; i++) {
+        if (i === index) continue;
+        for (const ex of varietyFinal.sessions[i]!.exercises) {
+          if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
+          avoidFromOthers.add(ex.exercise_id);
+        }
+      }
+      const result = ensureSessionExerciseStructure(session.exercises, catalog, {
+        locationSlug: track.location_slug,
+        sessionLabel: session.name,
+        trainingLevel: options?.trainingLevel,
+        programContext: {
+          ...enrichProgramContext(programContext, varietyFinal.sessions.length, index),
+          avoidExerciseIds: avoidFromOthers,
+        },
+      });
+      warnings.push(...result.warnings);
+      return { name: session.name, exercises: result.exercises };
+    });
+
+    const sessions = finalizedSessions.map((session, index) => {
       const source = structuredSessions[index]?.source ?? track.sessions[index]!;
       const exercises = session.exercises.map((ex) => ({
         exercise_id: ex.exercise_id,

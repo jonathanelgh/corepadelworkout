@@ -15,6 +15,7 @@ import {
   resolveAiCoachProvider,
   type AiCoachProvider,
 } from "@/lib/programs/ai-coach-provider";
+import { resolveProgramDurationWeeks } from "@/lib/programs/program-duration";
 import {
   catalogForAiPayload,
   fetchProgramsCatalog,
@@ -379,7 +380,9 @@ export async function sendAiCoachMessage(input: {
 
     const rawProgramArgs = {
       ...result.args,
-      duration_weeks: consultation.durationWeeks ?? 8,
+      duration_weeks: resolveProgramDurationWeeks(
+        consultation.durationWeeks ?? result.args.duration_weeks
+      ),
       sessions_per_week: consultation.sessionsPerWeek ?? result.args.sessions_per_week,
       minutes_per_session: consultation.minutes ?? result.args.minutes_per_session,
       location_slug:
@@ -470,7 +473,7 @@ export async function saveAiCoachProgram(
     // Full warm-up/tag enforcement already ran at generation time.
     const fixed: ProgramProposal = {
       ...cleanProposal,
-      duration_weeks: Math.max(8, Math.floor(cleanProposal.duration_weeks || 8)),
+      duration_weeks: resolveProgramDurationWeeks(cleanProposal.duration_weeks),
       sessions_per_week: Math.max(1, Math.floor(cleanProposal.sessions_per_week || 3)),
       design_rationale: undefined,
     };

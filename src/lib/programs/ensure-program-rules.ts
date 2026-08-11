@@ -238,16 +238,22 @@ function insertIntoMain(
   return out;
 }
 
-function normalizeStrengthExercise(
+function normalizeMainExercisePrescription(
   ex: WorkoutProposalExercise,
   entry: ExerciseCatalogEntry,
   level: OnboardingLevel = "beginner"
 ): WorkoutProposalExercise {
   if (ex.phase !== "main") return ex;
 
+  const band = resolveRestBand(entry, "main");
+  const hasDuration =
+    (ex.duration_seconds != null && ex.duration_seconds > 0) ||
+    (ex.duration_minutes != null && ex.duration_minutes > 0);
+  const hasSets = ex.sets != null && ex.sets > 0;
+  const hasReps = ex.reps != null && ex.reps > 0;
+
   // time_only catalog holds (e.g. Pallof Press Hold) must keep duration — never convert to sets×reps.
   if (entry.programPrescriptionMode === "time_only") {
-    const band = resolveRestBand(entry, "main");
     const filled = ensureTimeOnlyMainPrescription(
       {
         phase: "main",
@@ -270,14 +276,20 @@ function normalizeStrengthExercise(
     };
   }
 
-  if (!exerciseIsStrength(entry)) return ex;
+  // Catalog forces sets×reps — always fill missing sets/reps.
+  if (entry.programPrescriptionMode === "sets_reps_only") {
+    const defaults = defaultStrengthSetsRepsForEntry(entry, level);
+    return {
+      ...ex,
+      duration_seconds: undefined,
+      duration_minutes: undefined,
+      sets: hasSets ? ex.sets : defaults.sets,
+      reps: hasReps ? ex.reps : defaults.reps,
+    };
+  }
 
-  const hasDuration =
-    (ex.duration_seconds != null && ex.duration_seconds > 0) ||
-    (ex.duration_minutes != null && ex.duration_minutes > 0);
-
-  // AI prescribed a timed hold on a strength exercise — keep duration, drop reps.
-  if (hasDuration && entry.programPrescriptionMode !== "sets_reps_only") {
+  // AI prescribed a timed hold — keep duration, drop reps; rounds filled next.
+  if (hasDuration) {
     return {
       ...ex,
       duration_minutes: undefined,
@@ -285,13 +297,28 @@ function normalizeStrengthExercise(
     };
   }
 
-  const defaults = defaultStrengthSetsRepsForEntry(entry, level);
+  // Strength (or partial sets×reps) → fill missing sets/reps defaults.
+  if (exerciseIsStrength(entry) || hasSets || hasReps) {
+    const defaults = defaultStrengthSetsRepsForEntry(entry, level);
+    return {
+      ...ex,
+      duration_seconds: undefined,
+      duration_minutes: undefined,
+      sets: hasSets ? ex.sets : defaults.sets,
+      reps: hasReps ? ex.reps : defaults.reps,
+    };
+  }
+
+  // Non-strength main with no prescription at all (common AI miss on footwork/agility).
+  // Match defaultMainExercise: timed intervals, not an empty sets×reps row.
   return {
     ...ex,
-    duration_seconds: undefined,
+    duration_seconds: 45,
     duration_minutes: undefined,
-    sets: ex.sets != null && ex.sets > 0 ? ex.sets : defaults.sets,
-    reps: ex.reps != null && ex.reps > 0 ? ex.reps : defaults.reps,
+    sets: MAIN_TIMED_DEFAULT_ROUNDS,
+    reps: undefined,
+    rest_between_sets_seconds: ex.rest_between_sets_seconds ?? band.default,
+    rest_after_seconds: ex.rest_after_seconds ?? band.default,
   };
 }
 
@@ -749,7 +776,11 @@ export function applyProgramRulesToSession(
   out = out.map((ex) => {
     const entry = catalogById(catalog, ex.exercise_id);
     if (!entry) return ex;
-    return applyMainRest(normalizeMainTimedRounds(normalizeStrengthExercise(ex, entry, level)), entry, level);
+    return applyMainRest(
+      normalizeMainTimedRounds(normalizeMainExercisePrescription(ex, entry, level)),
+      entry,
+      level
+    );
   });
 
   out = ensureSafeMainStart(

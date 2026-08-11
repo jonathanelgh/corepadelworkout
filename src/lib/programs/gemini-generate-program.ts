@@ -8,6 +8,7 @@ import {
 import { resolveGeminiModel } from "@/lib/gemini-config";
 import { fillPromptTemplate } from "@/lib/programs/ai-prompts";
 import { appendHardAiConstraints } from "@/lib/programs/ai-hard-constraints";
+import { resolveProgramDurationWeeks, DEFAULT_PROGRAM_DURATION_WEEKS } from "@/lib/programs/program-duration";
 import {
   normalizeExercisePhases,
   parseChoiceGroup,
@@ -271,11 +272,11 @@ export async function generateProgramWithGemini(
   });
 
   const scheduleParts: string[] = [];
-  if (input.durationWeeks != null) scheduleParts.push(`Duration: ${input.durationWeeks} weeks`);
-  else scheduleParts.push("Duration: 8 weeks (required default)");
+  const weeks = resolveProgramDurationWeeks(input.durationWeeks);
+  if (input.durationWeeks != null) scheduleParts.push(`Duration: ${weeks} weeks (honor this length)`);
+  else scheduleParts.push(`Duration: ${DEFAULT_PROGRAM_DURATION_WEEKS} weeks (default — change only if the brief asks)`);
   if (input.sessionsPerWeek != null) scheduleParts.push(`Frequency: ${input.sessionsPerWeek} sessions per week`);
   if (input.minutesPerSession != null) scheduleParts.push(`Target session length: ~${input.minutesPerSession} minutes`);
-  const weeks = input.durationWeeks ?? 8;
   const spw = input.sessionsPerWeek;
   if (spw != null) {
     scheduleParts.push(

@@ -3,6 +3,7 @@ import type { ProgramAiContext } from "@/lib/programs/exercise-catalog";
 import { expandSessionsToTarget } from "@/lib/programs/expand-program-sessions";
 import { resolveWeekSizesFromSchedule } from "@/lib/programs/training-plan-curriculum";
 import type { SessionPhase } from "@/lib/programs/session-phase";
+import { resolveProgramDurationWeeks } from "@/lib/programs/program-duration";
 
 import type { ExerciseDurationUnit } from "@/app/admin/programs/new/create-program-form";
 import {
@@ -18,7 +19,10 @@ import {
   defaultRestBetweenSidesSeconds,
   ensureSetsRepsBetweenSetsNote,
   ensureTimeOnlyMainPrescription,
+  MAIN_TIMED_DEFAULT_ROUNDS,
+  MAIN_TIMED_HOLD_DEFAULT_SECONDS,
 } from "@/lib/programs/normalize-ai-exercise-prescription";
+import { defaultStrengthSetsRepsForEntry } from "@/lib/programs/program-prescription-rules";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
 export type AiProgramExerciseRow = {
@@ -85,7 +89,9 @@ export function mapGeminiDraftToForm(
 ): { draft: AiProgramFormDraft; warnings: string[] } {
   const warnings: string[] = [];
 
-  const durationWeeks = Math.max(8, scheduleHints?.durationWeeks ?? draft.duration_weeks ?? 8);
+  const durationWeeks = resolveProgramDurationWeeks(
+    scheduleHints?.durationWeeks ?? draft.duration_weeks
+  );
   const sessionsPerWeek = scheduleHints?.sessionsPerWeek ?? draft.sessions_per_week;
   const targetSessionCount =
     durationWeeks != null && sessionsPerWeek != null && durationWeeks > 0 && sessionsPerWeek > 0
@@ -219,11 +225,48 @@ export function mapGeminiDraftToForm(
           inferred,
           ex.phase
         );
-        const restBetween = defaultRestBetweenSetsSeconds(aiFields) ?? ex.rest_between_sets_seconds;
+
+        let setsOut = aiFields.sets;
+        let repsOut =
+          prescriptionType === "timed_intervals" || prescriptionType === "time"
+            ? null
+            : aiFields.reps;
+        let durationOut = workSecsOut;
+
+        // Never leave main sets×reps blank in the admin form.
+        if (prescriptionType === "sets_reps" && ex.phase === "main") {
+          const defaults = catalogEntry
+            ? defaultStrengthSetsRepsForEntry(catalogEntry, levelCap)
+            : { sets: 3, reps: 10 };
+          if (setsOut == null || setsOut <= 0) setsOut = defaults.sets ?? 3;
+          if (repsOut == null || repsOut <= 0) repsOut = defaults.reps ?? 10;
+        }
+
+        // Never leave timed main work without a duration / rounds.
+        if (
+          (prescriptionType === "timed_intervals" || prescriptionType === "time") &&
+          ex.phase === "main" &&
+          (durationOut == null || durationOut <= 0)
+        ) {
+          durationOut =
+            mode === "time_only" ? MAIN_TIMED_HOLD_DEFAULT_SECONDS : 45;
+          if (setsOut == null || setsOut < 2) setsOut = MAIN_TIMED_DEFAULT_ROUNDS;
+        }
+
+        const restBetween =
+          defaultRestBetweenSetsSeconds({
+            ...aiFields,
+            duration_seconds: durationOut,
+            sets: setsOut,
+            reps: repsOut,
+          }) ?? ex.rest_between_sets_seconds;
         const noteWithRest = ensureSetsRepsBetweenSetsNote(
           noteSansBothSides,
           {
             ...aiFields,
+            duration_seconds: durationOut,
+            sets: setsOut,
+            reps: repsOut,
             rest_between_sets_seconds: restBetween,
           },
           { bothSides: isBothSides }
@@ -231,6 +274,9 @@ export function mapGeminiDraftToForm(
         const restBetweenSides = defaultRestBetweenSidesSeconds(
           {
             ...aiFields,
+            duration_seconds: durationOut,
+            sets: setsOut,
+            reps: repsOut,
             rest_between_sides_seconds:
               "rest_between_sides_seconds" in ex
                 ? (ex as { rest_between_sides_seconds?: number | null }).rest_between_sides_seconds
@@ -245,15 +291,12 @@ export function mapGeminiDraftToForm(
           choiceGroup: ex.choice_group ?? "",
           prescriptionType,
           durationValue:
-            workSecsOut != null
-              ? String(workSecsOut)
+            durationOut != null
+              ? String(durationOut)
               : intToField(ex.duration_minutes),
-          durationUnit: workSecsOut != null ? "sec" : "min",
-          sets: intToField(aiFields.sets),
-          reps:
-            prescriptionType === "timed_intervals" || prescriptionType === "time"
-              ? ""
-              : intToField(aiFields.reps),
+          durationUnit: durationOut != null ? "sec" : "min",
+          sets: intToField(setsOut),
+          reps: intToField(repsOut),
           restBetweenSetsSeconds: intToField(restBetween),
           restBetweenSidesSeconds: intToField(restBetweenSides),
           restAfterSeconds: intToField(aiFields.rest_after_seconds),

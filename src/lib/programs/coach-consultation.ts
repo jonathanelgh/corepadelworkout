@@ -1001,7 +1001,9 @@ export function formatConsultationBrief(state: ConsultationState, isProgram: boo
         lines.push("- Movement screen: cleared for squats, lunges, push-ups, and jumps");
       }
     }
-    lines.push(`- Duration: ${state.durationWeeks ?? 8} weeks (always 8 unless admin overrides)`);
+    lines.push(
+      `- Duration: ${state.durationWeeks ?? 8} weeks (default 8; use the athlete/admin requested length when set)`
+    );
     if (state.sessionsPerWeek) lines.push(`- Frequency: ${state.sessionsPerWeek} sessions per week`);
     if (state.minutes) lines.push(`- Target session length: ~${state.minutes} minutes per workout`);
   } else if (state.minutes) {

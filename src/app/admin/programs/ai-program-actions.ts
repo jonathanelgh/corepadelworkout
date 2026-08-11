@@ -15,6 +15,7 @@ import { parseTrainingLevelFromBrief } from "@/lib/programs/program-prescription
 import { ensureGeminiDraftRotation } from "@/lib/programs/ensure-rotational-exercise";
 import { ensureGeminiDraftStructure, resolveSessionEnforcementOptions } from "@/lib/programs/ensure-session-structure";
 import { mapGeminiDraftToForm, type AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
+import { resolveProgramDurationWeeks } from "@/lib/programs/program-duration";
 
 export type GenerateAiProgramResult =
   | { ok: true; draft: AiProgramFormDraft; warnings: string[]; exerciseCount: number }
@@ -88,7 +89,7 @@ export async function generateAiProgram(input: AiProgramGenerateRequest): Promis
     );
     const catalogIds = new Set(levelCatalog.map((e) => e.id));
     const { draft, warnings } = mapGeminiDraftToForm(structuredDraft, ctx, catalogIds, {
-      durationWeeks: input.durationWeeks ?? 8,
+      durationWeeks: input.durationWeeks != null ? resolveProgramDurationWeeks(input.durationWeeks) : undefined,
       sessionsPerWeek: input.sessionsPerWeek,
       trainingLevel: levelCap,
     });

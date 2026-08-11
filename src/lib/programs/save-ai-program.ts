@@ -11,6 +11,7 @@ import {
   normalizeTrainingPlanSessionNames,
 } from "./training-plan-curriculum";
 import { aiExerciseToProgramPayload } from "./normalize-ai-exercise-prescription";
+import { resolveProgramDurationWeeks } from "./program-duration";
 import { slugifyTitle, uniqueProgramSlug } from "./program-slug";
 
 async function resolveLocationId(supabase: SupabaseClient, slug?: string): Promise<string> {
@@ -90,9 +91,8 @@ export async function saveAiProgram(
   }
 ): Promise<SaveAiProgramResult> {
   const status = options?.status ?? "draft";
-  const durationWeeks = Math.max(
-    8,
-    Math.floor(options?.durationWeeks ?? proposal.duration_weeks ?? 8)
+  const durationWeeks = resolveProgramDurationWeeks(
+    options?.durationWeeks ?? proposal.duration_weeks
   );
   const sessionsPerWeek = Math.max(
     1,

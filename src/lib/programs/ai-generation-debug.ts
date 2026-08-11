@@ -91,6 +91,11 @@ function snapshotSession(
     }
     if (entry.movementPatterns.some(isRotationalMovementLabel)) hasRotation = true;
     if (ex.phase === "main" && exerciseIsStrength(entry)) {
+      const hasDuration =
+        (ex.duration_seconds != null && ex.duration_seconds > 0) ||
+        (ex.duration_minutes != null && ex.duration_minutes > 0);
+      // Timed strength holds don't use reps — only flag empty sets×reps prescriptions.
+      if (hasDuration) continue;
       const hasSets = ex.sets != null && ex.sets > 0;
       const hasReps = ex.reps != null && ex.reps > 0;
       if (!hasSets || !hasReps) strengthMissingSetsReps.push(ex.title);
@@ -340,7 +345,7 @@ export function buildAiGenerationDebugLog(
       "Generation mode",
       "info",
       input.mode === "program"
-        ? "8-week program via week-1 templates (app expands)."
+        ? "Multi-week program via week-1 templates (app expands to duration_weeks)."
         : "Single session (no weekly expansion)."
     )
   );

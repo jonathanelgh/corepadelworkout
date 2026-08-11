@@ -136,7 +136,7 @@ Return JSON only (no markdown), matching:
 Rules:
 - category_slugs and difficulty_level_slug must match slugs from metadata lists, or use empty/null when unsure.
 - tracks array must include exactly one entry per requested location slug.
-- Return week-1 templates only (sessions_per_week per track). The app expands to 8 weeks — do NOT return every week.
+- Return week-1 templates only (sessions_per_week per track). The app expands to the requested duration_weeks (default 8) — do NOT return every week.
 - body: engaging copy explaining who the program is for and how it improves padel performance.`,
   },
   ai_program_cover: {

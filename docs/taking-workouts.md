@@ -153,7 +153,14 @@ for (ex of exercises) {
 
 Only expand when `bothSides && isTimed`.
 
-**Critical rule:** `duration_seconds` is **TOTAL** for both sides. Split:
+**Critical rule:** `duration_seconds` is **TOTAL** for both sides. Split for playback only (overwrite step `durationSeconds` to per-side). Labels must not split again when `workoutSide` is set:
+
+```ts
+// Unexpanded / overview: "60s total · 30s/side · 15s switch"
+// Expanded step: "30s" (and Left/Right badge) — never "30s total · 15s/side"
+```
+
+Split:
 
 ```ts
 total = max(2, round(duration))
@@ -284,7 +291,7 @@ Only when: started, timed, not prep, `isRunning`, `secondsLeft > 0`. 1 Hz countd
 | Exercise rest | “Get ready for” + next exercise |
 | sets_reps | Prescription label or “Go at your pace”; “Tap Next when you finish…” |
 | Coach note | Show unless `bothSides` |
-| both_sides untimed | Both-sides chip; **no note**; **no** sets/reps meta under note |
+| both_sides untimed | Both-sides chip; **no note**; show sets/reps with “per side” |
 | Timed work under note | Do not show the long prescription meta line during work (web removed this) |
 
 During side-switch / between-exercise rest, video previews the **next** step.

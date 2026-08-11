@@ -74,7 +74,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
     function: {
       name: "generate_program",
       description:
-        "Create an 8-week training program as week-1 session templates only (sessions_per_week entries). The app expands to 8 weeks and progresses prescriptions. Each session needs exactly 5 warmup, main (rotation/anti-rotation), and exactly 5 cooldown exercises. Never recommend existing published programs.",
+        "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). Default duration_weeks=8 unless the brief requests another length (e.g. 2 or 3). The app expands to duration_weeks and progresses prescriptions. Each session needs exactly 5 warmup, main (rotation/anti-rotation), and exactly 5 cooldown exercises. Never recommend existing published programs.",
       parameters: {
         type: "object",
         properties: {
@@ -88,7 +88,8 @@ const OPENAI_TOOLS: FunctionTool[] = [
           },
           duration_weeks: {
             type: "number",
-            description: "Always 8 for Core Padel programs unless admin explicitly requests another length.",
+            description:
+              "Program length in weeks. Default 8. Use 2, 3, etc. when the brief/admin explicitly asks for a shorter or different block (1–16).",
           },
           sessions_per_week: {
             type: "number",
@@ -102,7 +103,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           sessions: {
             type: "array",
             description:
-              "ONE WEEK ONLY: return exactly sessions_per_week session templates. App expands to 8 weeks. Each session: exactly 5 warmup, main, exactly 5 cooldown.",
+              "ONE WEEK ONLY: return exactly sessions_per_week session templates. App expands to duration_weeks. Each session: exactly 5 warmup, main, exactly 5 cooldown.",
             items: {
               type: "object",
               properties: {
