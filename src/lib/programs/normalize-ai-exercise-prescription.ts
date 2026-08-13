@@ -87,8 +87,8 @@ function resolveWorkSeconds(ex: AiExerciseFields): number | null {
 }
 
 /**
- * Main timed exercises always use timed intervals: duration work × 2–3 rounds.
- * Warm-up / cool-down stay single timed blocks.
+ * AI generation helper: main timed exercises use timed intervals with 2–3 rounds.
+ * Do **not** call this on manual admin create/edit — those paths keep entered values.
  */
 export function ensureMainTimedRounds<T extends AiExerciseFields>(ex: T): T {
   if (ex.phase !== "main" || !hasTimedDuration(ex)) return ex;

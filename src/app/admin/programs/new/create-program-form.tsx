@@ -1167,15 +1167,9 @@ export function CreateProgramForm({
                 const n = Number.parseInt(e.sets, 10);
                 if (Number.isFinite(n) && n > 0) sets = n;
               }
-              // Main never saves bare one-shot time — require at least 2 timed rounds.
-              if (e.sessionPhase === "main" && (sets == null || sets < 2)) {
-                sets = 2;
-              }
               if (e.restBetweenSetsSeconds.trim() !== "") {
                 const n = Number.parseInt(e.restBetweenSetsSeconds, 10);
                 if (Number.isFinite(n) && n > 0) rest_between_sets_seconds = n;
-              } else if (e.sessionPhase === "main" && sets != null && sets >= 2) {
-                rest_between_sets_seconds = MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS;
               }
             }
 

@@ -5,9 +5,6 @@ import { inferExercisePrescriptionType } from "@/lib/programs/program-exercises"
 import { parseProgramFormat } from "@/lib/programs/program-format";
 import { loadProgramExerciseOptions } from "@/lib/exercises/program-exercise-options";
 import { clampProgramPrescriptionTypeForPhase } from "@/lib/exercises/program-prescription-mode";
-import {
-  ensureMainTimedRounds,
-} from "@/lib/programs/normalize-ai-exercise-prescription";
 import { listMembersForAiPicker } from "@/lib/programs/profile-ai-context";
 import {
   CreateProgramForm,
@@ -72,21 +69,11 @@ function mapSessionRow(
       durationUnit = "min";
     }
     const sessionPhase = e.session_phase ?? "main";
-    const withRounds = ensureMainTimedRounds({
-      phase: sessionPhase,
-      duration_seconds: e.duration_seconds,
-      duration_minutes: e.duration_minutes,
-      sets: e.sets,
-      reps: e.reps,
-      rest_between_sets_seconds: e.rest_between_sets_seconds,
-      rest_after_seconds: e.rest_after_seconds,
-      note: e.note,
-    });
     const inferred = inferExercisePrescriptionType({
-      durationSeconds: withRounds.duration_seconds ?? e.duration_seconds,
-      durationMinutes: withRounds.duration_minutes ?? e.duration_minutes,
-      sets: withRounds.sets,
-      restBetweenSetsSeconds: withRounds.rest_between_sets_seconds,
+      durationSeconds: e.duration_seconds,
+      durationMinutes: e.duration_minutes,
+      sets: e.sets,
+      restBetweenSetsSeconds: e.rest_between_sets_seconds,
     });
     const mode =
       exerciseOptions.find((x) => x.id === e.exercise_id)?.programPrescriptionMode ?? "all";
@@ -98,12 +85,11 @@ function mapSessionRow(
       prescriptionType: clampProgramPrescriptionTypeForPhase(mode, inferred, sessionPhase),
       durationValue,
       durationUnit,
-      sets: withRounds.sets != null && Number.isFinite(withRounds.sets) ? String(withRounds.sets) : "",
+      sets: e.sets != null && Number.isFinite(e.sets) ? String(e.sets) : "",
       reps: e.reps != null && Number.isFinite(e.reps) ? String(e.reps) : "",
       restBetweenSetsSeconds:
-        withRounds.rest_between_sets_seconds != null &&
-        Number.isFinite(withRounds.rest_between_sets_seconds)
-          ? String(withRounds.rest_between_sets_seconds)
+        e.rest_between_sets_seconds != null && Number.isFinite(e.rest_between_sets_seconds)
+          ? String(e.rest_between_sets_seconds)
           : "",
       restBetweenSidesSeconds:
         e.rest_between_sides_seconds != null && Number.isFinite(e.rest_between_sides_seconds)
