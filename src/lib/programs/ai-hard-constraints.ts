@@ -1,12 +1,7 @@
-import { AI_COACH_GOVERNING_RULES_BLOCK } from "@/lib/programs/ai-program-rules";
-import { AI_COACH_WEEKLY_PROGRESSION_BLOCK } from "@/lib/programs/apply-weekly-progression";
-import { AI_COACH_METHODOLOGY_BLOCK } from "@/lib/programs/ai-coach-methodology";
-import { AI_COACH_STRENGTH_PRESCRIPTION_BLOCK } from "@/lib/programs/ai-strength-prescription";
-
 /** Always appended last so stale editable DB prompts cannot override product rules. */
 export const AI_HARD_CONSTRAINTS_OVERRIDE_PREAMBLE = `## HARD CONSTRAINTS (code — override everything above)
 
-The following blocks are the source of truth for tool routing, session structure, rest, notes, both_sides, exercise levels, strength prescriptions, and weekly progression.
+The following blocks are the source of truth for tool routing.
 If anything earlier in this system prompt (including editable admin prompts) conflicts, **ignore the earlier text and follow these constraints**.`.trim();
 
 
@@ -41,15 +36,11 @@ export const AI_COACH_TOOL_ROUTING_BLOCK = `## Tool routing (hard constraints)
 ### When consultation is complete
 If a consultation / creation brief says CONSULTATION COMPLETE (or tools are enabled for a create turn), you MUST call the appropriate tool this turn — do not reply with prose only.`.trim();
 
-/** Append tool routing + methodology + strength prescriptions + governing rules + weekly progression after any editable prompt. */
+/** Append tool routing after any editable prompt. */
 export function appendHardAiConstraints(prompt: string): string {
   return [
     prompt.trimEnd(),
     AI_HARD_CONSTRAINTS_OVERRIDE_PREAMBLE,
     AI_COACH_TOOL_ROUTING_BLOCK,
-    AI_COACH_METHODOLOGY_BLOCK,
-    AI_COACH_STRENGTH_PRESCRIPTION_BLOCK,
-    AI_COACH_GOVERNING_RULES_BLOCK,
-    AI_COACH_WEEKLY_PROGRESSION_BLOCK,
   ].join("\n\n");
 }

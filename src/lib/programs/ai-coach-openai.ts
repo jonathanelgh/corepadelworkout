@@ -43,6 +43,12 @@ const EXERCISE_PROPERTIES = {
     description:
       "Rest between sets. For sets×reps with sets >= 2 use 30. For timed intervals match tag rest band.",
   },
+  rest_between_sides_seconds: {
+    type: "number",
+    description:
+      "Rest when switching sides on bilateral timed exercises (must be > 0 when both_sides timed).",
+    minimum: 1,
+  },
   rest_after_seconds: {
     type: "number",
     description:
@@ -61,6 +67,16 @@ const EXERCISE_PROPERTIES = {
     type: "string",
     description:
       "Coach note shown in-workout. For sets×reps with sets >= 2 include: Rest 30 sec between sets. Otherwise technique only — never progression or load.",
+  },
+  rpe: {
+    type: "string",
+    description:
+      "Rate of Perceived Exertion for this exercise slot (e.g. \"7\", \"8-9\"). Required for QC / player display.",
+  },
+  intensity: {
+    type: "string",
+    description:
+      "Intensity or load recommendation for this exercise slot (e.g. \"RPE 8, moderate-heavy\" or load-selection guidance). Required for QC / player display.",
   },
   load_prescription: {
     type: "string",
@@ -115,7 +131,14 @@ const OPENAI_TOOLS: FunctionTool[] = [
                   items: {
                     type: "object",
                     properties: EXERCISE_PROPERTIES,
-                    required: ["exercise_id", "rest_after_seconds", "phase"],
+                    required: [
+                      "exercise_id",
+                      "rest_after_seconds",
+                      "phase",
+                      "rpe",
+                      "intensity",
+                      "rest_between_sides_seconds",
+                    ],
                   },
                 },
               },
@@ -148,7 +171,14 @@ const OPENAI_TOOLS: FunctionTool[] = [
             items: {
               type: "object",
               properties: EXERCISE_PROPERTIES,
-              required: ["exercise_id", "rest_after_seconds", "phase"],
+              required: [
+                "exercise_id",
+                "rest_after_seconds",
+                "phase",
+                "rpe",
+                "intensity",
+                "rest_between_sides_seconds",
+              ],
             },
           },
         },
@@ -177,6 +207,11 @@ const OPENAI_TOOLS: FunctionTool[] = [
     },
   },
 ];
+
+/** Tool schemas for OpenAI function calling (used by Edge Function wiring). */
+export function getAiCoachOpenAiTools(): FunctionTool[] {
+  return OPENAI_TOOLS;
+}
 
 function toOpenAiMessages(history: ChatHistoryMessage[]): ChatCompletionMessageParam[] {
   return history.map((m) => ({

@@ -6,11 +6,13 @@ import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { loadAiPrompt } from "@/lib/programs/ai-prompts";
 import {
   chatWithAiCoach,
+  buildSystemInstruction,
   type ChatHistoryMessage,
+  type AiCoachChatResult,
   type ProgramProposal,
   type WorkoutProposal,
 } from "@/lib/programs/ai-coach-gemini";
-import { chatWithAiCoachOpenAI } from "@/lib/programs/ai-coach-openai";
+import { getAiCoachOpenAiTools } from "@/lib/programs/ai-coach-openai";
 import {
   resolveAiCoachProvider,
   type AiCoachProvider,
@@ -64,6 +66,7 @@ import {
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
 import { saveAiProgram } from "@/lib/programs/save-ai-program";
 import { generateProgramCoverImage } from "@/lib/programs/generate-program-cover";
+import { validateProgramProposal, validateWorkoutProposal } from "@/lib/programs/validate-ai-coach-proposal";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -139,7 +142,136 @@ export async function sendAiCoachMessage(input: {
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const provider = resolveAiCoachProvider(input.provider);
-  const runCoach = provider === "openai" ? chatWithAiCoachOpenAI : chatWithAiCoach;
+  async function chatWithAiCoachOpenAIviaEdge(params: {
+    history: ChatHistoryMessage[];
+    programsCatalog: unknown[];
+    exerciseCatalog: string;
+    catalogById: Map<string, string>;
+    bothSidesByExerciseId?: Map<string, boolean>;
+    systemPromptTemplate: string;
+    userContextBlock: string;
+    extraTemplateVars?: Record<string, string>;
+    creationOnly?: boolean;
+    consultationBrief?: string;
+    toolsEnabled?: boolean;
+    forcedTool?: string | undefined;
+    audience?: "admin" | "member";
+  }): Promise<AiCoachChatResult> {
+    const systemPrompt = buildSystemInstruction(
+      params.systemPromptTemplate,
+      {
+        programsCatalog: params.programsCatalog as never[],
+        exerciseCatalog: params.exerciseCatalog,
+        exerciseCount: params.catalogById.size,
+        userContextBlock: params.userContextBlock,
+        extraTemplateVars: params.extraTemplateVars,
+      },
+      {
+        creationOnly: params.creationOnly,
+        consultationBrief: params.consultationBrief,
+        toolsEnabled: params.toolsEnabled,
+        omitProgramsCatalog: params.forcedTool != null,
+        audience: params.audience,
+      }
+    );
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+    if (!supabaseUrl) throw new Error("NEXT_PUBLIC_SUPABASE_URL not set.");
+
+    const edgeUrl = `${supabaseUrl}/functions/v1/ai-coach-openai-generate`;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+    const toolsEnabled = params.toolsEnabled !== false;
+    const forcedTool = params.forcedTool ?? null;
+    const tools = getAiCoachOpenAiTools();
+
+    async function attempt(callHistory: ChatHistoryMessage[]): Promise<AiCoachChatResult> {
+      const res = await fetch(edgeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(serviceKey ? { Authorization: `Bearer ${serviceKey}` } : {}),
+        },
+        body: JSON.stringify({
+          history: callHistory,
+          systemPrompt,
+          toolsEnabled,
+          forcedTool,
+          tools,
+        }),
+      });
+
+      const payload = (await res.json().catch(() => null)) as
+        | { type?: string; error?: string; name?: string; args?: Record<string, unknown>; text?: string }
+        | null;
+
+      if (!payload) {
+        throw new Error(`Edge function returned invalid JSON (HTTP ${res.status}).`);
+      }
+      // Edge function errors should always include { type: "error" }, but keep a fallback
+      // for older deployments that may return `{ error: "..." }` without `type`.
+      if (payload.type === "error" || typeof payload.error === "string") {
+        throw new Error(payload.error ?? "Edge generation failed.");
+      }
+      if (payload.type === "text") {
+        const text = typeof payload.text === "string" ? payload.text : "";
+        return { type: "text", text };
+      }
+      if (payload.type === "functionCall") {
+        const name = typeof payload.name === "string" ? payload.name : "";
+        if (!name) throw new Error("Edge function returned functionCall without name.");
+        if (typeof payload.args !== "object" || payload.args == null) {
+          throw new Error(`Edge function returned functionCall ${name} without args.`);
+        }
+        return {
+          type: "functionCall",
+          name: name as any,
+          args: payload.args as any,
+        };
+      }
+      const preview = (() => {
+        try {
+          return JSON.stringify(payload).slice(0, 500);
+        } catch {
+          return "[unserializable payload]";
+        }
+      })();
+      throw new Error(
+        `Edge function returned unknown payload (type=${String(payload.type)}). Payload preview: ${preview}`
+      );
+    }
+
+    // Minimal tool-call retry to cover empty/incomplete tool calls until we add QC fix-loop.
+    if (!toolsEnabled || !forcedTool) {
+      return await attempt(params.history);
+    }
+
+    try {
+      return await attempt(params.history);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const isToolParseError =
+        msg.includes("parse") || msg.includes("empty") || msg.includes("tool");
+      if (!isToolParseError) throw e;
+
+      if (!forcedTool) throw e;
+      const retryHistory: ChatHistoryMessage[] = [
+        ...params.history,
+        {
+          role: "user",
+          parts: [
+            {
+              text: `Call ${forcedTool} now and return ONLY a valid tool call with JSON args (no prose).`,
+            },
+          ],
+        },
+      ];
+      return await attempt(retryHistory);
+    }
+  }
+
+  const runCoach =
+    provider === "openai" ? chatWithAiCoachOpenAIviaEdge : chatWithAiCoach;
 
   const userMessage = input.userMessage.trim();
   if (!userMessage) return { error: "Message cannot be empty." };
@@ -236,6 +368,9 @@ export async function sendAiCoachMessage(input: {
     const catalogById = new Map(generationExercises.map((e) => [e.id, e.title]));
     const bothSidesByExerciseId = new Map(
       generationExercises.map((e) => [e.id, e.bothSides])
+    );
+    const exerciseCatalogById = new Map(
+      generationExercises.map((e) => [e.id, e])
     );
     const exerciseCatalog = formatExerciseCatalogForPrompt(generationExercises);
 
@@ -351,7 +486,55 @@ export async function sendAiCoachMessage(input: {
     }
 
     if (result.name === "generate_workout") {
-      const rawProposal = result.args;
+      let rawProposal = result.args;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const validation = validateWorkoutProposal(rawProposal, { exerciseCatalogById });
+        if (validation.ok) break;
+
+        if (attempt >= 2) {
+          const first = validation.errors[0]?.message ?? "unknown validation error";
+          throw new Error(
+            `AI workout proposal failed validation after ${attempt + 1} attempts. First error: ${first}`
+          );
+        }
+
+        const compactErrors = validation.errors
+          .slice(0, 8)
+          .map((e) => `- ${e.message}`)
+          .join("\n");
+
+        const fixHistory: ChatHistoryMessage[] = [
+          ...generationHistory,
+          {
+            role: "user",
+            parts: [
+              {
+                text: [
+                  "Validator errors:",
+                  compactErrors,
+                  "",
+                  `Fix and return ONLY the ${toolName} tool call with a fully valid payload (no prose).`,
+                ].join("\n"),
+              },
+            ],
+          },
+        ];
+
+        const retry = await runCoach({
+          history: fixHistory,
+          ...coachParams,
+          consultationBrief: generationBrief,
+          forcedTool: toolName,
+          toolsEnabled: true,
+        });
+
+        if (retry.type !== "functionCall" || retry.name !== "generate_workout") {
+          throw new Error("AI fix loop did not return a generate_workout tool call.");
+        }
+
+        rawProposal = retry.args;
+      }
+
       const { proposal: rotated, warnings: rotationWarnings } = ensureWorkoutProposalRotation(
         rawProposal,
         generationExercises,
@@ -378,18 +561,80 @@ export async function sendAiCoachMessage(input: {
       return { type: "workout_proposal", proposal, debugLog };
     }
 
-    const rawProgramArgs = {
+    let rawProgramArgs = {
       ...result.args,
       duration_weeks: resolveProgramDurationWeeks(
         consultation.durationWeeks ?? result.args.duration_weeks
       ),
-      sessions_per_week: consultation.sessionsPerWeek ?? result.args.sessions_per_week,
+      sessions_per_week:
+        consultation.sessionsPerWeek ?? result.args.sessions_per_week,
       minutes_per_session: consultation.minutes ?? result.args.minutes_per_session,
       location_slug:
         consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
           ? consultation.locationSlug
           : result.args.location_slug,
     };
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const validation = validateProgramProposal(rawProgramArgs, { exerciseCatalogById });
+      if (validation.ok) break;
+
+      if (attempt >= 2) {
+        const first = validation.errors[0]?.message ?? "unknown validation error";
+        throw new Error(
+          `AI program proposal failed validation after ${attempt + 1} attempts. First error: ${first}`
+        );
+      }
+
+      const compactErrors = validation.errors
+        .slice(0, 8)
+        .map((e) => `- ${e.message}`)
+        .join("\n");
+
+      const fixHistory: ChatHistoryMessage[] = [
+        ...generationHistory,
+        {
+          role: "user",
+          parts: [
+            {
+              text: [
+                "Validator errors:",
+                compactErrors,
+                "",
+                `Fix and return ONLY the ${toolName} tool call with a fully valid payload (no prose).`,
+              ].join("\n"),
+            },
+          ],
+        },
+      ];
+
+      const retry = await runCoach({
+        history: fixHistory,
+        ...coachParams,
+        consultationBrief: generationBrief,
+        forcedTool: toolName,
+        toolsEnabled: true,
+      });
+
+      if (retry.type !== "functionCall" || retry.name !== "generate_program") {
+        throw new Error("AI fix loop did not return a generate_program tool call.");
+      }
+
+      rawProgramArgs = {
+        ...retry.args,
+        duration_weeks: resolveProgramDurationWeeks(
+          consultation.durationWeeks ?? retry.args.duration_weeks
+        ),
+        sessions_per_week:
+          consultation.sessionsPerWeek ?? retry.args.sessions_per_week,
+        minutes_per_session: consultation.minutes ?? retry.args.minutes_per_session,
+        location_slug:
+          consultation.locationSlug && isValidLocationSlug(consultation.locationSlug)
+            ? consultation.locationSlug
+            : retry.args.location_slug,
+      };
+    }
+
     const { proposal: rotated, warnings: rotationWarnings } = ensureProgramProposalRotation(
       rawProgramArgs,
       generationExercises,

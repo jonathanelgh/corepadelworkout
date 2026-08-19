@@ -24,6 +24,8 @@ export type ProgramExerciseItem = {
   restBetweenSidesSeconds: number | null;
   restAfterSeconds: number | null;
   loadPrescription: string | null;
+  rpe: string | null;
+  intensity: string | null;
   note: string | null;
 };
 
@@ -71,6 +73,8 @@ type ProgramExerciseNested = {
   rest_between_sides_seconds: number | null;
   rest_after_seconds: number | null;
   load_prescription: string | null;
+  rpe: string | null;
+  intensity: string | null;
   session_phase: SessionPhase | null;
   choice_group: string | null;
   note: string | null;
@@ -340,6 +344,8 @@ function toProgramExerciseItem(pe: ProgramExerciseNested, ex: ExerciseNested): P
     restBetweenSidesSeconds: pe.rest_between_sides_seconds,
     restAfterSeconds: pe.rest_after_seconds,
     loadPrescription: pe.load_prescription?.trim() || null,
+    rpe: pe.rpe?.trim() || null,
+    intensity: pe.intensity?.trim() || null,
     note: pe.note?.trim() || null,
   };
 }
@@ -377,6 +383,8 @@ export async function fetchProgramExercises(
           rest_between_sides_seconds,
           rest_after_seconds,
           load_prescription,
+            rpe,
+            intensity,
           session_phase,
           choice_group,
           note,
@@ -441,6 +449,8 @@ export async function fetchProgramSessionExercises(
       rest_between_sides_seconds,
       rest_after_seconds,
       load_prescription,
+      rpe,
+      intensity,
       session_phase,
       choice_group,
       note,

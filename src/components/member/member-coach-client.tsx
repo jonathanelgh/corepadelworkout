@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2, Send, Sparkles } from "lucide-react";
 import type { ProgramCatalogRow } from "@/lib/programs/programs-catalog";
-import type { ChatHistoryMessage, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
+import type {
+  ChatHistoryMessage,
+  ProgramProposal,
+  WorkoutProposal,
+  WorkoutProposalExercise,
+} from "@/lib/programs/ai-coach-gemini";
 import type { ConsultationPrompt } from "@/lib/programs/coach-consultation";
 import {
   groupExercisesByPhase,
@@ -12,6 +17,7 @@ import {
 } from "@/lib/programs/session-phase";
 import {
   loadMemberCoachData,
+  saveMemberCoachProgram,
   saveMemberCoachWorkout,
   sendMemberCoachMessage,
 } from "@/app/member/member-coach-actions";
@@ -33,6 +39,7 @@ type ChatMessage = {
     introText: string;
     programs: ProgramCatalogRow[];
   };
+  programProposal?: ProgramProposal;
   workoutProposal?: WorkoutProposal;
   workoutLocationSlug?: string;
   proposalSaved?: boolean;
@@ -187,6 +194,15 @@ function toGeminiHistory(messages: ChatMessage[]): ChatHistoryMessage[] {
             },
           ],
         });
+      } else if (m.programProposal) {
+        out.push({
+          role: "model",
+          parts: [
+            {
+              text: `Proposed program: ${m.programProposal.title}\n${m.programProposal.description}`,
+            },
+          ],
+        });
       }
     }
   }
@@ -215,6 +231,13 @@ export function MemberCoachClient({
   const [savingProposalId, setSavingProposalId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messageIdRef = useRef(1);
+
+  const nextMessageId = useCallback((prefix: "u" | "a") => {
+    const id = `${prefix}-${messageIdRef.current}`;
+    messageIdRef.current += 1;
+    return id;
+  }, []);
 
   useEffect(() => {
     if (!hasActivePro) return;
@@ -232,16 +255,6 @@ export function MemberCoachClient({
   useEffect(() => {
     scrollToBottom();
   }, [messages, pending, scrollToBottom]);
-
-  const lastAssistant = messages[messages.length - 1];
-  const activeConsultationPrompt =
-    lastAssistant?.role === "assistant" && lastAssistant.consultationPrompt && !pending
-      ? lastAssistant.consultationPrompt
-      : null;
-
-  useEffect(() => {
-    if (activeConsultationPrompt?.multiSelect) setMultiDraft([]);
-  }, [activeConsultationPrompt?.topic, messages.length]);
 
   function toggleMultiDraft(value: string) {
     if (value === "yes to all") {
@@ -262,7 +275,7 @@ export function MemberCoachClient({
 
     setError(null);
     setInput("");
-    setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", text }]);
+    setMessages((prev) => [...prev, { id: nextMessageId("u"), role: "user", text }]);
     setPending(true);
 
     const res = await sendMemberCoachMessage({
@@ -277,8 +290,9 @@ export function MemberCoachClient({
       return;
     }
 
-    const assistantId = `a-${Date.now()}`;
+    const assistantId = nextMessageId("a");
     if (res.type === "consultation") {
+      if (res.prompt.multiSelect) setMultiDraft([]);
       setMessages((prev) => [
         ...prev,
         { id: assistantId, role: "assistant", text: res.text, consultationPrompt: res.prompt },
@@ -295,6 +309,18 @@ export function MemberCoachClient({
         },
       ]);
     } else {
+      if (res.type === "program_proposal") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: "assistant",
+            programProposal: res.proposal,
+            workoutLocationSlug: res.locationSlug,
+          },
+        ]);
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -324,6 +350,33 @@ export function MemberCoachClient({
       prev.map((m) =>
         m.id === proposalMsgId
           ? { ...m, proposalSaved: true, savedPlayHref: res.playHref, text: `Saved **${res.title}**. Tap Start workout when you're ready.` }
+          : m
+      )
+    );
+  }
+
+  async function handleSaveProgram(
+    proposalMsgId: string,
+    proposal: ProgramProposal,
+    locationSlug?: string
+  ) {
+    setSavingProposalId(proposalMsgId);
+    setError(null);
+    const res = await saveMemberCoachProgram(proposal, { locationSlug });
+    setSavingProposalId(null);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === proposalMsgId
+          ? {
+              ...m,
+              proposalSaved: true,
+              savedPlayHref: res.playHref,
+              text: `Saved **${res.title}**. Tap Start program when you're ready.`,
+            }
           : m
       )
     );
@@ -447,6 +500,47 @@ export function MemberCoachClient({
                         <>
                           <Sparkles className="h-4 w-4" />
                           Save & start workout
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {m.programProposal && !m.proposalSaved && (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="font-semibold text-zinc-900">{m.programProposal.title}</p>
+                      <p className="mt-1 text-zinc-600">{m.programProposal.description}</p>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        {m.programProposal.duration_weeks} weeks · {m.programProposal.sessions_per_week} sessions/week
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      {m.programProposal.sessions.map((session, idx) => (
+                        <div key={`${session.name}-${idx}`} className="rounded-xl border border-zinc-200 bg-white p-3">
+                          <p className="font-medium text-zinc-900">{session.name}</p>
+                          {session.description ? (
+                            <p className="mt-1 text-xs text-zinc-500">{session.description}</p>
+                          ) : null}
+                          <div className="mt-2">{renderPhasedExerciseList(session.exercises)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={savingProposalId === m.id}
+                      onClick={() => void handleSaveProgram(m.id, m.programProposal!, m.workoutLocationSlug)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
+                    >
+                      {savingProposalId === m.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Save & start program
                         </>
                       )}
                     </button>

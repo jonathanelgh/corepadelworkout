@@ -22,6 +22,8 @@ export type AiExerciseFields = {
   rest_between_sides_seconds?: number | null;
   rest_after_seconds?: number | null;
   load_prescription?: string | null;
+  rpe?: string | null;
+  intensity?: string | null;
   note?: string | null;
 };
 
@@ -259,6 +261,8 @@ export function aiExerciseToProgramPayload(
     }),
     rest_after_seconds: defaultRestAfterSeconds(forNote, opts),
     load_prescription: cleaned.load_prescription,
+    rpe: ex.rpe?.trim() || null,
+    intensity: ex.intensity?.trim() || null,
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
     note: ensureSetsRepsBetweenSetsNote(noteSansBothSides, forNote, {

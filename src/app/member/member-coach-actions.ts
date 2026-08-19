@@ -8,6 +8,7 @@ import {
   chatWithAiCoach,
   type AiCoachToolName,
   type ChatHistoryMessage,
+  type ProgramProposal,
   type WorkoutProposal,
 } from "@/lib/programs/ai-coach-gemini";
 import {
@@ -44,10 +45,11 @@ import {
 import { ensureWorkoutProposalRotation } from "@/lib/programs/ensure-rotational-exercise";
 import { ensureWorkoutProposalStructure, resolveSessionEnforcementOptions } from "@/lib/programs/ensure-session-structure";
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
+import { saveAiProgram } from "@/lib/programs/save-ai-program";
 import { fetchProgramSessionsForProgram } from "@/lib/programs/program-sessions";
 import { playHrefForSession } from "@/lib/programs/program-progress";
 
-const MEMBER_TOOLS: AiCoachToolName[] = ["recommend_programs", "generate_workout"];
+const MEMBER_TOOLS: AiCoachToolName[] = ["recommend_programs", "generate_workout", "generate_program"];
 
 async function requireProMember() {
   const supabase = await createClient();
@@ -113,6 +115,7 @@ export type SendMemberCoachMessageResult =
       introText: string;
       programs: ProgramCatalogRow[];
     }
+  | { type: "program_proposal"; proposal: ProgramProposal; locationSlug?: string }
   | { type: "workout_proposal"; proposal: WorkoutProposal; locationSlug?: string }
   | { error: string };
 
@@ -232,8 +235,10 @@ export async function sendMemberCoachMessage(input: {
     const forcedTool: AiCoachToolName | undefined =
       wantsWorkoutCreate && consultationComplete
         ? "generate_workout"
-        : wantsRecommend && (wantsProgram ? consultationComplete : true)
-          ? "recommend_programs"
+        : wantsProgram && consultationComplete
+          ? "generate_program"
+          : wantsRecommend && true
+            ? "recommend_programs"
           : undefined;
 
     const coachParams = {
@@ -262,7 +267,7 @@ export async function sendMemberCoachMessage(input: {
         ? formatGenerationCoachBrief(
             consultation,
             wantsProgram,
-            forcedTool === "recommend_programs" ? "recommend_programs" : "generate_workout"
+            forcedTool
           )
         : consultationBrief;
 
@@ -354,6 +359,14 @@ export async function sendMemberCoachMessage(input: {
       };
     }
 
+    if (result.name === "generate_program") {
+      return {
+        type: "program_proposal",
+        proposal: result.args,
+        locationSlug: consultation.locationSlug,
+      };
+    }
+
     return { error: "Unexpected coach response. Try again." };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Chat failed." };
@@ -361,6 +374,10 @@ export async function sendMemberCoachMessage(input: {
 }
 
 export type SaveMemberCoachWorkoutResult =
+  | { ok: true; slug: string; title: string; playHref: string }
+  | { error: string };
+
+export type SaveMemberCoachProgramResult =
   | { ok: true; slug: string; title: string; playHref: string }
   | { error: string };
 
@@ -405,5 +422,51 @@ export async function saveMemberCoachWorkout(
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not save workout." };
+  }
+}
+
+export async function saveMemberCoachProgram(
+  proposal: ProgramProposal,
+  options?: { locationSlug?: string }
+): Promise<SaveMemberCoachProgramResult> {
+  const auth = await requireProMember();
+  if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
+
+  try {
+    const ctx = await loadProgramAiContext(auth.supabase);
+    const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
+    const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
+
+    const fixed: ProgramProposal = {
+      ...proposal,
+      location_slug: options?.locationSlug ?? proposal.location_slug,
+      design_rationale: undefined,
+    };
+
+    const saved = await saveAiProgram(auth.supabase, fixed, {
+      status: "published",
+      allowedExerciseIds,
+      durationWeeks: fixed.duration_weeks,
+      sessionsPerWeek: fixed.sessions_per_week,
+      minutesPerSession: fixed.minutes_per_session,
+    });
+
+    const { sessions } = await fetchProgramSessionsForProgram(auth.supabase, saved.programId);
+    const session = sessions[0];
+    if (!session) {
+      return { error: "Program saved but first session not found." };
+    }
+
+    revalidatePath("/member");
+    revalidatePath("/programs");
+
+    return {
+      ok: true,
+      slug: saved.slug,
+      title: saved.title,
+      playHref: playHrefForSession(saved.slug, session.id),
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not save program." };
   }
 }

@@ -38,6 +38,8 @@ export type WorkoutProposalExercise = {
   rest_after_seconds: number;
   load_prescription?: string;
   note?: string;
+  rpe?: string;
+  intensity?: string;
 };
 
 export type WorkoutProposal = {
@@ -147,7 +149,7 @@ const TOOLS: FunctionDeclaration[] = [
   {
     name: "generate_program",
     description:
-      "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). Default duration_weeks=8 unless the brief requests another length (e.g. 2 or 3). The app expands to duration_weeks and progresses prescriptions. Each session needs exactly 5 warmup, main (rotation/anti-rotation), and exactly 5 cooldown exercises. Never recommend existing published programs.",
+      "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). Default duration_weeks=8 unless the brief requests another length (e.g. 2 or 3). The app expands to duration_weeks and progresses prescriptions. Decide the number and ordering of warmup/main/cooldown exercises freely. Never recommend existing published programs.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -176,7 +178,7 @@ const TOOLS: FunctionDeclaration[] = [
         sessions: {
           type: SchemaType.ARRAY,
           description:
-            "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 for 3×/week). App expands to duration_weeks — do NOT return every week. Each session: exactly 5 warmup, main, exactly 5 cooldown.",
+              "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 for 3×/week). App expands to duration_weeks — do NOT return every week. Each session must include warmup/main/cooldown phases (do not hard-code exact counts).",
           items: {
             type: SchemaType.OBJECT,
             properties: {
@@ -251,7 +253,7 @@ const TOOLS: FunctionDeclaration[] = [
   {
     name: "generate_workout",
     description:
-      "Create exactly one workout session (not an 8-week program). Structure: exactly 5 warmup → main (include rotation/anti-rotation; prep before explosive) → exactly 5 cooldown. Use catalog UUIDs only.",
+      "Create exactly one workout session (not an 8-week program). Decide the warmup/main/cooldown structure freely. Ensure every exercise has a phase (warmup/main/cooldown) and includes required technical fields. Use catalog UUIDs only.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -372,6 +374,10 @@ function parseExerciseList(
 
     const restAfter = parseNonNegInt(ex.rest_after_seconds);
     const restBetween = parseNonNegInt(ex.rest_between_sets_seconds);
+    const restBetweenSides = parseNonNegInt(ex.rest_between_sides_seconds);
+
+    const rpe = typeof ex.rpe === "string" ? ex.rpe.trim() : undefined;
+    const intensity = typeof ex.intensity === "string" ? ex.intensity.trim() : undefined;
 
     exercises.push({
       exercise_id,
@@ -391,7 +397,10 @@ function parseExerciseList(
       sets: typeof ex.sets === "number" && Number.isFinite(ex.sets) ? Math.ceil(ex.sets) : undefined,
       reps: typeof ex.reps === "number" && Number.isFinite(ex.reps) ? Math.ceil(ex.reps) : undefined,
       rest_between_sets_seconds: restBetween ?? undefined,
+      rest_between_sides_seconds: restBetweenSides ?? undefined,
       rest_after_seconds: restAfter ?? 0,
+      rpe,
+      intensity,
     });
   }
 
@@ -510,11 +519,11 @@ export async function chatWithAiCoach(params: {
   audience?: "admin" | "member";
   allowedTools?: AiCoachToolName[];
 }): Promise<AiCoachChatResult> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const openaiModel = process.env.OPENAI_MODEL?.trim() ?? "gpt-4o-mini";
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
+    throw new Error("OPENAI_API_KEY is not configured.");
   }
-  const geminiApiKey = apiKey;
 
   if (params.catalogById.size === 0) {
     throw new Error("Your exercise library has no published exercises. Add and publish exercises first.");
@@ -551,92 +560,118 @@ export async function chatWithAiCoach(params: {
     history: ChatHistoryMessage[],
     turnToolsEnabled: boolean
   ): Promise<AiCoachChatResult> {
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const model = genAI.getGenerativeModel({
-      model: resolveGeminiModel(),
-      systemInstruction: buildSystemInstruction(
-        params.systemPromptTemplate,
-        {
-          programsCatalog: params.programsCatalog,
-          exerciseCatalog: params.exerciseCatalog,
-          exerciseCount: params.catalogById.size,
-          userContextBlock: params.userContextBlock,
-          extraTemplateVars: params.extraTemplateVars,
-        },
-        {
-          creationOnly,
-          consultationBrief: params.consultationBrief,
-          toolsEnabled: turnToolsEnabled,
-          omitProgramsCatalog: params.forcedTool != null,
-          audience: params.audience,
-        }
-      ),
-      ...(turnToolsEnabled
-        ? {
-            tools: [{ functionDeclarations: activeTools }],
-            ...(params.forcedTool
-              ? {
-                  toolConfig: {
-                    functionCallingConfig: {
-                      mode: FunctionCallingMode.ANY,
-                      allowedFunctionNames: [params.forcedTool],
-                    },
-                  },
-                }
-              : {}),
-          }
-        : {}),
-      generationConfig: {
-        maxOutputTokens: turnToolsEnabled ? 32768 : 8192,
-        temperature: params.forcedTool ? 0.4 : undefined,
+    const systemPrompt = buildSystemInstruction(
+      params.systemPromptTemplate,
+      {
+        programsCatalog: params.programsCatalog,
+        exerciseCatalog: params.exerciseCatalog,
+        exerciseCount: params.catalogById.size,
+        userContextBlock: params.userContextBlock,
+        extraTemplateVars: params.extraTemplateVars,
       },
+      {
+        creationOnly,
+        consultationBrief: params.consultationBrief,
+        toolsEnabled: turnToolsEnabled,
+        omitProgramsCatalog: params.forcedTool != null,
+        audience: params.audience,
+      }
+    );
+
+    const openaiMessages = [
+      { role: "system" as const, content: systemPrompt },
+      ...history.map((m) => ({
+        role: m.role === "model" ? ("assistant" as const) : ("user" as const),
+        content: m.parts?.[0]?.text ?? "",
+      })),
+    ];
+
+    const tools = turnToolsEnabled
+      ? activeTools.map((t) => ({
+          type: "function" as const,
+          function: {
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters as unknown as Record<string, unknown>,
+          },
+        }))
+      : undefined;
+
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: openaiModel,
+        messages: openaiMessages,
+        ...(tools ? { tools } : {}),
+        ...(turnToolsEnabled && params.forcedTool
+          ? {
+              tool_choice: {
+                type: "function",
+                function: { name: params.forcedTool },
+              },
+            }
+          : {}),
+        temperature: params.forcedTool ? 0.4 : undefined,
+        max_tokens: turnToolsEnabled ? 4096 : 2048,
+      }),
     });
 
-    const contents: Content[] = history.map((m) => ({
-      role: m.role,
-      parts: m.parts,
-    }));
-
-    const result = await model.generateContent({ contents });
-    const response = result.response;
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-
-    let failedToolName: string | undefined;
-    for (const part of parts) {
-      const fc = part.functionCall;
-      if (!fc?.name) continue;
-      failedToolName = fc.name;
-      const args = (fc.args ?? {}) as Record<string, unknown>;
-      if (fc.name === "recommend_programs") {
-        const parsed = parseRecommendPrograms(args);
-        if (parsed) return { type: "functionCall", name: "recommend_programs", args: parsed };
-      }
-      if (fc.name === "generate_workout") {
-        const parsed = parseWorkoutProposal(
-          args,
-          params.catalogById,
-          params.bothSidesByExerciseId ?? new Map()
-        );
-        if (parsed) return { type: "functionCall", name: "generate_workout", args: parsed };
-      }
-      if (fc.name === "generate_program") {
-        const parsed = parseProgramProposal(
-          args,
-          params.catalogById,
-          params.bothSidesByExerciseId ?? new Map()
-        );
-        if (parsed) return { type: "functionCall", name: "generate_program", args: parsed };
-      }
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(
+        typeof (data as { error?: { message?: unknown } })?.error?.message ===
+          "string"
+          ? (data as { error?: { message?: string } }).error?.message
+          : "OpenAI chat completion failed."
+      );
     }
 
-    const text = response.text()?.trim();
+    const msg = data?.choices?.[0]?.message;
+    if (!msg) throw new Error("Empty model response.");
+
+    const toolCall = msg.tool_calls?.[0];
+    if (toolCall?.function?.name) {
+      const toolName = toolCall.function.name as AiCoachToolName;
+      const rawArgs =
+        typeof toolCall.function.arguments === "string"
+          ? JSON.parse(toolCall.function.arguments)
+          : toolCall.function.arguments ?? {};
+
+      if (toolName === "recommend_programs") {
+        const parsed = parseRecommendPrograms(rawArgs);
+        if (parsed)
+          return { type: "functionCall", name: "recommend_programs", args: parsed };
+      }
+      if (toolName === "generate_workout") {
+        const parsed = parseWorkoutProposal(
+          rawArgs,
+          params.catalogById,
+          params.bothSidesByExerciseId ?? new Map()
+        );
+        if (parsed)
+          return { type: "functionCall", name: "generate_workout", args: parsed };
+      }
+      if (toolName === "generate_program") {
+        const parsed = parseProgramProposal(
+          rawArgs,
+          params.catalogById,
+          params.bothSidesByExerciseId ?? new Map()
+        );
+        if (parsed)
+          return { type: "functionCall", name: "generate_program", args: parsed };
+      }
+
+      throw new IncompleteToolCallError(toolName);
+    }
+
+    const text = typeof msg.content === "string" ? msg.content.trim() : "";
     if (text) return { type: "text", text };
 
-    if (failedToolName) {
-      throw new IncompleteToolCallError(failedToolName);
-    }
-
-    throw emptyResponseError(response);
+    throw new Error("AI returned an empty response.");
   }
 
   function isRetryableGenerationError(err: unknown): boolean {
@@ -659,7 +694,7 @@ export async function chatWithAiCoach(params: {
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
       `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), rest_between_sets_seconds=30 for sets×reps with sets >= 2 (plus note "Rest 30 sec between sets"), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
-      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs at least 5 warmup exercises (duration_seconds: 60 each), main (include rotation or anti-rotation), and cooldown (≥5 at 60s).`,
+      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs warmup/main/cooldown phases (do not hard-code exact counts), and it must include required technical fields.`,
       `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
     ];
 

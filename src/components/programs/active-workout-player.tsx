@@ -609,7 +609,7 @@ export function ActiveWorkoutPlayer({
             {len} exercise{len === 1 ? "" : "s"} · follows each exercise prescription
           </p>
 
-          <div className="pointer-events-none absolute -left-[9999px] h-px w-px overflow-hidden opacity-0">
+          <div className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0">
             <WorkoutVideo
               url={resolvedExercises[0]?.video_url ?? null}
               playing={false}
@@ -692,7 +692,7 @@ export function ActiveWorkoutPlayer({
                 </p>
               </div>
             )}
-            <ExerciseVideoFrame className="relative z-10 max-h-[42dvh] !aspect-auto h-[min(100vw,42dvh)] sm:h-auto sm:max-h-none sm:!aspect-square">
+            <ExerciseVideoFrame className="relative z-10 max-h-[42dvh] aspect-auto! h-[min(100vw,42dvh)] sm:h-auto sm:max-h-none sm:aspect-square!">
               <WorkoutVideo
                 url={displayVideoUrl}
                 playing={!workoutFinished && (inPrep || inTimedPreview || isRunning)}
@@ -721,6 +721,13 @@ export function ActiveWorkoutPlayer({
                       {current.note.trim()}
                     </p>
                   )}
+                  {!current.bothSides &&
+                    (current.rpe?.trim() || current.intensity?.trim()) && (
+                      <p className="mt-2 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-2.5 text-xs leading-relaxed text-white/80">
+                        RPE: {current.rpe?.trim() || "—"} · Intensity:{" "}
+                        {current.intensity?.trim() || "—"}
+                      </p>
+                    )}
                   <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{prepCountdown}</p>
                   <p className="mt-2 text-sm text-white/60">Starting in…</p>
                 </div>
@@ -745,6 +752,13 @@ export function ActiveWorkoutPlayer({
                       {current.note.trim()}
                     </p>
                   )}
+                  {!current.bothSides &&
+                    (current.rpe?.trim() || current.intensity?.trim()) && (
+                      <p className="mt-2 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-2.5 text-xs leading-relaxed text-white/80">
+                        RPE: {current.rpe?.trim() || "—"} · Intensity:{" "}
+                        {current.intensity?.trim() || "—"}
+                      </p>
+                    )}
                   <p className="mt-6 text-sm text-white/60">Preview the demo, then start when ready.</p>
                 </div>
               )}
@@ -768,6 +782,13 @@ export function ActiveWorkoutPlayer({
                       {next.note.trim()}
                     </p>
                   )}
+                  {!next.bothSides &&
+                    (next.rpe?.trim() || next.intensity?.trim()) && (
+                      <p className="mt-2 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-2.5 text-xs leading-relaxed text-white/80">
+                        RPE: {next.rpe?.trim() || "—"} · Intensity:{" "}
+                        {next.intensity?.trim() || "—"}
+                      </p>
+                    )}
                   <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
                   <p className="mt-2 text-sm text-white/60">Rest</p>
                 </div>
@@ -905,6 +926,14 @@ export function ActiveWorkoutPlayer({
                     {displayNote}
                   </p>
                 )}
+                {!inRest &&
+                  !displayExercise?.bothSides &&
+                  (displayExercise?.rpe?.trim() || displayExercise?.intensity?.trim()) && (
+                    <p className="mt-2 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-2.5 text-xs leading-relaxed text-white/80">
+                      RPE: {displayExercise?.rpe?.trim() || "—"} · Intensity:{" "}
+                      {displayExercise?.intensity?.trim() || "—"}
+                    </p>
+                  )}
 
                 {currentIsTimed && !inRest && phase === "work" && current && (
                   <p className="mt-3 text-lg font-medium text-[#ccff00]">

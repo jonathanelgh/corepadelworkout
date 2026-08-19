@@ -12,6 +12,8 @@ export type ProgramExercisePayload = {
   rest_between_sides_seconds: number | null;
   rest_after_seconds: number | null;
   load_prescription: string | null;
+  rpe: string | null;
+  intensity: string | null;
   session_phase: SessionPhase;
   choice_group: string | null;
   note: string | null;
@@ -59,6 +61,8 @@ async function insertSessionExercises(
     rest_between_sides_seconds: ex.rest_between_sides_seconds,
     rest_after_seconds: ex.rest_after_seconds,
     load_prescription: ex.load_prescription?.trim() || null,
+    rpe: ex.rpe?.trim() || null,
+    intensity: ex.intensity?.trim() || null,
     session_phase: ex.session_phase,
     choice_group: ex.choice_group,
     note: ex.note?.trim() || null,

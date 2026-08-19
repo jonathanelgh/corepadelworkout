@@ -4,17 +4,14 @@ import { isOnboardingLevel } from "@/lib/programs/profile-ai-context";
 import { parseTrainingLevelFromAthleteContext, detectFootworkSpecialtyFocus, resolveMinFootworkPerSession, parseTrainingLevelFromBrief } from "@/lib/programs/program-prescription-rules";
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
 import type { GeminiProgramDraft } from "@/lib/programs/gemini-generate-program";
-import { applyProgramRulesToSession, type ProgramRulesContext } from "@/lib/programs/ensure-program-rules";
+import type { ProgramRulesContext } from "@/lib/programs/ensure-program-rules";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
-import { ensureWeeklyExerciseVariety } from "@/lib/programs/ensure-weekly-exercise-variety";
 import { normalizeAiExerciseRest } from "@/lib/programs/normalize-ai-exercise-prescription";
 import type { SessionPhase } from "@/lib/programs/session-phase";
 import { resolveProgramDurationWeeks } from "@/lib/programs/program-duration";
 import {
   COOLDOWN_DURATION_SECONDS,
   COOLDOWN_REST_AFTER_SECONDS,
-  MIN_COOLDOWN_EXERCISES_PER_SESSION,
-  MIN_WARMUP_EXERCISES_PER_SESSION,
   WARMUP_DURATION_SECONDS,
   WARMUP_REST_AFTER_SECONDS,
 } from "@/lib/programs/warmup-prescription";
@@ -107,12 +104,16 @@ export function normalizeWarmupPrescription<T extends WorkoutProposalExercise>(e
   if (ex.phase !== "warmup") return ex;
   return {
     ...ex,
-    duration_seconds: WARMUP_DURATION_SECONDS,
-    duration_minutes: undefined,
-    sets: undefined,
-    reps: undefined,
-    rest_between_sets_seconds: undefined,
-    rest_after_seconds: WARMUP_REST_AFTER_SECONDS,
+    // Do not overwrite AI-provided warm-up timing/prescription.
+    // Only backfill if the model omitted timing fields entirely.
+    duration_seconds:
+      ex.duration_seconds != null && Number(ex.duration_seconds) > 0
+        ? ex.duration_seconds
+        : WARMUP_DURATION_SECONDS,
+    rest_after_seconds:
+      ex.rest_after_seconds != null && Number(ex.rest_after_seconds) > 0
+        ? ex.rest_after_seconds
+        : WARMUP_REST_AFTER_SECONDS,
   };
 }
 
@@ -121,12 +122,14 @@ export function normalizeCooldownPrescription<T extends WorkoutProposalExercise>
   if (ex.phase !== "cooldown") return ex;
   return {
     ...ex,
-    duration_seconds: COOLDOWN_DURATION_SECONDS,
-    duration_minutes: undefined,
-    sets: undefined,
-    reps: undefined,
-    rest_between_sets_seconds: undefined,
-    rest_after_seconds: COOLDOWN_REST_AFTER_SECONDS,
+    duration_seconds:
+      ex.duration_seconds != null && Number(ex.duration_seconds) > 0
+        ? ex.duration_seconds
+        : COOLDOWN_DURATION_SECONDS,
+    rest_after_seconds:
+      ex.rest_after_seconds != null && Number(ex.rest_after_seconds) > 0
+        ? ex.rest_after_seconds
+        : COOLDOWN_REST_AFTER_SECONDS,
   };
 }
 
@@ -242,91 +245,6 @@ export function ensureSessionExerciseStructure(
   const mains = eligibleExercises.filter((e) => e.phase !== "warmup" && e.phase !== "cooldown");
 
   let out = [...warmups, ...mains, ...cooldowns];
-  const usedIds = new Set(out.map((e) => e.exercise_id));
-  const preferAvoidIds = (() => {
-    const raw = options?.programContext?.avoidExerciseIds;
-    if (!raw) return undefined;
-    return raw instanceof Set ? raw : new Set(raw);
-  })();
-
-  const warmupNeeded = Math.max(0, MIN_WARMUP_EXERCISES_PER_SESSION - warmups.length);
-  if (warmupNeeded > 0) {
-    const picks = pickCatalogExercises(
-      catalog,
-      usedIds,
-      warmupNeeded,
-      warmupCandidateScore,
-      options?.locationSlug,
-      level,
-      preferAvoidIds
-    );
-    if (picks.length === 0) {
-      warnings.push(
-        sessionLabel
-          ? `${sessionLabel}: Could not add warm-up exercises — no suitable catalog moves for this location.`
-          : "Could not add warm-up exercises — no suitable catalog moves for this location."
-      );
-    } else {
-      const prefix = picks.map((pick) => ({
-        exercise_id: pick.id,
-        title: pick.title,
-        ...defaultWarmupExerciseFields(),
-      }));
-      for (const ex of prefix) usedIds.add(ex.exercise_id);
-      out = [...prefix, ...out];
-      warnings.push(
-        sessionLabel
-          ? `${sessionLabel}: Added ${prefix.length} warm-up exercise(s) at 60s each.`
-          : `Added ${prefix.length} warm-up exercise(s) at 60s each.`
-      );
-    }
-  }
-
-  const cooldownCount = cooldowns.length;
-  const cooldownNeeded = Math.max(0, MIN_COOLDOWN_EXERCISES_PER_SESSION - cooldownCount);
-  if (cooldownNeeded > 0) {
-    const picks = pickCatalogExercises(
-      catalog,
-      usedIds,
-      cooldownNeeded,
-      cooldownCandidateScore,
-      options?.locationSlug,
-      level,
-      preferAvoidIds
-    );
-    if (picks.length === 0) {
-      warnings.push(
-        sessionLabel
-          ? `${sessionLabel}: Could not add cool-down exercises — no suitable catalog moves for this location.`
-          : "Could not add cool-down exercises — no suitable catalog moves for this location."
-      );
-    } else {
-      const suffix = picks.map((pick) => ({
-        exercise_id: pick.id,
-        title: pick.title,
-        ...defaultCooldownExerciseFields(),
-      }));
-      for (const ex of suffix) usedIds.add(ex.exercise_id);
-      out = [...out, ...suffix];
-      warnings.push(
-        sessionLabel
-          ? `${sessionLabel}: Added ${suffix.length} cool-down exercise(s) at 60s each.`
-          : `Added ${suffix.length} cool-down exercise(s) at 60s each.`
-      );
-    }
-  }
-
-  out = sortExercisesByPhase(out.map((ex) => normalizeCooldownPrescription(normalizeWarmupPrescription(ex))));
-
-  const rulesResult = applyProgramRulesToSession(out, catalog, {
-    locationSlug: options?.locationSlug,
-    sessionLabel,
-    trainingLevel: options?.trainingLevel,
-    programContext: options?.programContext,
-  });
-  out = rulesResult.exercises;
-  warnings.push(...rulesResult.warnings);
-
   out = sortExercisesByPhase(out.map((ex) => normalizeCooldownPrescription(normalizeWarmupPrescription(ex))));
   const bothSidesByExerciseId = new Map(catalog.map((entry) => [entry.id, entry.bothSides]));
   out = normalizeAiExerciseRest(out, { bothSidesByExerciseId });
@@ -359,75 +277,22 @@ export function ensureProgramProposalStructure(
 ): { proposal: ProgramProposal; warnings: string[] } {
   const warnings: string[] = [];
   const locationSlug = proposal.location_slug;
-  const baseContext: ProgramRulesContext = {
-    title: proposal.title,
-    description: proposal.description,
-    ...options?.programContext,
-  };
 
-  // Build days sequentially so fillers avoid mains already used earlier in the week.
-  const weekMainUsed = new Set<string>();
-  const sessionsAfterRules = proposal.sessions.map((session, index) => {
-    const programContext = {
-      ...enrichProgramContext(baseContext, proposal.sessions.length, index),
-      avoidExerciseIds: new Set(weekMainUsed),
-    };
+  const sessions = proposal.sessions.map((session) => {
     const result = ensureSessionExerciseStructure(session.exercises, catalog, {
       locationSlug,
       sessionLabel: session.name,
       trainingLevel: options?.trainingLevel,
-      programContext,
-    });
-    warnings.push(...result.warnings);
-    for (const ex of result.exercises) {
-      if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
-      weekMainUsed.add(ex.exercise_id);
-    }
-    return { ...session, exercises: result.exercises };
-  });
-
-  const variety = ensureWeeklyExerciseVariety(sessionsAfterRules, catalog, {
-    locationSlug,
-    trainingLevel: options?.trainingLevel,
-  });
-  warnings.push(...variety.warnings);
-
-  // Variety can disturb required tags — re-apply structure with cross-day avoid sets.
-  const sessions = variety.sessions.map((session, index) => {
-    const avoidFromOthers = new Set<string>();
-    for (let i = 0; i < variety.sessions.length; i++) {
-      if (i === index) continue;
-      for (const ex of variety.sessions[i]!.exercises) {
-        if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
-        avoidFromOthers.add(ex.exercise_id);
-      }
-    }
-    const programContext = {
-      ...enrichProgramContext(baseContext, variety.sessions.length, index),
-      avoidExerciseIds: avoidFromOthers,
-    };
-    const result = ensureSessionExerciseStructure(session.exercises, catalog, {
-      locationSlug,
-      sessionLabel: session.name,
-      trainingLevel: options?.trainingLevel,
-      programContext,
+      programContext: options?.programContext,
     });
     warnings.push(...result.warnings);
     return { ...session, exercises: result.exercises };
   });
 
-  // Final variety pass after repair so structure fillers don't re-clone days.
-  const varietyFinal = ensureWeeklyExerciseVariety(sessions, catalog, {
-    locationSlug,
-    trainingLevel: options?.trainingLevel,
-  });
-  warnings.push(...varietyFinal.warnings);
-
-  // Honor requested length (default 8 when unset); do not force a minimum of 8.
   const duration_weeks = resolveProgramDurationWeeks(proposal.duration_weeks);
 
   return {
-    proposal: { ...proposal, sessions: varietyFinal.sessions, duration_weeks },
+    proposal: { ...proposal, sessions, duration_weeks },
     warnings,
   };
 }
@@ -481,70 +346,8 @@ export function ensureGeminiDraftStructure(
       return { name: session.name, exercises: result.exercises, source: session };
     });
 
-    const variety = ensureWeeklyExerciseVariety(
-      structuredSessions.map((s) => ({ name: s.name, exercises: s.exercises })),
-      catalog,
-      {
-        locationSlug: track.location_slug,
-        trainingLevel: options?.trainingLevel,
-      }
-    );
-    warnings.push(...variety.warnings);
-
-    const repairedSessions = variety.sessions.map((session, index) => {
-      const avoidFromOthers = new Set<string>();
-      for (let i = 0; i < variety.sessions.length; i++) {
-        if (i === index) continue;
-        for (const ex of variety.sessions[i]!.exercises) {
-          if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
-          avoidFromOthers.add(ex.exercise_id);
-        }
-      }
-      const programContextForDay = {
-        ...enrichProgramContext(programContext, variety.sessions.length, index),
-        avoidExerciseIds: avoidFromOthers,
-      };
-      const result = ensureSessionExerciseStructure(session.exercises, catalog, {
-        locationSlug: track.location_slug,
-        sessionLabel: session.name,
-        trainingLevel: options?.trainingLevel,
-        programContext: programContextForDay,
-      });
-      warnings.push(...result.warnings);
-      return { name: session.name, exercises: result.exercises };
-    });
-
-    const varietyFinal = ensureWeeklyExerciseVariety(repairedSessions, catalog, {
-      locationSlug: track.location_slug,
-      trainingLevel: options?.trainingLevel,
-    });
-    warnings.push(...varietyFinal.warnings);
-
-    // Final structure pass: variety swaps can leave incomplete prescriptions; normalize again.
-    const finalizedSessions = varietyFinal.sessions.map((session, index) => {
-      const avoidFromOthers = new Set<string>();
-      for (let i = 0; i < varietyFinal.sessions.length; i++) {
-        if (i === index) continue;
-        for (const ex of varietyFinal.sessions[i]!.exercises) {
-          if (ex.phase === "warmup" || ex.phase === "cooldown") continue;
-          avoidFromOthers.add(ex.exercise_id);
-        }
-      }
-      const result = ensureSessionExerciseStructure(session.exercises, catalog, {
-        locationSlug: track.location_slug,
-        sessionLabel: session.name,
-        trainingLevel: options?.trainingLevel,
-        programContext: {
-          ...enrichProgramContext(programContext, varietyFinal.sessions.length, index),
-          avoidExerciseIds: avoidFromOthers,
-        },
-      });
-      warnings.push(...result.warnings);
-      return { name: session.name, exercises: result.exercises };
-    });
-
-    const sessions = finalizedSessions.map((session, index) => {
-      const source = structuredSessions[index]?.source ?? track.sessions[index]!;
+    const sessions = structuredSessions.map((session) => {
+      const source = session.source ?? track.sessions.find((s) => s.name === session.name)!;
       const exercises = session.exercises.map((ex) => ({
         exercise_id: ex.exercise_id,
         phase: ex.phase,
