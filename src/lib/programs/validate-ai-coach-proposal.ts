@@ -236,6 +236,23 @@ export function validateProgramProposal(
     return { ok: false, errors };
   }
 
+  const weeks =
+    typeof proposal.duration_weeks === "number" && Number.isFinite(proposal.duration_weeks)
+      ? Math.floor(proposal.duration_weeks)
+      : null;
+  const spw =
+    typeof proposal.sessions_per_week === "number" && Number.isFinite(proposal.sessions_per_week)
+      ? Math.floor(proposal.sessions_per_week)
+      : null;
+  if (weeks != null && weeks > 0 && spw != null && spw > 0) {
+    const expected = weeks * spw;
+    if (proposal.sessions.length !== expected) {
+      errors.push({
+        message: `Program must include all ${expected} sessions (duration_weeks=${weeks} × sessions_per_week=${spw}). Got ${proposal.sessions.length}. Return every week — do not return week-1 templates only.`,
+      });
+    }
+  }
+
   proposal.sessions.forEach((session, sIdx) => {
     if (!requireNonEmptyString(session.name)) {
       errors.push({ message: `Session[${sIdx}] is missing a non-empty name.` });

@@ -280,7 +280,7 @@ export async function generateProgramWithGemini(
   const spw = input.sessionsPerWeek;
   if (spw != null) {
     scheduleParts.push(
-      `REQUIRED: Each track MUST contain exactly ${spw} week-1 session templates only (one training week). The app expands to ${weeks} weeks × ${spw} sessions and writes progressed prescriptions. Do NOT return all ${weeks * spw} sessions.`
+      `REQUIRED: Each track MUST contain exactly ${weeks * spw} sessions (${weeks} weeks × ${spw}/week) — the full program. Decide progression and variation across weeks. Do NOT return only week-1 templates.`
     );
   }
 

@@ -90,7 +90,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
     function: {
       name: "generate_program",
       description:
-        "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). You decide program structure, phases, exercise selection, volume, intensity, rest, progression intent, and deload strategy based on the athlete brief. Default duration_weeks=8 unless the brief requests another length. The app expands templates across duration_weeks. Use catalog UUIDs only. Never recommend existing published programs.",
+        "Create a full multi-week training program. Return ALL sessions for ALL weeks (duration_weeks × sessions_per_week). You decide structure, progression, variation, and deload across the block. Use catalog UUIDs only. Never recommend existing published programs.",
       parameters: {
         type: "object",
         properties: {
@@ -100,7 +100,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           design_rationale: {
             type: "string",
             description:
-              "3–6 sentences explaining your coaching decisions: structure, periodization, exercise choices, progression/deload, and tradeoffs. For admin review.",
+              "3–6 sentences explaining your coaching decisions: structure, periodization across weeks, exercise choices, progression/deload, and tradeoffs. For admin review.",
           },
           duration_weeks: {
             type: "number",
@@ -119,11 +119,14 @@ const OPENAI_TOOLS: FunctionTool[] = [
           sessions: {
             type: "array",
             description:
-              "ONE WEEK ONLY: return exactly sessions_per_week session templates. App expands to duration_weeks. Decide warmup/main/cooldown counts and content freely for the goal — do not force a fixed exercise count.",
+              "FULL PROGRAM: return exactly duration_weeks × sessions_per_week sessions in order (Week 1 Day 1, Week 1 Day 2, … through the last week). Do NOT return only week-1 templates. Decide warmup/main/cooldown freely per session; progress and vary across weeks as appropriate.",
             items: {
               type: "object",
               properties: {
-                name: { type: "string", description: "e.g. Day 1: Bilateral lower + push/pull" },
+                name: {
+                  type: "string",
+                  description: "e.g. Week 1 — Day 1: Bilateral lower + push/pull",
+                },
                 description: { type: "string" },
                 duration_minutes: { type: "number" },
                 exercises: {
@@ -372,8 +375,8 @@ export async function chatWithAiCoachOpenAI(params: {
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
       `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds, rpe, intensity, plus sets/reps or duration as appropriate. For multi-set work include rest_between_sets_seconds; for both_sides timed work include rest_between_sides_seconds > 0.`,
-      `Your previous response was empty or incomplete. Call ${toolName} again with a compact but complete payload. For programs: return ONLY sessions_per_week session templates (one training week). You decide structure — do not force a fixed exercise count.`,
-      `Final attempt: call ${toolName} only — no prose. Keep the payload complete and valid.`,
+      `Your previous response was empty or incomplete. Call ${toolName} again with a compact but complete payload. For programs: return ALL sessions for ALL weeks (duration_weeks × sessions_per_week) — not week-1 templates only. You decide structure and progression.`,
+      `Final attempt: call ${toolName} only — no prose. Keep the payload complete and valid. For programs include every week.`,
     ];
 
     for (let attempt = 0; attempt <= retryMessages.length; attempt++) {

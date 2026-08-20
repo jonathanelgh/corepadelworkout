@@ -702,7 +702,7 @@ export function AiCoachClient({
                         {m.programProposal.sessions.length === 1 ? "" : "s"} in draft
                         {m.programProposal.sessions.length <
                         m.programProposal.duration_weeks * m.programProposal.sessions_per_week
-                          ? " (weekly template will repeat on save if needed)"
+                          ? " (incomplete — expected all weeks)"
                           : ""}
                       </p>
                     </div>

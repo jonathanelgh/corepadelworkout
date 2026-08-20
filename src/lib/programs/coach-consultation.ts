@@ -1022,7 +1022,7 @@ export function formatConsultationBrief(state: ConsultationState, isProgram: boo
       `You MUST call ${isProgram ? "generate_program" : "generate_workout"} now.`,
       "Do not ask more consultation questions. Do not describe the program in prose only — return the tool call so the admin can review and save it.",
       isProgram
-        ? "- generate_program sessions[]: return ONLY sessions_per_week templates (one training week). On save, week_sizes and program_weeks match the manual program builder (Day 1, Day 2, … per week)."
+        ? "- generate_program sessions[]: return ALL sessions for ALL weeks (duration_weeks × sessions_per_week), in order. Name them clearly (e.g. Week 1 — Day 1). Do not return only one week of templates."
         : "- generate_workout: one session filling the target minutes with warmup, main, and cooldown."
     );
   }
@@ -1084,8 +1084,8 @@ export function formatGenerationCoachBrief(
 - Every exercise needs phase (warmup, main, or cooldown), rest_after_seconds (0 on the last exercise), rpe, and intensity. For multi-set work include rest_between_sets_seconds. For both_sides timed work include rest_between_sides_seconds > 0.
 ${
   isProgram
-    ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block.
-- Week-1 templates only: the app repeats them for the full block. Describe progression/deload intent in design_rationale — do not duplicate sessions per week in sessions[].`
+    ? `- sessions[] must contain exactly ${(state.durationWeeks ?? 8) * (state.sessionsPerWeek ?? 3)} sessions = duration_weeks (${state.durationWeeks ?? 8}) × sessions_per_week (${state.sessionsPerWeek ?? "sessions_per_week"}) — every week of the block, in order.
+- Progress, vary, and deload across weeks as you decide. Do NOT return week-1 templates only.`
     : `- Target ~${state.minutes ?? 30} minutes for this single workout.`
 }`;
 }

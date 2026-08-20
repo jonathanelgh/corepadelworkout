@@ -345,7 +345,7 @@ export function buildAiGenerationDebugLog(
       "Generation mode",
       "info",
       input.mode === "program"
-        ? "Multi-week program via week-1 templates (app expands to duration_weeks)."
+        ? "Multi-week program with all weeks authored by the AI (duration_weeks × sessions_per_week)."
         : "Single session (no weekly expansion)."
     )
   );

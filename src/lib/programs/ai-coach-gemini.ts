@@ -149,7 +149,7 @@ const TOOLS: FunctionDeclaration[] = [
   {
     name: "generate_program",
     description:
-      "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). Default duration_weeks=8 unless the brief requests another length (e.g. 2 or 3). The app expands to duration_weeks and progresses prescriptions. Decide the number and ordering of warmup/main/cooldown exercises freely. Never recommend existing published programs.",
+      "Create a full multi-week training program. Return ALL sessions for ALL weeks (duration_weeks × sessions_per_week). Decide structure, progression, variation, and deload across the block. Never recommend existing published programs.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -159,7 +159,7 @@ const TOOLS: FunctionDeclaration[] = [
         design_rationale: {
           type: SchemaType.STRING,
           description:
-            "3–6 sentences: weekly split logic, day roles, footwork 2/1/2, progression intent, and any tradeoffs. For admin review.",
+            "3–6 sentences: periodization across weeks, day roles, progression/deload, and tradeoffs. For admin review.",
         },
         duration_weeks: {
           type: SchemaType.NUMBER,
@@ -178,11 +178,11 @@ const TOOLS: FunctionDeclaration[] = [
         sessions: {
           type: SchemaType.ARRAY,
           description:
-              "ONE WEEK ONLY: return exactly sessions_per_week session templates (e.g. 3 for 3×/week). App expands to duration_weeks — do NOT return every week. Each session must include warmup/main/cooldown phases (do not hard-code exact counts).",
+              "FULL PROGRAM: return exactly duration_weeks × sessions_per_week sessions in order (Week 1 Day 1 … through last week). Do NOT return only week-1 templates. Each session must include warmup/main/cooldown phases (counts are free).",
           items: {
             type: SchemaType.OBJECT,
             properties: {
-              name: { type: SchemaType.STRING, description: "e.g. Day 1: Bilateral lower + push/pull" },
+              name: { type: SchemaType.STRING, description: "e.g. Week 1 — Day 1: Bilateral lower + push/pull" },
               description: { type: SchemaType.STRING },
               duration_minutes: { type: SchemaType.NUMBER },
               exercises: {
@@ -694,7 +694,7 @@ export async function chatWithAiCoach(params: {
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
       `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), rest_between_sets_seconds=30 for sets×reps with sets >= 2 (plus note "Rest 30 sec between sets"), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
-      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs warmup/main/cooldown phases (do not hard-code exact counts), and it must include required technical fields.`,
+      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ALL sessions for ALL weeks (duration_weeks × sessions_per_week). Each session needs warmup/main/cooldown phases (do not hard-code exact counts), and it must include required technical fields.`,
       `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
     ];
 

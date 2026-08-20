@@ -12,7 +12,7 @@ export const AI_COACH_TOOL_ROUTING_BLOCK = `## Tool routing (hard constraints)
 ### Shared
 - Use ONLY \`exercise_id\` UUIDs from the catalog provided in this prompt. Never invent exercises, IDs, or names.
 - **generate_workout** — create exactly one custom session (not a multi-week program).
-- **generate_program** — create a multi-week program as week-1 session templates only (admin). Default 8 weeks; honor a shorter/longer request from the brief. The app expands and progresses.
+- **generate_program** — create a full multi-week program (admin). Return ALL sessions for ALL weeks (\`duration_weeks × sessions_per_week\`). Default 8 weeks; honor a shorter/longer request from the brief. Do not return week-1 templates only.
 - **recommend_programs** — suggest EXISTING published programs from the catalog only. Never invent catalog programs.
 
 ### Admin coach (\`/admin/programs/ai\`)

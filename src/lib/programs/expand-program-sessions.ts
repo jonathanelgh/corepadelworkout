@@ -21,8 +21,8 @@ export type ExpandSessionsOptions = {
 };
 
 /**
- * Build a full multi-week schedule from week-1 session templates.
- * Uses the first `sessionsPerWeek` entries as the repeating template and applies weekly progression.
+ * Resolve a full multi-week schedule from AI output.
+ * Prefer an AI-authored full schedule when present; only expand week-1 templates as a fallback.
  */
 export function expandSessionsToTarget<T extends ProgressableExercise>(
   sessions: ExpandableSession<T>[],
@@ -34,11 +34,24 @@ export function expandSessionsToTarget<T extends ProgressableExercise>(
   }
 
   const sessionsPerWeek = Math.max(1, options?.sessionsPerWeek ?? sessions.length);
+  const warnings: string[] = [];
+
+  // AI already returned a full (or oversized) multi-week schedule — keep it as authored.
+  if (sessions.length >= targetCount) {
+    if (sessions.length > targetCount) {
+      warnings.push(
+        `AI returned ${sessions.length} sessions; using the first ${targetCount} to match duration_weeks × sessions_per_week.`
+      );
+    } else {
+      warnings.push("Using AI-authored full multi-week schedule (no week-1 template expansion).");
+    }
+    return { sessions: sessions.slice(0, targetCount), warnings };
+  }
+
   const applyProgression = options?.applyWeeklyProgression !== false;
   const progressionOpts: WeeklyProgressionOptions = {
     trainingLevel: options?.trainingLevel ?? "beginner",
   };
-  const warnings: string[] = [];
 
   const template = sessions.slice(0, Math.min(sessionsPerWeek, sessions.length));
   if (template.length === 0) {
@@ -47,14 +60,11 @@ export function expandSessionsToTarget<T extends ProgressableExercise>(
 
   if (sessions.length > template.length) {
     warnings.push(
-      `Used the first ${template.length} session(s) as the week-1 template; extra AI sessions were ignored.`
+      `AI returned a partial schedule (${sessions.length} sessions); expanding from the first ${template.length} as a week template.`
     );
-  }
-
-  const needsRepeat = targetCount > template.length;
-  if (needsRepeat) {
+  } else {
     warnings.push(
-      `Built ${targetCount} sessions from the week-1 template with automatic weekly progression.`
+      `Built ${targetCount} sessions from a week-1 template with automatic weekly progression (fallback).`
     );
   }
 

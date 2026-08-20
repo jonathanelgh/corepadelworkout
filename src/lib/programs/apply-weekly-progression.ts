@@ -255,15 +255,10 @@ export function applyWeeklyProgressionToExercise<T extends ProgressableExercise>
   return ex;
 }
 
-export const AI_COACH_WEEKLY_PROGRESSION_BLOCK = `### Weekly progression (automatic on save — app-owned)
+export const AI_COACH_WEEKLY_PROGRESSION_BLOCK = `### Weekly progression (AI-authored full schedule)
 
-- Programs default to **8 weeks**, or the requested \`duration_weeks\` (e.g. 2 or 3). Return **week-1 templates only** (\`sessions_per_week\` entries). The app expands to \`duration_weeks\` and writes each week's prescription.
-- Never return all sessions for every week in the block.
-- **Sets / timed rounds never auto-progress** — keep sets fixed across the block.
-- **Sets×reps (main):**
-  - **Beginner:** progress **reps only** (hold / +1 pattern). Sets stay fixed. Leave \`load_prescription\` blank.
-  - **Intermediate / Advanced:** **+1 rep each week** from week-1 baseline through the last week — never reset. If an admin set a numeric \`load_prescription\`, also bump load from week 5 onward when the block is long enough (reps keep climbing).
-- **Timed main work** (duration + rounds): progress **duration_seconds** with the **same weekly step pattern** as reps (+5 seconds per step). Rounds (\`sets\`) stay fixed. Warm-up and cool-down: no duration progression.
+- Programs default to **8 weeks**, or the requested \`duration_weeks\` (e.g. 2 or 3).
+- Return **ALL sessions for ALL weeks** (\`duration_weeks × sessions_per_week\`). You decide progression, variation, and deload across the block.
+- Do not rely on the app to invent later weeks from a week-1 template.
 - Leave \`load_prescription\` **blank** — athletes choose a weight that fits their strength. Never invent kg/lb values.
-- Warm-up and cool-down: **no** progressive overload.
-- Never put progression instructions in \`note\`.`.trim();
+- Never put progression instructions only in \`note\` — put sets/reps/duration changes in structured fields on each week's sessions.`.trim();
