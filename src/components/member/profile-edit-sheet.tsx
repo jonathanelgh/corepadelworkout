@@ -96,7 +96,7 @@ export function ProfileEditSheet({
 
   const togglePain = useCallback((p: PainKey) => {
     if (p === "none") {
-      setPains(["none"]);
+      setPains((prev) => (prev.length === 1 && prev[0] === "none" ? [] : ["none"]));
       return;
     }
     setPains((prev) => {
@@ -108,15 +108,7 @@ export function ProfileEditSheet({
     });
   }, []);
 
-  const canSave =
-    name.trim().length >= 1 &&
-    level !== null &&
-    pains.length > 0 &&
-    goal !== null &&
-    environments.length > 0;
-
   async function handleSave() {
-    if (!level || !goal || !canSave) return;
     setSubmitting(true);
     setError(null);
     const res = await updateMemberProfile({
@@ -200,7 +192,7 @@ export function ProfileEditSheet({
                     <li key={item.id}>
                       <button
                         type="button"
-                        onClick={() => setLevel(item.id)}
+                        onClick={() => setLevel((prev) => (prev === item.id ? null : item.id))}
                         className={`w-full rounded-xl border-2 px-4 py-3 text-left transition ${
                           selected
                             ? "border-[#ccff00] bg-[#ccff00]/10"
@@ -250,7 +242,7 @@ export function ProfileEditSheet({
                     <li key={id}>
                       <button
                         type="button"
-                        onClick={() => setGoal(id)}
+                        onClick={() => setGoal((prev) => (prev === id ? null : id))}
                         className={`w-full rounded-xl border-2 px-3 py-2.5 text-left text-sm font-semibold transition ${
                           selected
                             ? "border-emerald-400 bg-emerald-50 text-zinc-900"
@@ -308,7 +300,7 @@ export function ProfileEditSheet({
           <button
             type="button"
             onClick={() => void handleSave()}
-            disabled={!canSave || submitting}
+            disabled={submitting}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#ccff00] py-3.5 text-sm font-bold text-zinc-950 transition hover:bg-[#b8e600] disabled:opacity-50"
           >
             {submitting ? (

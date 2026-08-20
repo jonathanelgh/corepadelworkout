@@ -10,6 +10,8 @@ export const PADEL_SLUG_TO_LEVEL: Record<string, OnboardingLevel> = {
   "padel-beginner": "beginner",
   "padel-intermediate": "intermediate",
   "padel-advanced": "advanced",
+  // Admin / legacy “Pro” level uses the same edit tier as Advanced in the profile UI.
+  "padel-pro": "advanced",
 };
 
 export function levelFromPadelSlug(slug: string | null | undefined): OnboardingLevel | null {
@@ -73,4 +75,39 @@ export function normalizePainSelection(selected: PainKey[]): PainKey[] {
 
 export function isPainKey(v: string): v is PainKey {
   return PAIN_SET.has(v);
+}
+
+/** Accept stored slugs or legacy human labels from older writes. */
+const PAIN_LABEL_TO_KEY: Record<string, PainKey> = {
+  padel_elbow: "padel_elbow",
+  "padel elbow": "padel_elbow",
+  jumpers_knee: "jumpers_knee",
+  "jumper's knee": "jumpers_knee",
+  "jumpers knee": "jumpers_knee",
+  lower_back: "lower_back",
+  "lower back": "lower_back",
+  plantar_fasciitis: "plantar_fasciitis",
+  "heel pain": "plantar_fasciitis",
+  "heel / plantar": "plantar_fasciitis",
+  "plantar fasciitis": "plantar_fasciitis",
+  none: "none",
+  "none of these": "none",
+  "none — general strength": "none",
+};
+
+export function coercePainKey(v: string): PainKey | null {
+  const trimmed = v.trim();
+  if (!trimmed) return null;
+  if (isPainKey(trimmed)) return trimmed;
+  return PAIN_LABEL_TO_KEY[trimmed.toLowerCase()] ?? null;
+}
+
+export function coercePainKeys(values: string[] | null | undefined): PainKey[] {
+  if (!values?.length) return [];
+  const mapped: PainKey[] = [];
+  for (const v of values) {
+    const key = coercePainKey(v);
+    if (key) mapped.push(key);
+  }
+  return normalizePainSelection(mapped);
 }

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProgramCard } from "@/app/programs/programs-library-client";
-import { PRIMARY_GOAL_LABELS, isOnboardingGoal, isPainKey, levelFromPadelSlug } from "@/lib/member/onboarding";
+import { PRIMARY_GOAL_LABELS, coercePainKeys, isOnboardingGoal, levelFromPadelSlug } from "@/lib/member/onboarding";
 import type { OnboardingEnvironment, OnboardingGoal, OnboardingLevel, PainKey } from "@/lib/member/onboarding";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { loadMemberSubscriptionStatus, type MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
@@ -223,8 +223,7 @@ export async function loadMemberHubData(
         ? envName[profile.training_environment] ?? profile.training_environment
         : "—";
 
-  const pains: PainKey[] =
-    profile?.padel_pains?.filter((p: string): p is PainKey => isPainKey(p)) ?? [];
+  const pains: PainKey[] = coercePainKeys(profile?.padel_pains);
 
   const painLabels: Record<string, string> = {
     padel_elbow: "Padel elbow",

@@ -9,15 +9,14 @@ import {
   type OnboardingGoal,
   type OnboardingLevel,
   type PainKey,
-  isPainKey,
-  normalizePainSelection,
+  coercePainKeys,
 } from "@/lib/member/onboarding";
 
 export type UpdateMemberProfilePayload = {
   displayName: string;
-  level: OnboardingLevel;
+  level: OnboardingLevel | null;
   pains: PainKey[];
-  goal: OnboardingGoal;
+  goal: OnboardingGoal | null;
   environments: OnboardingEnvironment[];
 };
 
@@ -25,31 +24,28 @@ export async function updateMemberProfile(
   payload: UpdateMemberProfilePayload,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const name = payload.displayName.trim();
-  if (name.length < 1 || name.length > 80) {
-    return { ok: false, message: "Please enter your name (1–80 characters)." };
+  if (name.length > 80) {
+    return { ok: false, message: "Name must be 80 characters or fewer." };
   }
 
-  if (!(payload.level in LEVEL_TO_PADEL_SLUG)) {
+  if (payload.level != null && !(payload.level in LEVEL_TO_PADEL_SLUG)) {
     return { ok: false, message: "Invalid level." };
   }
 
-  const painsIn = payload.pains.filter(isPainKey);
-  const pains = normalizePainSelection(painsIn);
-  if (pains.length === 0) {
-    return { ok: false, message: "Pick at least one option for how you feel." };
-  }
+  const pains = coercePainKeys(payload.pains);
 
-  if (!ONBOARDING_GOAL_SLUGS.includes(payload.goal)) {
-    return { ok: false, message: "Invalid goal." };
+  let goal: OnboardingGoal | null = null;
+  if (payload.goal != null) {
+    if (!ONBOARDING_GOAL_SLUGS.includes(payload.goal)) {
+      return { ok: false, message: "Invalid goal." };
+    }
+    goal = payload.goal;
   }
 
   const envOptions: OnboardingEnvironment[] = ["gym", "home", "club"];
   const environments = [...new Set(payload.environments)].filter((v): v is OnboardingEnvironment =>
     envOptions.includes(v),
   );
-  if (environments.length === 0) {
-    return { ok: false, message: "Pick at least one training location." };
-  }
 
   const supabase = await createClient();
   const {
@@ -59,25 +55,28 @@ export async function updateMemberProfile(
     return { ok: false, message: "You need to be signed in." };
   }
 
-  const slug = LEVEL_TO_PADEL_SLUG[payload.level];
-  const { data: levelRow, error: levelErr } = await supabase
-    .from("padel_levels")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (levelErr || !levelRow?.id) {
-    return { ok: false, message: "Could not load skill levels. Try again later." };
+  let padelLevelId: string | null = null;
+  if (payload.level != null) {
+    const slug = LEVEL_TO_PADEL_SLUG[payload.level];
+    const { data: levelRow, error: levelErr } = await supabase
+      .from("padel_levels")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (levelErr || !levelRow?.id) {
+      return { ok: false, message: "Could not load skill levels. Try again later." };
+    }
+    padelLevelId = levelRow.id;
   }
 
   const { error } = await supabase
     .from("profiles")
     .update({
-      full_name: name,
-      padel_level_id: levelRow.id,
+      full_name: name.length > 0 ? name : null,
+      padel_level_id: padelLevelId,
       padel_pains: pains,
-      primary_goal: payload.goal,
-      training_environment: environments[0],
+      primary_goal: goal,
+      training_environment: environments[0] ?? null,
       training_environments: environments,
     })
     .eq("id", user.id);
