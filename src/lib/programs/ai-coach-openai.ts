@@ -32,7 +32,7 @@ const EXERCISE_PROPERTIES = {
   sets: {
     type: "number",
     description:
-      "Sets (fixed across the 8-week block). For main timed work use 2 or 3 rounds with duration_seconds.",
+      "Sets or timed rounds — you decide based on the goal. For both_sides sets×reps, reps are per side.",
   },
   reps: {
     type: "number",
@@ -41,12 +41,12 @@ const EXERCISE_PROPERTIES = {
   rest_between_sets_seconds: {
     type: "number",
     description:
-      "Rest between sets. For sets×reps with sets >= 2 use 30. For timed intervals match tag rest band.",
+      "Rest between sets/rounds when sets > 1. Choose an appropriate value for the training goal.",
   },
   rest_between_sides_seconds: {
     type: "number",
     description:
-      "Rest when switching sides on bilateral timed exercises (must be > 0 when both_sides timed).",
+      "Required when the catalog exercise is both_sides AND timed: rest when switching sides (must be > 0).",
     minimum: 1,
   },
   rest_after_seconds: {
@@ -61,12 +61,12 @@ const EXERCISE_PROPERTIES = {
   choice_group: {
     type: "string",
     description:
-      "Optional. Same value on 2–3 warmup or cooldown exercises = athlete picks one alternative.",
+      "Optional. Same value on 2–3 exercises = athlete picks one alternative.",
   },
   note: {
     type: "string",
     description:
-      "Coach note shown in-workout. For sets×reps with sets >= 2 include: Rest 30 sec between sets. Otherwise technique only — never progression or load.",
+      "Coach note shown in-workout (technique, intent, cueing). Do not put progression or invent exact kg/lb loads.",
   },
   rpe: {
     type: "string",
@@ -90,7 +90,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
     function: {
       name: "generate_program",
       description:
-        "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). Default duration_weeks=8 unless the brief requests another length (e.g. 2 or 3). The app expands to duration_weeks and progresses prescriptions. Each session needs exactly 5 warmup, main (rotation/anti-rotation), and exactly 5 cooldown exercises. Never recommend existing published programs.",
+        "Create a multi-week training program as week-1 session templates only (sessions_per_week entries). You decide program structure, phases, exercise selection, volume, intensity, rest, progression intent, and deload strategy based on the athlete brief. Default duration_weeks=8 unless the brief requests another length. The app expands templates across duration_weeks. Use catalog UUIDs only. Never recommend existing published programs.",
       parameters: {
         type: "object",
         properties: {
@@ -100,7 +100,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           design_rationale: {
             type: "string",
             description:
-              "3–6 sentences: weekly split logic, day roles, footwork 2/1/2, progression intent, and any tradeoffs. For admin review.",
+              "3–6 sentences explaining your coaching decisions: structure, periodization, exercise choices, progression/deload, and tradeoffs. For admin review.",
           },
           duration_weeks: {
             type: "number",
@@ -109,7 +109,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           },
           sessions_per_week: {
             type: "number",
-            description: "Training sessions per week (typically 3).",
+            description: "Training sessions per week (honor the brief).",
           },
           minutes_per_session: { type: "number" },
           location_slug: {
@@ -119,7 +119,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           sessions: {
             type: "array",
             description:
-              "ONE WEEK ONLY: return exactly sessions_per_week session templates. App expands to duration_weeks. Each session: exactly 5 warmup, main, exactly 5 cooldown.",
+              "ONE WEEK ONLY: return exactly sessions_per_week session templates. App expands to duration_weeks. Decide warmup/main/cooldown counts and content freely for the goal — do not force a fixed exercise count.",
             items: {
               type: "object",
               properties: {
@@ -137,7 +137,6 @@ const OPENAI_TOOLS: FunctionTool[] = [
                       "phase",
                       "rpe",
                       "intensity",
-                      "rest_between_sides_seconds",
                     ],
                   },
                 },
@@ -155,7 +154,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
     function: {
       name: "generate_workout",
       description:
-        "Create exactly one workout session (not an 8-week program). Structure: exactly 5 warmup → main (include rotation/anti-rotation; prep before explosive) → exactly 5 cooldown. Use catalog UUIDs only.",
+        "Create exactly one workout session (not a multi-week program). You decide warmup/main/cooldown structure, exercise selection, volume, intensity, and rest based on the athlete brief. Use catalog UUIDs only.",
       parameters: {
         type: "object",
         properties: {
@@ -164,7 +163,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           design_rationale: {
             type: "string",
             description:
-              "2–5 sentences: why this session structure, exercise order, and key rule choices. For admin review.",
+              "2–5 sentences explaining your coaching decisions for this session. For admin review.",
           },
           exercises: {
             type: "array",
@@ -177,7 +176,6 @@ const OPENAI_TOOLS: FunctionTool[] = [
                 "phase",
                 "rpe",
                 "intensity",
-                "rest_between_sides_seconds",
               ],
             },
           },
@@ -373,9 +371,9 @@ export async function chatWithAiCoachOpenAI(params: {
     let history = initialHistory;
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
-      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), rest_between_sets_seconds=30 for sets×reps with sets >= 2 (plus note "Rest 30 sec between sets"), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
-      `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ONLY sessions_per_week session templates (one training week). Each session needs at least 5 warmup exercises (duration_seconds: 60 each), main (include rotation or anti-rotation), and cooldown (≥5 at 60s).`,
-      `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
+      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds, rpe, intensity, plus sets/reps or duration as appropriate. For multi-set work include rest_between_sets_seconds; for both_sides timed work include rest_between_sides_seconds > 0.`,
+      `Your previous response was empty or incomplete. Call ${toolName} again with a compact but complete payload. For programs: return ONLY sessions_per_week session templates (one training week). You decide structure — do not force a fixed exercise count.`,
+      `Final attempt: call ${toolName} only — no prose. Keep the payload complete and valid.`,
     ];
 
     for (let attempt = 0; attempt <= retryMessages.length; attempt++) {

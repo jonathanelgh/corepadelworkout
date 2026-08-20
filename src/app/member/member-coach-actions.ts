@@ -42,7 +42,6 @@ import {
   type ConsultationLocationOption,
   type ConsultationPrompt,
 } from "@/lib/programs/coach-consultation";
-import { ensureWorkoutProposalRotation } from "@/lib/programs/ensure-rotational-exercise";
 import { ensureWorkoutProposalStructure, resolveSessionEnforcementOptions } from "@/lib/programs/ensure-session-structure";
 import { saveAiWorkoutProgram } from "@/lib/programs/save-ai-workout";
 import { saveAiProgram } from "@/lib/programs/save-ai-program";
@@ -348,10 +347,11 @@ export async function sendMemberCoachMessage(input: {
     }
 
     if (result.name === "generate_workout") {
-      const { proposal: rotated } = ensureWorkoutProposalRotation(result.args, generationExercises, {
-        trainingLevel: enforcementOptions.trainingLevel,
-      });
-      const { proposal } = ensureWorkoutProposalStructure(rotated, generationExercises, enforcementOptions);
+      const { proposal } = ensureWorkoutProposalStructure(
+        result.args,
+        generationExercises,
+        enforcementOptions
+      );
       return {
         type: "workout_proposal",
         proposal,
@@ -393,8 +393,7 @@ export async function saveMemberCoachWorkout(
     const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
     const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
 
-    const { proposal: rotated } = ensureWorkoutProposalRotation(proposal, publishedExercises);
-    const { proposal: fixed } = ensureWorkoutProposalStructure(rotated, publishedExercises, {
+    const { proposal: fixed } = ensureWorkoutProposalStructure(proposal, publishedExercises, {
       locationSlug: options?.locationSlug,
     });
 

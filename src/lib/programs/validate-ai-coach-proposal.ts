@@ -129,15 +129,8 @@ function validateExerciseTechnical(
       errors.push({ path, message: "Timed exercise is missing duration_seconds/duration_minutes." });
     }
 
-    // Timed main work uses sets as multi-round intervals.
-    if (ex.phase === "main") {
-      if (sets == null) {
-        errors.push({ path, message: "Timed main exercise must include sets as number of rounds." });
-      } else if (sets < 2) {
-        errors.push({ path, message: "Timed main exercise sets must be >= 2 rounds." });
-      }
-    }
-
+    // Timed work may be a single hold or multi-round intervals — AI decides.
+    // If multi-round, rest between rounds is required.
     if (sets != null && sets > 1) {
       if (!hasRestBetweenSets(ex)) {
         errors.push({

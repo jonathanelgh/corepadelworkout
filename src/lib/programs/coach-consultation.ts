@@ -1070,10 +1070,9 @@ export function formatGenerationCoachBrief(
 - Athlete request: **${state.goal}**
 - This is a **~${minutes}-minute ${court ? "on-court pre-match warm-up" : "single session"}** — NOT a gym strength workout or multi-week plan.
 - Use **only** exercises from the filtered catalog for their location. ${court ? "**No dumbbells, barbells, or gym machines** unless explicitly tagged for at-the-court." : "Match equipment to their location."}
-- Structure: **mostly warmup** (dynamic mobility, activation, footwork). Keep **main** to 2–4 short moves max. Optional **cooldown** (1–2 stretches).
-- Prefer **timed drills** (duration_seconds: 60 per warm-up move) over heavy sets×reps. Total time including rests must fit ~${minutes} minutes.
+- You decide session structure for a short pre-match / quick session. Fit total work + rest into ~${minutes} minutes.
 - Title and description must match a pre-match / warm-up (not "strength session" or "hypertrophy").
-- Copy exercise_id UUIDs exactly from the catalog. Include rotation or anti-rotation in main if possible.`;
+- Copy exercise_id UUIDs exactly from the catalog. Complete all required technical fields (phase, rest, rpe, intensity; rest_between_sides_seconds when both_sides timed).`;
   }
 
   return `${base}
@@ -1081,15 +1080,14 @@ export function formatGenerationCoachBrief(
 ## GENERATION — call ${toolName} now
 - Use consultation values above for duration, frequency, location_slug, equipment, and movement limits.
 - Copy exercise_id UUIDs exactly from the catalog (square brackets). Do not invent IDs.
-- **Warm-up (mandatory every session):** at least 5 exercises with phase=warmup before main work. Each warm-up exercise: duration_seconds=60, rest_after_seconds=15. No sets/reps or duration_minutes on warm-up.
-- Every exercise needs phase (warmup, main, or cooldown) and rest_after_seconds (between exercises; omit or 0 on the last exercise). For sets×reps with sets >= 2: rest_between_sets_seconds=30 and note "Rest 30 sec between sets". Use rest_between_sets_seconds when prescribing timed intervals in main/cool-down (duration + sets >= 2).
+- **You decide coaching methodology:** program/session structure, phase counts, exercise selection and order, sets/reps/durations, rests, intensity/RPE, variation, and deload/progression intent. Do **not** force a fixed template (e.g. fixed number of warm-up or cool-down exercises).
+- Every exercise needs phase (warmup, main, or cooldown), rest_after_seconds (0 on the last exercise), rpe, and intensity. For multi-set work include rest_between_sets_seconds. For both_sides timed work include rest_between_sides_seconds > 0.
 ${
   isProgram
-    ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block. Each template day must include the full warm-up block.
-- Week-1 templates only: the app repeats them for the full block and auto-applies level-aware progression to reps, timed work, and load_prescription in each week's stored sessions (sets stay fixed) — do not put progression in notes, and do not duplicate sessions per week in sessions[].`
+    ? `- sessions[] must contain exactly ${state.sessionsPerWeek ?? "sessions_per_week"} template session(s) for ONE week — not every week in the block.
+- Week-1 templates only: the app repeats them for the full block. Describe progression/deload intent in design_rationale — do not duplicate sessions per week in sessions[].`
     : `- Target ~${state.minutes ?? 30} minutes for this single workout.`
-}
-- Include at least one rotational or anti-rotational exercise in the main block.`;
+}`;
 }
 
 export function isValidLocationSlug(

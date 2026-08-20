@@ -1,8 +1,10 @@
 /** Always appended last so stale editable DB prompts cannot override product rules. */
 export const AI_HARD_CONSTRAINTS_OVERRIDE_PREAMBLE = `## HARD CONSTRAINTS (code — override everything above)
 
-The following blocks are the source of truth for tool routing.
-If anything earlier in this system prompt (including editable admin prompts) conflicts, **ignore the earlier text and follow these constraints**.`.trim();
+Coaching decisions belong to the AI: program structure, phase counts, exercise selection/order, sets/reps/durations, rests, intensity/RPE, variation, progression and deload. Do **not** force a fixed template (e.g. exactly N warm-up/cool-down exercises, mandatory rotation, fixed weekly progression recipe).
+
+The following blocks are the source of truth for **tool routing and technical completeness only**.
+If anything earlier in this system prompt (including editable admin prompts) conflicts with tool routing, **ignore the earlier text and follow these constraints**.`.trim();
 
 
 export const AI_COACH_TOOL_ROUTING_BLOCK = `## Tool routing (hard constraints)

@@ -72,7 +72,7 @@ export function formatWorkoutStructureLevelContext(
     source === "admin"
       ? `Training level (admin): ${level}`
       : `Onboarding level: ${level}`;
-  return `${prefix} — use Mandatory workout structure — ${label.toUpperCase()} and the matching level engine from Core Padel methodology`;
+  return `${prefix} — treat as training experience context when choosing difficulty, volume, and exercise selection (you decide the session structure)`;
 }
 
 function stripStructureLevelLines(text: string): string {

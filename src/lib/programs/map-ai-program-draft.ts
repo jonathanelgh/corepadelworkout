@@ -250,7 +250,7 @@ export function mapGeminiDraftToForm(
         ) {
           durationOut =
             mode === "time_only" ? MAIN_TIMED_HOLD_DEFAULT_SECONDS : 45;
-          if (setsOut == null || setsOut < 2) setsOut = MAIN_TIMED_DEFAULT_ROUNDS;
+          if (setsOut == null || setsOut <= 0) setsOut = MAIN_TIMED_DEFAULT_ROUNDS;
         }
 
         const restBetween =

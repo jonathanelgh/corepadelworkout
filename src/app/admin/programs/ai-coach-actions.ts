@@ -50,10 +50,6 @@ import {
   type ConsultationPrompt,
 } from "@/lib/programs/coach-consultation";
 import {
-  ensureProgramProposalRotation,
-  ensureWorkoutProposalRotation,
-} from "@/lib/programs/ensure-rotational-exercise";
-import {
   ensureProgramProposalStructure,
   ensureWorkoutProposalStructure,
   resolveSessionEnforcementOptions,
@@ -535,17 +531,12 @@ export async function sendAiCoachMessage(input: {
         rawProposal = retry.args;
       }
 
-      const { proposal: rotated, warnings: rotationWarnings } = ensureWorkoutProposalRotation(
-        rawProposal,
-        generationExercises,
-        { trainingLevel: enforcementOptions.trainingLevel }
-      );
       const { proposal, warnings: structureWarnings } = ensureWorkoutProposalStructure(
-        rotated,
+        rawProposal,
         generationExercises,
         enforcementOptions
       );
-      const allWarnings = [...rotationWarnings, ...structureWarnings];
+      const allWarnings = [...structureWarnings];
       if (allWarnings.length > 0) {
         console.info("[ai-coach] workout enforcement:", allWarnings.join(" "));
       }
@@ -635,17 +626,12 @@ export async function sendAiCoachMessage(input: {
       };
     }
 
-    const { proposal: rotated, warnings: rotationWarnings } = ensureProgramProposalRotation(
-      rawProgramArgs,
-      generationExercises,
-      { trainingLevel: enforcementOptions.trainingLevel }
-    );
     const { proposal, warnings: structureWarnings } = ensureProgramProposalStructure(
-      rotated,
+      rawProgramArgs,
       generationExercises,
       enforcementOptions
     );
-    const allWarnings = [...rotationWarnings, ...structureWarnings];
+    const allWarnings = [...structureWarnings];
     if (allWarnings.length > 0) {
       console.info("[ai-coach] program enforcement:", allWarnings.join(" "));
     }
@@ -780,8 +766,7 @@ export async function saveAiCoachWorkout(
     const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
     const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
 
-    const { proposal: rotated } = ensureWorkoutProposalRotation(proposal, publishedExercises);
-    const { proposal: fixed } = ensureWorkoutProposalStructure(rotated, publishedExercises);
+    const { proposal: fixed } = ensureWorkoutProposalStructure(proposal, publishedExercises);
 
     const saved = await saveAiWorkoutProgram(auth.supabase, fixed, {
       status: options?.publish ? "published" : "draft",
