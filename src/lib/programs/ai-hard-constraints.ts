@@ -38,11 +38,22 @@ export const AI_COACH_TOOL_ROUTING_BLOCK = `## Tool routing (hard constraints)
 ### When consultation is complete
 If a consultation / creation brief says CONSULTATION COMPLETE (or tools are enabled for a create turn), you MUST call the appropriate tool this turn — do not reply with prose only.`.trim();
 
+export const AI_COACH_LOAD_GUIDANCE_BLOCK = `## Load guidance (athlete-facing — required)
+
+- Leave \`load_prescription\` **blank**. Never invent exact kg/lb amounts.
+- For **weighted / strength** main work (sets×reps), put qualitative load guidance in **both** \`intensity\` and \`note\`:
+  - Lower reps (e.g. 3–6) or strength-focused sets → **challenging / heavy** (last reps hard with good form).
+  - Moderate reps (e.g. 8–12) → **moderate to challenging**.
+  - Higher reps (e.g. 12–20) or endurance-style → **light to medium**, controlled.
+- Example note: "Brace hard; choose a challenging weight so the last 1–2 reps are tough but form stays clean."
+- Timed / bodyweight / mobility work: technique cues are enough; intensity can be effort-based (easy / moderate / hard) without inventing loads.`.trim();
+
 /** Append tool routing after any editable prompt. */
 export function appendHardAiConstraints(prompt: string): string {
   return [
     prompt.trimEnd(),
     AI_HARD_CONSTRAINTS_OVERRIDE_PREAMBLE,
     AI_COACH_TOOL_ROUTING_BLOCK,
+    AI_COACH_LOAD_GUIDANCE_BLOCK,
   ].join("\n\n");
 }

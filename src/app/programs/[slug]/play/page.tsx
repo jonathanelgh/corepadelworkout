@@ -10,6 +10,7 @@ import {
   playHrefForSession,
 } from "@/lib/programs/program-progress";
 import { requireProgramWorkoutAccess } from "../../program-access-bar";
+import { fetchMemberExerciseLoads } from "@/lib/programs/member-exercise-loads";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,14 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
       ? sessionDisplayLabel(workout.session, sessionIndex)
       : row.title);
 
+  const initialLoads = user
+    ? await fetchMemberExerciseLoads(
+        supabase,
+        user.id,
+        workout.exercises.map((e) => e.exerciseId)
+      )
+    : {};
+
   return (
     <ActiveWorkoutPlayer
       programId={row.id}
@@ -124,6 +133,7 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
       coverImageUrl={row.cover_image_url}
       songUrl={row.song_url}
       exercises={workout.exercises}
+      initialLoads={initialLoads}
       nextSessionHref={nextSession ? playHrefForSession(slug, nextSession.id) : null}
       nextSessionLabel={nextSession?.name ?? null}
       programComplete={

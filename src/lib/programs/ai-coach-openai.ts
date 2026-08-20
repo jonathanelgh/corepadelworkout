@@ -15,6 +15,7 @@ import {
   type ChatHistoryMessage,
 } from "@/lib/programs/ai-coach-gemini";
 import type { ProgramCatalogForAI } from "@/lib/programs/programs-catalog";
+import { AI_DESIGN_RATIONALE_FIELD_DESCRIPTION } from "@/lib/programs/ai-program-rules";
 
 type FunctionTool = Extract<ChatCompletionTool, { type: "function" }>;
 
@@ -66,7 +67,7 @@ const EXERCISE_PROPERTIES = {
   note: {
     type: "string",
     description:
-      "Coach note shown in-workout (technique, intent, cueing). Do not put progression or invent exact kg/lb loads.",
+      "Coach note shown in-workout. Include technique cues AND qualitative load guidance for weighted work (e.g. \"Choose a challenging weight — last 2 reps should feel hard\" or \"Use a medium load you can control\"). Match guidance to the prescription: lower reps / higher sets → heavier/challenging; higher reps → moderate/lighter. Never invent exact kg/lb. No week-to-week progression text.",
   },
   rpe: {
     type: "string",
@@ -76,7 +77,7 @@ const EXERCISE_PROPERTIES = {
   intensity: {
     type: "string",
     description:
-      "Intensity or load recommendation for this exercise slot (e.g. \"RPE 8, moderate-heavy\" or load-selection guidance). Required for QC / player display.",
+      "Qualitative intensity/load cue for the athlete (e.g. \"challenging\", \"moderate-heavy\", \"light–medium control\"). Align with sets×reps (low reps → heavier/challenging). Never invent exact kg/lb.",
   },
   load_prescription: {
     type: "string",
@@ -99,8 +100,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           body: { type: "string", description: "Optional longer copy for the program detail page" },
           design_rationale: {
             type: "string",
-            description:
-              "3–6 sentences explaining your coaching decisions: structure, periodization across weeks, exercise choices, progression/deload, and tradeoffs. For admin review.",
+            description: AI_DESIGN_RATIONALE_FIELD_DESCRIPTION,
           },
           duration_weeks: {
             type: "number",
@@ -148,7 +148,14 @@ const OPENAI_TOOLS: FunctionTool[] = [
             },
           },
         },
-        required: ["title", "description", "duration_weeks", "sessions_per_week", "sessions"],
+        required: [
+          "title",
+          "description",
+          "design_rationale",
+          "duration_weeks",
+          "sessions_per_week",
+          "sessions",
+        ],
       },
     },
   },
@@ -165,8 +172,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
           description: { type: "string" },
           design_rationale: {
             type: "string",
-            description:
-              "2–5 sentences explaining your coaching decisions for this session. For admin review.",
+            description: AI_DESIGN_RATIONALE_FIELD_DESCRIPTION,
           },
           exercises: {
             type: "array",
@@ -183,7 +189,7 @@ const OPENAI_TOOLS: FunctionTool[] = [
             },
           },
         },
-        required: ["title", "description", "exercises"],
+        required: ["title", "description", "design_rationale", "exercises"],
       },
     },
   },

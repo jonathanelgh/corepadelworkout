@@ -62,9 +62,14 @@ function ConsultationOptions({
   onSelectSingle: (value: string) => void;
 }) {
   if (prompt.multiSelect) {
+    const isEquipment = prompt.topic === "equipment";
     return (
       <div className="mt-3 space-y-3">
-        <div className="flex flex-wrap gap-2">
+        <div
+          className={`flex flex-wrap gap-2 ${
+            isEquipment ? "max-h-48 overflow-y-auto pr-1" : ""
+          }`}
+        >
           {prompt.options.map((opt) => {
             const selected = multiDraft.includes(opt.value);
             return (
@@ -257,15 +262,18 @@ export function MemberCoachClient({
   }, [messages, pending, scrollToBottom]);
 
   function toggleMultiDraft(value: string) {
-    if (value === "yes to all") {
-      setMultiDraft(["yes to all"]);
+    const exclusiveAlone = value === "yes to all" || value === "bodyweight only";
+    if (exclusiveAlone) {
+      setMultiDraft((prev) => (prev.includes(value) ? [] : [value]));
       return;
     }
     setMultiDraft((prev) => {
-      const withoutAll = prev.filter((v) => v !== "yes to all");
-      return withoutAll.includes(value)
-        ? withoutAll.filter((v) => v !== value)
-        : [...withoutAll, value];
+      const withoutExclusive = prev.filter(
+        (v) => v !== "yes to all" && v !== "bodyweight only"
+      );
+      return withoutExclusive.includes(value)
+        ? withoutExclusive.filter((v) => v !== value)
+        : [...withoutExclusive, value];
     });
   }
 
@@ -436,11 +444,15 @@ export function MemberCoachClient({
                     multiDraft={multiDraft}
                     onToggleMulti={toggleMultiDraft}
                     onConfirmMulti={(values) => {
-                      const payload =
-                        values.includes("yes to all") || values.length === 0
-                          ? "yes to all"
-                          : values.join(", ");
-                      void handleSend(payload);
+                      if (values.includes("yes to all") || values.length === 0) {
+                        void handleSend("yes to all");
+                        return;
+                      }
+                      if (values.includes("bodyweight only")) {
+                        void handleSend("bodyweight only");
+                        return;
+                      }
+                      void handleSend(values.join(", "));
                     }}
                     onSelectSingle={(value) => void handleSend(value)}
                   />

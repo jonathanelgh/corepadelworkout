@@ -32,6 +32,8 @@ import {
   SESSION_PHASE_LABELS,
 } from "@/lib/programs/session-phase";
 import { logProgramSessionComplete, logProgramSessionStart } from "@/app/programs/program-progress-actions";
+import { saveExerciseLoad } from "@/app/programs/exercise-load-actions";
+import type { MemberExerciseLoad, WeightUnit } from "@/lib/programs/member-exercise-loads";
 import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
 import { programTrainingHref } from "@/lib/programs/program-routes";
 import { BackButton } from "@/components/navigation/back-button";
@@ -143,6 +145,7 @@ export function ActiveWorkoutPlayer({
   coverImageUrl,
   songUrl,
   exercises,
+  initialLoads = {},
   nextSessionHref = null,
   nextSessionLabel = null,
   programComplete = false,
@@ -156,6 +159,7 @@ export function ActiveWorkoutPlayer({
   coverImageUrl: string | null;
   songUrl: string | null;
   exercises: ProgramExerciseItem[];
+  initialLoads?: Record<string, MemberExerciseLoad>;
   nextSessionHref?: string | null;
   nextSessionLabel?: string | null;
   programComplete?: boolean;
@@ -182,6 +186,23 @@ export function ActiveWorkoutPlayer({
   const [awaitingTimedStart, setAwaitingTimedStart] = useState(false);
   const [completionLogged, setCompletionLogged] = useState(false);
   const [startLogged, setStartLogged] = useState(false);
+
+  type LoadDraft = { value: string; unit: WeightUnit };
+  const [loadDrafts, setLoadDrafts] = useState<Record<string, LoadDraft>>(() => {
+    const init: Record<string, LoadDraft> = {};
+    for (const [exerciseId, load] of Object.entries(initialLoads)) {
+      init[exerciseId] = {
+        value: String(load.weightValue),
+        unit: load.weightUnit,
+      };
+    }
+    return init;
+  });
+  const savedLoadsRef = useRef<Record<string, { weightValue: number; weightUnit: WeightUnit }>>(
+    {}
+  );
+  const loadDraftsRef = useRef(loadDrafts);
+  loadDraftsRef.current = loadDrafts;
 
   const restCuePlayedRef = useRef(false);
   const workCuePlayedRef = useRef(false);
@@ -296,7 +317,34 @@ export function ActiveWorkoutPlayer({
     [playbackSteps]
   );
 
+  const persistLoadForExercise = useCallback(
+    (ex: ProgramExerciseItem | WorkoutPlaybackStep | null | undefined) => {
+      if (!ex?.usesExternalLoad || !ex.exerciseId) return;
+      const draft = loadDraftsRef.current[ex.exerciseId];
+      if (!draft) return;
+      const weightValue = Number.parseFloat(draft.value.replace(",", "."));
+      if (!Number.isFinite(weightValue) || weightValue <= 0) return;
+
+      const prev = savedLoadsRef.current[ex.exerciseId];
+      if (prev && prev.weightValue === weightValue && prev.weightUnit === draft.unit) {
+        return;
+      }
+      savedLoadsRef.current[ex.exerciseId] = { weightValue, weightUnit: draft.unit };
+
+      void saveExerciseLoad({
+        exerciseId: ex.exerciseId,
+        programId,
+        sessionId,
+        programExerciseId: ex.id,
+        weightValue,
+        weightUnit: draft.unit,
+      });
+    },
+    [programId, sessionId]
+  );
+
   const advanceExercise = useCallback(() => {
+    persistLoadForExercise(playbackSteps[currentIndex] ?? null);
     if (len === 0) return;
     if (currentIndex >= len - 1) {
       setAwaitingTimedStart(false);
@@ -308,10 +356,15 @@ export function ActiveWorkoutPlayer({
     const nextIndex = currentIndex + 1;
     setCurrentIndex(nextIndex);
     beginWorkForCurrent(nextIndex);
-  }, [len, currentIndex, beginWorkForCurrent]);
+  }, [len, currentIndex, beginWorkForCurrent, playbackSteps, persistLoadForExercise]);
+
+  const persistCurrentLoad = useCallback(() => {
+    persistLoadForExercise(current);
+  }, [current, persistLoadForExercise]);
 
   /** Sets×reps → timed: land on a preview with Start now (do not auto-start the timer). */
   const advanceFromSetsReps = useCallback(() => {
+    persistLoadForExercise(playbackSteps[currentIndex] ?? null);
     if (len === 0) return;
     if (currentIndex >= len - 1) {
       setAwaitingTimedStart(false);
@@ -332,7 +385,7 @@ export function ActiveWorkoutPlayer({
       return;
     }
     beginWorkForCurrent(nextIndex);
-  }, [len, currentIndex, playbackSteps, beginWorkForCurrent]);
+  }, [len, currentIndex, playbackSteps, beginWorkForCurrent, persistLoadForExercise]);
 
   const finishWorkPhase = useCallback(() => {
     if (!current) return;
@@ -508,6 +561,7 @@ export function ActiveWorkoutPlayer({
 
   function goPrev() {
     if (currentIndex <= 0) return;
+    persistCurrentLoad();
     const prev = currentIndex - 1;
     setCurrentIndex(prev);
     beginWorkForCurrent(prev);
@@ -947,7 +1001,72 @@ export function ActiveWorkoutPlayer({
                   </p>
                 )}
                 {!inRest && current?.usesExternalLoad && (
-                  <p className="mt-1 text-sm text-white/55">{CHOOSE_WEIGHT_HINT}</p>
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm text-white/55">{CHOOSE_WEIGHT_HINT}</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
+                        placeholder="Weight"
+                        value={loadDrafts[current.exerciseId]?.value ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setLoadDrafts((prev) => ({
+                            ...prev,
+                            [current.exerciseId]: {
+                              value,
+                              unit: prev[current.exerciseId]?.unit ?? "kg",
+                            },
+                          }));
+                        }}
+                        onBlur={() => persistCurrentLoad()}
+                        className="w-28 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-white placeholder:text-white/35 outline-none focus:border-[#ccff00]/60"
+                        aria-label="Weight used"
+                      />
+                      <div className="flex overflow-hidden rounded-xl border border-white/20">
+                        {(["kg", "lb"] as const).map((unit) => {
+                          const active =
+                            (loadDrafts[current.exerciseId]?.unit ?? "kg") === unit;
+                          return (
+                            <button
+                              key={unit}
+                              type="button"
+                              onClick={() => {
+                                const value = loadDrafts[current.exerciseId]?.value ?? "";
+                                setLoadDrafts((prev) => ({
+                                  ...prev,
+                                  [current.exerciseId]: { value, unit },
+                                }));
+                                const weightValue = Number.parseFloat(value.replace(",", "."));
+                                if (!Number.isFinite(weightValue) || weightValue <= 0) return;
+                                savedLoadsRef.current[current.exerciseId] = {
+                                  weightValue,
+                                  weightUnit: unit,
+                                };
+                                void saveExerciseLoad({
+                                  exerciseId: current.exerciseId,
+                                  programId,
+                                  sessionId,
+                                  programExerciseId: current.id,
+                                  weightValue,
+                                  weightUnit: unit,
+                                });
+                              }}
+                              className={`px-3 py-2 text-sm font-semibold ${
+                                active
+                                  ? "bg-[#ccff00] text-black"
+                                  : "bg-white/5 text-white/70"
+                              }`}
+                            >
+                              {unit}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 )}
                 {!currentIsTimed && (
                   <p className="mt-2 text-sm text-white/60">Tap Next when you finish this exercise.</p>

@@ -75,6 +75,11 @@ function hasOwnKey(obj: unknown, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
+/** Admin-facing coaching summary — require enough substance for a real explanation. */
+function hasSubstantialDesignRationale(v: unknown): boolean {
+  return typeof v === "string" && v.trim().length >= 120;
+}
+
 function validateExerciseTechnical(
   ex: WorkoutProposalExercise,
   opts: ValidatorOptions,
@@ -121,6 +126,25 @@ function validateExerciseTechnical(
   if (ex.phase === "main") {
     if (!hasOptionalCoachNote(ex)) {
       errors.push({ path, message: "Main exercise is missing coach note (note)." });
+    }
+  }
+
+  // Sets×reps main work needs qualitative load guidance (not exact kg/lb).
+  if (ex.phase === "main" && !isTimed && sets != null && reps != null) {
+    const noteText = typeof ex.note === "string" ? ex.note : "";
+    const intensityText =
+      typeof getOptionalIntensity(ex) === "string" ? String(getOptionalIntensity(ex)) : "";
+    const blob = `${noteText} ${intensityText}`.toLowerCase();
+    const hasLoadCue =
+      /\b(light|easy|medium|moderate|challenging|heavy|hard|tough|effort|demanding|controlled|comfortable)\b/.test(
+        blob
+      ) || /\bchoose\s+a\s+\w+\s+(weight|load)\b/.test(blob);
+    if (!hasLoadCue) {
+      errors.push({
+        path,
+        message:
+          "Sets×reps main exercise must include qualitative load guidance in note and/or intensity (e.g. challenging, moderate, light–medium) — never exact kg/lb.",
+      });
     }
   }
 
@@ -197,6 +221,12 @@ export function validateWorkoutProposal(
   if (!requireNonEmptyString(proposal.description)) {
     errors.push({ message: "Workout proposal is missing a non-empty description." });
   }
+  if (!hasSubstantialDesignRationale(proposal.design_rationale)) {
+    errors.push({
+      message:
+        "Workout proposal is missing design_rationale — provide a thorough coaching summary (structure, exercise choices, and why times/sets/reps).",
+    });
+  }
 
   if (!Array.isArray(proposal.exercises) || proposal.exercises.length === 0) {
     errors.push({ message: "Workout proposal must include at least one exercise." });
@@ -223,6 +253,12 @@ export function validateProgramProposal(
   }
   if (!requireNonEmptyString(proposal.description)) {
     errors.push({ message: "Program proposal is missing a non-empty description." });
+  }
+  if (!hasSubstantialDesignRationale(proposal.design_rationale)) {
+    errors.push({
+      message:
+        "Program proposal is missing design_rationale — provide a thorough coaching summary (structure, exercise choices, prescriptions, and week-to-week plan).",
+    });
   }
   if (!isFinitePositiveNumber(proposal.duration_weeks)) {
     errors.push({ message: "Program proposal is missing duration_weeks (positive number)." });

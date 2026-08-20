@@ -17,6 +17,7 @@ import {
 } from "@/lib/programs/session-phase";
 import { normalizeAiExerciseRest } from "@/lib/programs/normalize-ai-exercise-prescription";
 import type { ProgramCatalogForAI } from "./programs-catalog";
+import { AI_DESIGN_RATIONALE_FIELD_DESCRIPTION } from "@/lib/programs/ai-program-rules";
 
 export type ChatHistoryMessage = {
   role: "user" | "model";
@@ -158,8 +159,7 @@ const TOOLS: FunctionDeclaration[] = [
         body: { type: SchemaType.STRING, description: "Optional longer copy for the program detail page" },
         design_rationale: {
           type: SchemaType.STRING,
-          description:
-            "3–6 sentences: periodization across weeks, day roles, progression/deload, and tradeoffs. For admin review.",
+          description: AI_DESIGN_RATIONALE_FIELD_DESCRIPTION,
         },
         duration_weeks: {
           type: SchemaType.NUMBER,
@@ -231,7 +231,16 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Coach note shown in-workout. For sets×reps with sets >= 2 include exactly: Rest 30 sec between sets. Otherwise technique/split only — never progression or load.",
+                  "Coach note shown in-workout. Include technique + qualitative load guidance for weighted sets×reps (challenging / moderate / light–medium matching reps). Never invent kg/lb or week-to-week progression.",
+              },
+              rpe: {
+                type: SchemaType.STRING,
+                description: 'Rate of Perceived Exertion (e.g. "7", "8-9").',
+              },
+              intensity: {
+                type: SchemaType.STRING,
+                description:
+                  'Qualitative load cue (e.g. "challenging", "moderate-heavy", "light–medium"). Align with sets×reps — lower reps → heavier/challenging. Never invent kg/lb.',
               },
               load_prescription: {
                 type: SchemaType.STRING,
@@ -247,7 +256,14 @@ const TOOLS: FunctionDeclaration[] = [
           },
         },
       },
-      required: ["title", "description", "duration_weeks", "sessions_per_week", "sessions"],
+      required: [
+        "title",
+        "description",
+        "design_rationale",
+        "duration_weeks",
+        "sessions_per_week",
+        "sessions",
+      ],
     },
   },
   {
@@ -261,8 +277,7 @@ const TOOLS: FunctionDeclaration[] = [
         description: { type: SchemaType.STRING },
         design_rationale: {
           type: SchemaType.STRING,
-          description:
-            "2–5 sentences: why this session structure, exercise order, and key rule choices (warm-up, footwork, rotation, rest). For admin review — not shown to athletes.",
+          description: AI_DESIGN_RATIONALE_FIELD_DESCRIPTION,
         },
         exercises: {
           type: SchemaType.ARRAY,
@@ -310,7 +325,16 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Coach note shown in-workout. For sets×reps with sets >= 2 include: Rest 30 sec between sets. Otherwise technique only (omit if none). Never progression or load.",
+                  "Coach note shown in-workout. Include technique + qualitative load guidance for weighted sets×reps (challenging / moderate / light–medium matching reps). Never invent kg/lb or week-to-week progression.",
+              },
+              rpe: {
+                type: SchemaType.STRING,
+                description: 'Rate of Perceived Exertion (e.g. "7", "8-9").',
+              },
+              intensity: {
+                type: SchemaType.STRING,
+                description:
+                  'Qualitative load cue (e.g. "challenging", "moderate-heavy", "light–medium"). Align with sets×reps — lower reps → heavier/challenging. Never invent kg/lb.',
               },
               load_prescription: {
                 type: SchemaType.STRING,
@@ -322,7 +346,7 @@ const TOOLS: FunctionDeclaration[] = [
           },
         },
       },
-      required: ["title", "description", "exercises"],
+      required: ["title", "description", "design_rationale", "exercises"],
     },
   },
   {

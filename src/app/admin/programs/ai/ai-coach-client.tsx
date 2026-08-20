@@ -46,7 +46,21 @@ type GeneratedWorkout = {
   status: "draft" | "published";
   coverPending?: boolean;
   coverImageUrl?: string;
+  designRationale?: string;
 };
+
+function CoachDesignSummary({ text }: { text: string }) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  return (
+    <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-800">
+        Coach summary
+      </p>
+      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{trimmed}</p>
+    </div>
+  );
+}
 
 type ChatMessage = {
   id: string;
@@ -80,9 +94,14 @@ function ConsultationOptions({
   onSelectSingle: (value: string) => void;
 }) {
   if (prompt.multiSelect) {
+    const isEquipment = prompt.topic === "equipment";
     return (
       <div className="mt-3 space-y-3">
-        <div className="flex flex-wrap gap-2">
+        <div
+          className={`flex flex-wrap gap-2 ${
+            isEquipment ? "max-h-48 overflow-y-auto pr-1" : ""
+          }`}
+        >
           {prompt.options.map((opt) => {
             const selected = multiDraft.includes(opt.value);
             return (
@@ -300,22 +319,31 @@ export function AiCoachClient({
   }, [activeConsultationPrompt?.topic, messages.length]);
 
   function toggleMultiDraft(value: string) {
-    if (value === "yes to all") {
-      setMultiDraft(["yes to all"]);
+    const exclusiveAlone = value === "yes to all" || value === "bodyweight only";
+    if (exclusiveAlone) {
+      setMultiDraft((prev) => (prev.includes(value) ? [] : [value]));
       return;
     }
     setMultiDraft((prev) => {
-      const withoutAll = prev.filter((v) => v !== "yes to all");
-      return withoutAll.includes(value)
-        ? withoutAll.filter((v) => v !== value)
-        : [...withoutAll, value];
+      const withoutExclusive = prev.filter(
+        (v) => v !== "yes to all" && v !== "bodyweight only"
+      );
+      return withoutExclusive.includes(value)
+        ? withoutExclusive.filter((v) => v !== value)
+        : [...withoutExclusive, value];
     });
   }
 
   function confirmMultiDraft(values: string[]) {
-    const payload =
-      values.includes("yes to all") || values.length === 0 ? "yes to all" : values.join(", ");
-    void handleSend(payload);
+    if (values.includes("yes to all") || values.length === 0) {
+      void handleSend("yes to all");
+      return;
+    }
+    if (values.includes("bodyweight only")) {
+      void handleSend("bodyweight only");
+      return;
+    }
+    void handleSend(values.join(", "));
   }
 
   async function handleSend(textOverride?: string) {
@@ -466,6 +494,7 @@ export function AiCoachClient({
               description: `${res.description ?? proposal.description} (${res.sessionCount ?? 0} sessions)`,
               status: res.status ?? (publish ? "published" : "draft"),
               coverPending: Boolean(res.coverPending),
+              designRationale: proposal.design_rationale?.trim() || undefined,
             },
           })
       );
@@ -516,6 +545,7 @@ export function AiCoachClient({
           description: res.description,
           status: res.status,
           coverPending: res.coverPending,
+          designRationale: proposal.design_rationale?.trim() || undefined,
         },
       })
     );
@@ -719,6 +749,9 @@ export function AiCoachClient({
                         </details>
                       ))}
                     </div>
+                    {m.programProposal.design_rationale?.trim() && (
+                      <CoachDesignSummary text={m.programProposal.design_rationale} />
+                    )}
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -766,6 +799,9 @@ export function AiCoachClient({
                       <p className="mt-1 text-gray-600">{m.workoutProposal.description}</p>
                     </div>
                     {renderPhasedExerciseList(m.workoutProposal.exercises)}
+                    {m.workoutProposal.design_rationale?.trim() && (
+                      <CoachDesignSummary text={m.workoutProposal.design_rationale} />
+                    )}
                     {m.generationDebugLog && (
                       <AiGenerationDebugPanel log={m.generationDebugLog} />
                     )}
@@ -824,6 +860,9 @@ export function AiCoachClient({
                         )}
                       </div>
                     </div>
+                    {m.generatedWorkout.designRationale?.trim() && (
+                      <CoachDesignSummary text={m.generatedWorkout.designRationale} />
+                    )}
                     {m.generatedWorkout.coverImageUrl ? (
                       <img
                         src={m.generatedWorkout.coverImageUrl}

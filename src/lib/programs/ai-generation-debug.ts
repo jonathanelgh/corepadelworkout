@@ -397,8 +397,8 @@ export function buildAiGenerationDebugLog(
       check(
         "ai-rationale",
         "AI design rationale",
-        "fixed",
-        "Model omitted design_rationale; structure was enforced in code (see auto-fixes)."
+        "fail",
+        "Missing design_rationale (required coaching summary for admin review)."
       )
     );
   } else {
@@ -406,8 +406,8 @@ export function buildAiGenerationDebugLog(
       check(
         "ai-rationale",
         "AI design rationale",
-        "info",
-        "No design_rationale returned — optional for audit."
+        "fail",
+        "Missing design_rationale — required thorough coaching summary for admin review."
       )
     );
   }

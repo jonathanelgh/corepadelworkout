@@ -104,7 +104,8 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
               "rest_between_sets_seconds": "number | null",
               "rest_after_seconds": "number | null",
               "load_prescription": "null — leave blank; athletes choose their own weight (never invent kg/lb)",
-              "note": "string | null (sets×reps with 2+ sets: include \"Rest 30 sec between sets\"; otherwise technique/setup only — never weekly increases)"
+              "note": "string | null (technique + qualitative load guidance for weighted sets×reps: challenging / moderate / light–medium matching reps — never invent kg/lb or weekly increases)",
+              "intensity": "string | null (qualitative load cue e.g. challenging, moderate-heavy, light–medium — never exact kg/lb)"
             }
           ]
         }
