@@ -111,20 +111,25 @@ export function ProfileEditSheet({
   async function handleSave() {
     setSubmitting(true);
     setError(null);
-    const res = await updateMemberProfile({
-      displayName: name.trim(),
-      level,
-      pains,
-      goal,
-      environments,
-    });
-    setSubmitting(false);
-    if (!res.ok) {
-      setError(res.message);
-      return;
+    try {
+      const res = await updateMemberProfile({
+        displayName: name.trim(),
+        level,
+        pains,
+        goal,
+        environments,
+      });
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      onClose();
+      router.refresh();
+    } catch {
+      setError("Could not save your profile. Try again.");
+    } finally {
+      setSubmitting(false);
     }
-    onClose();
-    router.refresh();
   }
 
   if (!open) return null;

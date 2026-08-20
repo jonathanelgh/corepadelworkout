@@ -102,10 +102,11 @@ export function inferExercisePrescriptionType(fields: {
     (fields.durationSeconds != null && fields.durationSeconds > 0) ||
     (fields.durationMinutes != null && fields.durationMinutes > 0);
   const sets = fields.sets != null && fields.sets > 0 ? Math.round(fields.sets) : 0;
-  const hasBetweenRest =
-    fields.restBetweenSetsSeconds != null && fields.restBetweenSetsSeconds > 0;
 
-  if (hasDuration && (sets > 1 || hasBetweenRest)) return "timed_intervals";
+  // Multi-round timed work only when rounds/sets > 1.
+  // A lone rest_between with empty/1 set must not become timed_intervals (causes
+  // between-round rest + rest-after for a single bout).
+  if (hasDuration && sets > 1) return "timed_intervals";
   if (hasDuration) return "time";
   return "sets_reps";
 }

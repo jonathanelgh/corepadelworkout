@@ -61,7 +61,7 @@ export const SETS_REPS_REST_BETWEEN_SETS_SECONDS = 30;
 export const SETS_REPS_BETWEEN_SETS_NOTE = "Rest 30 sec between sets";
 const DEFAULT_REST_BETWEEN_SIDES = DEFAULT_REST_BETWEEN_SIDES_SECONDS;
 
-/** Default rounds when AI omits sets on main timed work (no upper/lower clamp). */
+/** Default rounds when inventing multi-round timed main work (fillers / empty prescriptions). */
 export const MAIN_TIMED_DEFAULT_ROUNDS = 3;
 export const MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS = 30;
 /** Default hold length when catalog is time_only and AI/admin omit duration (e.g. Pallof Press Hold). */
@@ -87,26 +87,33 @@ function resolveWorkSeconds(ex: AiExerciseFields): number | null {
 }
 
 /**
- * Preserve AI-chosen timed rounds. Only fill a default when main timed work omits sets.
- * Do not clamp volume — coaching decisions belong to the model.
+ * Preserve AI-chosen timed rounds. If sets/rounds are omitted, keep a single timed bout
+ * (`time`) — do not invent multi-round intervals or between-round rest.
  */
 export function ensureMainTimedRounds<T extends AiExerciseFields>(ex: T): T {
   if (ex.phase !== "main" || !hasTimedDuration(ex)) return ex;
 
   const sets =
-    ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : MAIN_TIMED_DEFAULT_ROUNDS;
+    ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null;
+
+  if (sets == null || sets <= 1) {
+    return {
+      ...ex,
+      sets: null,
+      // Single bout: only rest_after applies — drop between-round rest.
+      rest_between_sets_seconds: null,
+    };
+  }
 
   const restBetween =
     ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
       ? Math.ceil(ex.rest_between_sets_seconds)
-      : sets > 1
-        ? MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS
-        : null;
+      : MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS;
 
   return {
     ...ex,
     sets,
-    rest_between_sets_seconds: restBetween ?? ex.rest_between_sets_seconds ?? null,
+    rest_between_sets_seconds: restBetween,
   };
 }
 

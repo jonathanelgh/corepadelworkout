@@ -872,16 +872,20 @@ export function CreateProgramForm({
                   sessionPhase,
                   prescriptionType,
                 };
-                // Main timed work needs rounds; warm-up/cool-down single time can clear sets.
+                // Single-bout timed main work stays `time` without invented rounds.
+                // Only keep/fill between-round rest when rounds are already multi-set.
                 if (
                   sessionPhase === "main" &&
-                  (prescriptionType === "timed_intervals" || prescriptionType === "time")
+                  prescriptionType === "timed_intervals"
                 ) {
                   const setsN = Number.parseInt(e.sets, 10);
-                  if (!Number.isFinite(setsN) || setsN < 2) next.sets = "2";
-                  if (!e.restBetweenSetsSeconds.trim()) {
+                  if (Number.isFinite(setsN) && setsN > 1 && !e.restBetweenSetsSeconds.trim()) {
                     next.restBetweenSetsSeconds = String(MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS);
                   }
+                }
+                if (prescriptionType === "time") {
+                  next.sets = "";
+                  next.restBetweenSetsSeconds = "";
                 }
                 return next;
               }),
@@ -915,7 +919,22 @@ export function CreateProgramForm({
                   prescriptionType,
                   e.sessionPhase
                 );
-                return { ...e, prescriptionType: clamped };
+                const next: SessionExerciseEntry = { ...e, prescriptionType: clamped };
+                if (clamped === "time") {
+                  next.sets = "";
+                  next.restBetweenSetsSeconds = "";
+                }
+                if (
+                  clamped === "timed_intervals" &&
+                  (!e.sets.trim() || Number.parseInt(e.sets, 10) < 2)
+                ) {
+                  // Starting intervals without rounds — seed a multi-round default.
+                  next.sets = "2";
+                  if (!e.restBetweenSetsSeconds.trim()) {
+                    next.restBetweenSetsSeconds = String(MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS);
+                  }
+                }
+                return next;
               }),
             };
           }),
@@ -1170,6 +1189,11 @@ export function CreateProgramForm({
               if (e.restBetweenSetsSeconds.trim() !== "") {
                 const n = Number.parseInt(e.restBetweenSetsSeconds, 10);
                 if (Number.isFinite(n) && n > 0) rest_between_sets_seconds = n;
+              }
+              // One round (or empty rounds) is a single Time bout — not timed intervals.
+              if (sets == null || sets <= 1) {
+                sets = null;
+                rest_between_sets_seconds = null;
               }
             }
 

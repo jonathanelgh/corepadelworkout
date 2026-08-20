@@ -3,7 +3,7 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions";
-import { requireOpenAiApiKey, resolveOpenAiModel } from "@/lib/openai-config";
+import { OPENAI_CHAT_LIKE, requireOpenAiApiKey, resolveOpenAiModel } from "@/lib/openai-config";
 import {
   buildSystemInstruction,
   IncompleteToolCallError,
@@ -19,6 +19,25 @@ import { AI_DESIGN_RATIONALE_FIELD_DESCRIPTION } from "@/lib/programs/ai-program
 
 type FunctionTool = Extract<ChatCompletionTool, { type: "function" }>;
 
+/** Responses API function-tool shape (flat, not chat.completions nested). */
+export type ResponsesFunctionTool = {
+  type: "function";
+  name: string;
+  description?: string;
+  parameters: Record<string, unknown> | null;
+  strict: boolean;
+};
+
+export function toResponsesFunctionTools(tools: FunctionTool[]): ResponsesFunctionTool[] {
+  return tools.map((t) => ({
+    type: "function" as const,
+    name: t.function.name,
+    description: t.function.description,
+    parameters: (t.function.parameters ?? null) as Record<string, unknown> | null,
+    strict: false,
+  }));
+}
+
 const EXERCISE_PROPERTIES = {
   exercise_id: {
     type: "string",
@@ -33,7 +52,7 @@ const EXERCISE_PROPERTIES = {
   sets: {
     type: "number",
     description:
-      "Sets or timed rounds — you decide based on the goal. For both_sides sets×reps, reps are per side.",
+      "Sets for sets×reps, or timed rounds when repeating a timed bout. Omit or leave unset for a single continuous Time bout (duration_seconds only — no rest_between_sets). Use 2+ only for true intervals with rest between rounds.",
   },
   reps: {
     type: "number",
@@ -297,21 +316,73 @@ export async function chatWithAiCoachOpenAI(params: {
       }
     );
 
-    // gpt-5.6+ defaults to reasoning on chat.completions; function tools require
-    // reasoning_effort: "none" (or migrating to /v1/responses).
+    // Chat Completions + function tools requires reasoning_effort "none" on GPT-5.6,
+    // which is not ChatGPT-like. Use Responses with medium reasoning (ChatGPT default)
+    // and omit temperature/top_p so sampling matches chat.
+    if (turnToolsEnabled) {
+      const response = await client.responses.create({
+        model,
+        instructions: system,
+        input: toOpenAiMessages(history).map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: typeof m.content === "string" ? m.content : "",
+        })),
+        tools: toResponsesFunctionTools(activeTools),
+        tool_choice: params.forcedTool
+          ? { type: "function" as const, name: params.forcedTool }
+          : ("auto" as const),
+        reasoning: { effort: OPENAI_CHAT_LIKE.reasoningEffort },
+        max_output_tokens: OPENAI_CHAT_LIKE.maxOutputTokensTools,
+      });
+
+      let failedToolName: string | undefined;
+      for (const item of response.output ?? []) {
+        if (item.type !== "function_call") continue;
+        failedToolName = item.name;
+        const args = parseToolArgsJson(item.arguments ?? "");
+        if (!args) continue;
+
+        if (item.name === "recommend_programs") {
+          const parsed = parseRecommendPrograms(args);
+          if (parsed) return { type: "functionCall", name: "recommend_programs", args: parsed };
+        }
+        if (item.name === "generate_workout") {
+          const parsed = parseWorkoutProposal(
+            args,
+            params.catalogById,
+            params.bothSidesByExerciseId ?? new Map()
+          );
+          if (parsed) return { type: "functionCall", name: "generate_workout", args: parsed };
+        }
+        if (item.name === "generate_program") {
+          const parsed = parseProgramProposal(
+            args,
+            params.catalogById,
+            params.bothSidesByExerciseId ?? new Map()
+          );
+          if (parsed) return { type: "functionCall", name: "generate_program", args: parsed };
+        }
+      }
+
+      const text =
+        typeof response.output_text === "string" ? response.output_text.trim() : "";
+      if (text) return { type: "text", text };
+
+      if (failedToolName) {
+        throw new IncompleteToolCallError(failedToolName);
+      }
+      if (response.status === "incomplete") {
+        throw new Error("The AI response was cut off. Try a shorter message or try again.");
+      }
+      throw new Error("AI returned an empty response. Try again.");
+    }
+
+    // Text-only consultation turns: Chat Completions with ChatGPT-like defaults
+    // (omit temperature / top_p / reasoning_effort overrides).
     const response = await client.chat.completions.create({
       model,
       messages: [{ role: "system", content: system }, ...toOpenAiMessages(history)],
-      ...(turnToolsEnabled
-        ? {
-            tools: activeTools,
-            tool_choice: params.forcedTool
-              ? { type: "function" as const, function: { name: params.forcedTool } }
-              : ("auto" as const),
-            reasoning_effort: "none" as const,
-          }
-        : {}),
-      max_completion_tokens: turnToolsEnabled ? 32768 : 8192,
+      max_completion_tokens: OPENAI_CHAT_LIKE.maxOutputTokensChat,
     });
 
     const message = response.choices[0]?.message;
@@ -319,43 +390,8 @@ export async function chatWithAiCoachOpenAI(params: {
       throw new Error("AI returned an empty response. Try again.");
     }
 
-    const toolCalls = message.tool_calls ?? [];
-    let failedToolName: string | undefined;
-
-    for (const call of toolCalls) {
-      if (call.type !== "function") continue;
-      failedToolName = call.function.name;
-      const args = parseToolArgsJson(call.function.arguments ?? "");
-      if (!args) continue;
-
-      if (call.function.name === "recommend_programs") {
-        const parsed = parseRecommendPrograms(args);
-        if (parsed) return { type: "functionCall", name: "recommend_programs", args: parsed };
-      }
-      if (call.function.name === "generate_workout") {
-        const parsed = parseWorkoutProposal(
-          args,
-          params.catalogById,
-          params.bothSidesByExerciseId ?? new Map()
-        );
-        if (parsed) return { type: "functionCall", name: "generate_workout", args: parsed };
-      }
-      if (call.function.name === "generate_program") {
-        const parsed = parseProgramProposal(
-          args,
-          params.catalogById,
-          params.bothSidesByExerciseId ?? new Map()
-        );
-        if (parsed) return { type: "functionCall", name: "generate_program", args: parsed };
-      }
-    }
-
     const text = message.content?.trim();
     if (text) return { type: "text", text };
-
-    if (failedToolName) {
-      throw new IncompleteToolCallError(failedToolName);
-    }
 
     const finish = response.choices[0]?.finish_reason;
     if (finish === "length") {

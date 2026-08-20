@@ -50,7 +50,7 @@ Sets: 3–5 · Reps: 3–6 · Stop when speed or landing quality drops
 Levels: Intermediate, Advanced  
 Sets: 3–5 · Reps/contacts: 3–6 · Low fatigue; excellent landing/reactive quality  
 \`rest_between_sets_seconds\`: 90–180 · \`rest_after_seconds\`: 90–180  
-Main timed plyometrics still use **2–3 rounds** with \`duration_seconds\` when timed.
+Main timed plyometrics: either one continuous \`duration_seconds\` bout **or** 2–3 rounds with \`rest_between_sets_seconds\` when you want intervals.
 
 ### strength_specific
 Levels: All (scaled)  
@@ -59,7 +59,7 @@ Sets: 2–4 · Reps: 6–12 (per side only if catalog \`both_sides\`) · Clear p
 
 ### strength_stability
 Levels: All  
-Sets: 2–4 · Reps: 8–12 **OR** hold 20–45s (\`duration_seconds\` + **2–3 rounds** in main)  
+Sets: 2–4 · Reps: 8–12 **OR** a single hold 20–45s (\`duration_seconds\` only) **or** 2–3 timed rounds with rest between when you want intervals  
 Controlled; no loss of alignment  
 \`rest_between_sets_seconds\`: 30–60 · \`rest_after_seconds\`: 30–60
 

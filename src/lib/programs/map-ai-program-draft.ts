@@ -19,7 +19,6 @@ import {
   defaultRestBetweenSidesSeconds,
   ensureSetsRepsBetweenSetsNote,
   ensureTimeOnlyMainPrescription,
-  MAIN_TIMED_DEFAULT_ROUNDS,
   MAIN_TIMED_HOLD_DEFAULT_SECONDS,
 } from "@/lib/programs/normalize-ai-exercise-prescription";
 import { defaultStrengthSetsRepsForEntry } from "@/lib/programs/program-prescription-rules";
@@ -242,7 +241,7 @@ export function mapGeminiDraftToForm(
           if (repsOut == null || repsOut <= 0) repsOut = defaults.reps ?? 10;
         }
 
-        // Never leave timed main work without a duration / rounds.
+        // Never leave timed main work without a duration.
         if (
           (prescriptionType === "timed_intervals" || prescriptionType === "time") &&
           ex.phase === "main" &&
@@ -250,16 +249,29 @@ export function mapGeminiDraftToForm(
         ) {
           durationOut =
             mode === "time_only" ? MAIN_TIMED_HOLD_DEFAULT_SECONDS : 45;
-          if (setsOut == null || setsOut <= 0) setsOut = MAIN_TIMED_DEFAULT_ROUNDS;
+        }
+
+        // Empty/1 round timed work is a single bout (`time`) — drop between-round rest.
+        let finalPrescriptionType = prescriptionType;
+        const rounds = setsOut != null && setsOut > 0 ? Math.ceil(setsOut) : 0;
+        if (
+          (finalPrescriptionType === "timed_intervals" || finalPrescriptionType === "time") &&
+          rounds <= 1
+        ) {
+          finalPrescriptionType = clampProgramPrescriptionTypeForPhase(mode, "time", ex.phase);
+          setsOut = null;
+          repsOut = null;
         }
 
         const restBetween =
-          defaultRestBetweenSetsSeconds({
-            ...aiFields,
-            duration_seconds: durationOut,
-            sets: setsOut,
-            reps: repsOut,
-          }) ?? ex.rest_between_sets_seconds;
+          finalPrescriptionType === "timed_intervals" && rounds > 1
+            ? defaultRestBetweenSetsSeconds({
+                ...aiFields,
+                duration_seconds: durationOut,
+                sets: setsOut,
+                reps: repsOut,
+              }) ?? ex.rest_between_sets_seconds
+            : null;
         const noteWithRest = ensureSetsRepsBetweenSetsNote(
           noteSansBothSides,
           {
@@ -289,7 +301,7 @@ export function mapGeminiDraftToForm(
           exerciseId: ex.exercise_id,
           sessionPhase: ex.phase,
           choiceGroup: ex.choice_group ?? "",
-          prescriptionType,
+          prescriptionType: finalPrescriptionType,
           durationValue:
             durationOut != null
               ? String(durationOut)

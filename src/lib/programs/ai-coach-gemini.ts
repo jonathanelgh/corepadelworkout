@@ -203,7 +203,7 @@ const TOOLS: FunctionDeclaration[] = [
               sets: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Sets (fixed across the 8-week block). For main timed work use 2 or 3 rounds with duration_seconds.",
+                  "Sets for strength, or timed rounds when repeating a timed bout. Omit for a single Time bout (duration_seconds only).",
               },
               reps: {
                 type: SchemaType.NUMBER,
@@ -297,7 +297,7 @@ const TOOLS: FunctionDeclaration[] = [
               sets: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Sets for strength, or 2–3 rounds for main timed intervals (with duration_seconds).",
+                  "Sets for strength, or 2+ rounds for true timed intervals. Omit for a single continuous Time bout.",
               },
               reps: {
                 type: SchemaType.NUMBER,

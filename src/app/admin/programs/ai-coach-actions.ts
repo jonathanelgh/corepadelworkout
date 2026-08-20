@@ -13,6 +13,7 @@ import {
   type WorkoutProposal,
 } from "@/lib/programs/ai-coach-gemini";
 import { getAiCoachOpenAiTools } from "@/lib/programs/ai-coach-openai";
+import { resolveOpenAiModel } from "@/lib/openai-config";
 import {
   resolveAiCoachProvider,
   type AiCoachProvider,
@@ -194,6 +195,7 @@ export async function sendAiCoachMessage(input: {
           toolsEnabled,
           forcedTool,
           tools,
+          model: resolveOpenAiModel(),
         }),
       });
 

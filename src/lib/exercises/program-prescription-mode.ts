@@ -46,16 +46,14 @@ export function allowedProgramPrescriptionTypes(
 }
 
 /**
- * Main block never uses a single continuous timer — only timed sets (intervals) or sets×reps.
- * Warm-up / cool-down may still use single `time`.
+ * All phases may use single `time`, multi-round `timed_intervals`, or `sets_reps`
+ * (subject to the exercise catalog mode).
  */
 export function allowedProgramPrescriptionTypesForPhase(
   mode: ExerciseProgramPrescriptionMode,
-  phase: SessionPhase | string | null | undefined
+  _phase: SessionPhase | string | null | undefined
 ): ExercisePrescriptionType[] {
-  const allowed = allowedProgramPrescriptionTypes(mode);
-  if (parseSessionPhase(phase) !== "main") return allowed;
-  return allowed.filter((t) => t !== "time");
+  return allowedProgramPrescriptionTypes(mode);
 }
 
 export function defaultProgramPrescriptionType(
@@ -91,7 +89,8 @@ export function clampProgramPrescriptionType(
 }
 
 /**
- * Like clampProgramPrescriptionType, but upgrades bare `time` → `timed_intervals` in main.
+ * Prefer the requested type when allowed for this catalog mode + phase.
+ * Single-bout timed main work stays `time` (not upgraded to timed intervals).
  */
 export function clampProgramPrescriptionTypeForPhase(
   mode: ExerciseProgramPrescriptionMode,
@@ -99,11 +98,7 @@ export function clampProgramPrescriptionTypeForPhase(
   phase: SessionPhase | string | null | undefined
 ): ExercisePrescriptionType {
   const allowed = allowedProgramPrescriptionTypesForPhase(mode, phase);
-  let preferredForPhase = preferred;
-  if (parseSessionPhase(phase) === "main" && preferred === "time") {
-    preferredForPhase = "timed_intervals";
-  }
-  if (allowed.includes(preferredForPhase)) return preferredForPhase;
+  if (allowed.includes(preferred)) return preferred;
   return allowed[0] ?? defaultProgramPrescriptionType(mode);
 }
 

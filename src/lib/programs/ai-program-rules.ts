@@ -36,9 +36,10 @@ Rules for fields:
 - Prefer sensible athletic sequencing (prep before explosive work; avoid fatiguing conditioning before power/speed when that conflicts with the goal).
 
 ### Rest
-- \`rest_between_sets_seconds\` = between sets/rounds of the same exercise (required when sets > 1).
+- \`rest_between_sets_seconds\` = between sets/rounds of the same exercise (required when sets > 1). Do **not** set this for a single timed bout — use only \`rest_after_seconds\`.
 - \`rest_between_sides_seconds\` = between sides for both_sides timed work (required when applicable).
 - \`rest_after_seconds\` = after the final set, before the next exercise (0 on the last exercise).
+- Timed work: one continuous bout → \`duration_seconds\` only (omit \`sets\` / \`rest_between_sets_seconds\`). Multi-round intervals → \`duration_seconds\` + \`sets\` ≥ 2 + \`rest_between_sets_seconds\`.
 
 ### Admin transparency (required)
 Always set \`design_rationale\` — a thorough coaching summary for admin review (not shown to athletes). Write 1–3 short paragraphs that explain:

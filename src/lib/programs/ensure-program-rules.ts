@@ -322,7 +322,10 @@ function normalizeMainExercisePrescription(
   };
 }
 
-/** Main timed work must be timed intervals with 2–3 rounds (not a single continuous timer). */
+/**
+ * Main timed work: one bout (sets empty/1) stays as Time with no between-round rest.
+ * Multi-round work stays timed intervals with 2–3 rounds and rest between rounds.
+ */
 function normalizeMainTimedRounds(ex: WorkoutProposalExercise): WorkoutProposalExercise {
   if (ex.phase !== "main") return ex;
   const hasDuration =
@@ -330,8 +333,16 @@ function normalizeMainTimedRounds(ex: WorkoutProposalExercise): WorkoutProposalE
     (ex.duration_minutes != null && ex.duration_minutes > 0);
   if (!hasDuration) return ex;
 
-  let sets = ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : 3;
-  sets = Math.min(3, Math.max(2, sets));
+  // Explicit single bout, or omitted sets → Time (avoid double rest via rest_between + rest_after).
+  if (ex.sets == null || ex.sets <= 1) {
+    return {
+      ...ex,
+      sets: undefined,
+      rest_between_sets_seconds: undefined,
+    };
+  }
+
+  const sets = Math.min(3, Math.max(2, Math.ceil(ex.sets)));
   const restBetween =
     ex.rest_between_sets_seconds != null && ex.rest_between_sets_seconds > 0
       ? ex.rest_between_sets_seconds
