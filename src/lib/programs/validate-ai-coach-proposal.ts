@@ -129,21 +129,19 @@ function validateExerciseTechnical(
     }
   }
 
-  // Sets×reps main work needs qualitative load guidance (not exact kg/lb).
+  // Sets×reps main work needs RPE-based load guidance in coach explanations (not exact kg/lb).
   if (ex.phase === "main" && !isTimed && sets != null && reps != null) {
     const noteText = typeof ex.note === "string" ? ex.note : "";
     const intensityText =
       typeof getOptionalIntensity(ex) === "string" ? String(getOptionalIntensity(ex)) : "";
-    const blob = `${noteText} ${intensityText}`.toLowerCase();
-    const hasLoadCue =
-      /\b(light|easy|medium|moderate|challenging|heavy|hard|tough|effort|demanding|controlled|comfortable)\b/.test(
-        blob
-      ) || /\bchoose\s+a\s+\w+\s+(weight|load)\b/.test(blob);
-    if (!hasLoadCue) {
+    const rpeText = typeof getOptionalRpe(ex) === "string" ? String(getOptionalRpe(ex)) : "";
+    const explanation = `${noteText} ${intensityText}`.toLowerCase();
+    const hasRpeInExplanation = /\brpe\b/.test(explanation);
+    if (!requireNonEmptyString(rpeText) || !hasRpeInExplanation) {
       errors.push({
         path,
         message:
-          "Sets×reps main exercise must include qualitative load guidance in note and/or intensity (e.g. challenging, moderate, light–medium) — never exact kg/lb.",
+          "Sets×reps main exercise must set rpe and include RPE-based load guidance in note and/or intensity (e.g. \"choose a weight that hits RPE 8\") — never exact kg/lb.",
       });
     }
   }

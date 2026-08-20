@@ -1082,8 +1082,8 @@ export function formatGenerationCoachBrief(
 - Copy exercise_id UUIDs exactly from the catalog (square brackets). Do not invent IDs.
 - **You decide coaching methodology:** program/session structure, phase counts, exercise selection and order, sets/reps/durations, rests, intensity/RPE, variation, and deload/progression intent. Do **not** force a fixed template (e.g. fixed number of warm-up or cool-down exercises).
 - Every exercise needs phase (warmup, main, or cooldown), rest_after_seconds (0 on the last exercise), rpe, and intensity. For multi-set work include rest_between_sets_seconds. For both_sides timed work include rest_between_sides_seconds > 0.
-- For weighted sets×reps work: put qualitative load guidance in \`note\` and \`intensity\` (challenging / moderate / light–medium) matching the prescription — lower reps → heavier/challenging; never invent exact kg/lb.
-- Required: set \`design_rationale\` to a thorough coaching summary for admin review — structure, why these exercises, and why the times/sets/reps (plus week-to-week plan for programs).
+- For weighted sets×reps work: put RPE-based load guidance in \`note\` and \`intensity\` (e.g. RPE 7–8) matching the prescription — lower reps → higher RPE; never invent exact kg/lb. Always set \`rpe\`.
+- Required: set \`design_rationale\` to a thorough coaching summary for admin review — structure, why these exercises, and why the times/sets/reps using RPE targets (plus week-to-week plan for programs).
 ${
   isProgram
     ? `- sessions[] must contain exactly ${(state.durationWeeks ?? 8) * (state.sessionsPerWeek ?? 3)} sessions = duration_weeks (${state.durationWeeks ?? 8}) × sessions_per_week (${state.sessionsPerWeek ?? "sessions_per_week"}) — every week of the block, in order.

@@ -67,7 +67,7 @@ const EXERCISE_PROPERTIES = {
   note: {
     type: "string",
     description:
-      "Coach note shown in-workout. Include technique cues AND qualitative load guidance for weighted work (e.g. \"Choose a challenging weight — last 2 reps should feel hard\" or \"Use a medium load you can control\"). Match guidance to the prescription: lower reps / higher sets → heavier/challenging; higher reps → moderate/lighter. Never invent exact kg/lb. No week-to-week progression text.",
+      "Coach note shown in-workout. Include technique cues AND RPE-based load guidance for weighted work (e.g. \"Choose a weight that hits RPE 8 — last 2 reps should feel hard\"). Align with the exercise `rpe` field: lower reps → higher RPE; higher reps → lower RPE. Never invent exact kg/lb. No week-to-week progression text.",
   },
   rpe: {
     type: "string",
@@ -77,7 +77,7 @@ const EXERCISE_PROPERTIES = {
   intensity: {
     type: "string",
     description:
-      "Qualitative intensity/load cue for the athlete (e.g. \"challenging\", \"moderate-heavy\", \"light–medium control\"). Align with sets×reps (low reps → heavier/challenging). Never invent exact kg/lb.",
+      "Short RPE/load cue for the athlete (e.g. \"RPE 7-8\", \"RPE 8-9\"). Align with sets×reps (low reps → higher RPE). Never invent exact kg/lb.",
   },
   load_prescription: {
     type: "string",

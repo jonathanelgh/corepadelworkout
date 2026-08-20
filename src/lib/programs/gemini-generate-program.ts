@@ -104,8 +104,9 @@ export const AI_PROGRAM_RESPONSE_SCHEMA = `{
               "rest_between_sets_seconds": "number | null",
               "rest_after_seconds": "number | null",
               "load_prescription": "null — leave blank; athletes choose their own weight (never invent kg/lb)",
-              "note": "string | null (technique + qualitative load guidance for weighted sets×reps: challenging / moderate / light–medium matching reps — never invent kg/lb or weekly increases)",
-              "intensity": "string | null (qualitative load cue e.g. challenging, moderate-heavy, light–medium — never exact kg/lb)"
+              "note": "string | null (technique + RPE-based load guidance for weighted sets×reps: choose a weight that hits the target RPE — never invent kg/lb or weekly increases)",
+              "rpe": "string (e.g. 7 or 8-9)",
+              "intensity": "string | null (short RPE cue e.g. RPE 7-8 — never exact kg/lb)"
             }
           ]
         }

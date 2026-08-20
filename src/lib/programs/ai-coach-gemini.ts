@@ -231,7 +231,7 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Coach note shown in-workout. Include technique + qualitative load guidance for weighted sets×reps (challenging / moderate / light–medium matching reps). Never invent kg/lb or week-to-week progression.",
+                  "Coach note shown in-workout. Include technique + RPE-based load guidance for weighted sets×reps (e.g. choose a weight that hits RPE 7–8). Align with the rpe field. Never invent kg/lb or week-to-week progression.",
               },
               rpe: {
                 type: SchemaType.STRING,
@@ -240,7 +240,7 @@ const TOOLS: FunctionDeclaration[] = [
               intensity: {
                 type: SchemaType.STRING,
                 description:
-                  'Qualitative load cue (e.g. "challenging", "moderate-heavy", "light–medium"). Align with sets×reps — lower reps → heavier/challenging. Never invent kg/lb.',
+                  'Short RPE/load cue (e.g. "RPE 7-8", "RPE 8-9"). Align with sets×reps — lower reps → higher RPE. Never invent kg/lb.',
               },
               load_prescription: {
                 type: SchemaType.STRING,
@@ -325,7 +325,7 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Coach note shown in-workout. Include technique + qualitative load guidance for weighted sets×reps (challenging / moderate / light–medium matching reps). Never invent kg/lb or week-to-week progression.",
+                  "Coach note shown in-workout. Include technique + RPE-based load guidance for weighted sets×reps (e.g. choose a weight that hits RPE 7–8). Align with the rpe field. Never invent kg/lb or week-to-week progression.",
               },
               rpe: {
                 type: SchemaType.STRING,
@@ -334,7 +334,7 @@ const TOOLS: FunctionDeclaration[] = [
               intensity: {
                 type: SchemaType.STRING,
                 description:
-                  'Qualitative load cue (e.g. "challenging", "moderate-heavy", "light–medium"). Align with sets×reps — lower reps → heavier/challenging. Never invent kg/lb.',
+                  'Short RPE/load cue (e.g. "RPE 7-8", "RPE 8-9"). Align with sets×reps — lower reps → higher RPE. Never invent kg/lb.',
               },
               load_prescription: {
                 type: SchemaType.STRING,

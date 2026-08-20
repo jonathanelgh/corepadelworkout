@@ -41,12 +41,13 @@ If a consultation / creation brief says CONSULTATION COMPLETE (or tools are enab
 export const AI_COACH_LOAD_GUIDANCE_BLOCK = `## Load guidance (athlete-facing — required)
 
 - Leave \`load_prescription\` **blank**. Never invent exact kg/lb amounts.
-- For **weighted / strength** main work (sets×reps), put qualitative load guidance in **both** \`intensity\` and \`note\`:
-  - Lower reps (e.g. 3–6) or strength-focused sets → **challenging / heavy** (last reps hard with good form).
-  - Moderate reps (e.g. 8–12) → **moderate to challenging**.
-  - Higher reps (e.g. 12–20) or endurance-style → **light to medium**, controlled.
-- Example note: "Brace hard; choose a challenging weight so the last 1–2 reps are tough but form stays clean."
-- Timed / bodyweight / mobility work: technique cues are enough; intensity can be effort-based (easy / moderate / hard) without inventing loads.`.trim();
+- Always set \`rpe\` (e.g. "6", "7-8") for every exercise.
+- For **weighted / strength** main work (sets×reps), explain load using **RPE** in **both** \`intensity\` and \`note\` (not vague "challenging/medium" alone):
+  - Lower reps (e.g. 3–6) or strength-focused → higher RPE (e.g. **8–9**).
+  - Moderate reps (e.g. 8–12) → mid RPE (e.g. **7–8**).
+  - Higher reps (e.g. 12–20) → lower RPE (e.g. **6–7**), controlled.
+- Example note: "Brace hard; choose a weight that hits RPE 8 — last 1–2 reps tough with clean form."
+- Timed / bodyweight / mobility: technique cues + RPE for effort is enough; never invent loads.`.trim();
 
 /** Append tool routing after any editable prompt. */
 export function appendHardAiConstraints(prompt: string): string {

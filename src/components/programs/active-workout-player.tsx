@@ -41,6 +41,7 @@ import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 import { WorkoutCompletionOverlay } from "@/components/programs/workout-completion-overlay";
 import { BothSidesChip } from "@/components/programs/both-sides-chip";
 import { WorkoutSideBadge } from "@/components/programs/workout-side-badge";
+import { CoachNoteWithRpeInfo } from "@/components/programs/rpe-info-button";
 
 type Phase = "work" | "setRest" | "rest";
 
@@ -771,9 +772,10 @@ export function ActiveWorkoutPlayer({
                     </div>
                   )}
                   {current.note?.trim() && !current.bothSides && (
-                    <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
-                      {current.note.trim()}
-                    </p>
+                    <CoachNoteWithRpeInfo
+                      note={current.note.trim()}
+                      className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
+                    />
                   )}
                   {!current.bothSides &&
                     (current.rpe?.trim() || current.intensity?.trim()) && (
@@ -802,9 +804,10 @@ export function ActiveWorkoutPlayer({
                     </div>
                   )}
                   {current.note?.trim() && !current.bothSides && (
-                    <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
-                      {current.note.trim()}
-                    </p>
+                    <CoachNoteWithRpeInfo
+                      note={current.note.trim()}
+                      className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
+                    />
                   )}
                   {!current.bothSides &&
                     (current.rpe?.trim() || current.intensity?.trim()) && (
@@ -832,9 +835,10 @@ export function ActiveWorkoutPlayer({
                     </div>
                   )}
                   {next.note?.trim() && !next.bothSides && (
-                    <p className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-sm leading-relaxed text-white/90">
-                      {next.note.trim()}
-                    </p>
+                    <CoachNoteWithRpeInfo
+                      note={next.note.trim()}
+                      className="mt-4 max-w-md rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
+                    />
                   )}
                   {!next.bothSides &&
                     (next.rpe?.trim() || next.intensity?.trim()) && (
@@ -976,9 +980,10 @@ export function ActiveWorkoutPlayer({
                   </div>
                 )}
                 {!inRest && displayNote && (
-                  <p className="mt-3 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-sm leading-relaxed text-white/90">
-                    {displayNote}
-                  </p>
+                  <CoachNoteWithRpeInfo
+                    note={displayNote}
+                    className="mt-3 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
+                  />
                 )}
                 {!inRest &&
                   !displayExercise?.bothSides &&
