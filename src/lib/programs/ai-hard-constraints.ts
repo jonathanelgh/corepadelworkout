@@ -1,10 +1,10 @@
 /** Always appended last so stale editable DB prompts cannot override product rules. */
 export const AI_HARD_CONSTRAINTS_OVERRIDE_PREAMBLE = `## HARD CONSTRAINTS (code — override everything above)
 
-Coaching decisions belong to the AI: program structure, phase counts, exercise selection/order, sets/reps/durations, rests, intensity/RPE, variation, progression and deload. Do **not** force a fixed template (e.g. exactly N warm-up/cool-down exercises, mandatory rotation, fixed weekly progression recipe).
+Coaching decisions belong to the AI: program structure, phase counts, exercise selection/order, sets/reps/durations, rests, intensity/RPE (when applicable), variation, progression and deload. Do **not** force a fixed template (e.g. exactly N warm-up/cool-down exercises, mandatory rotation, fixed weekly day roles).
 
-The following blocks are the source of truth for **tool routing and technical completeness only**.
-If anything earlier in this system prompt (including editable admin prompts) conflicts with tool routing, **ignore the earlier text and follow these constraints**.`.trim();
+The following blocks are the source of truth for **tool routing and technical completeness**.
+If anything earlier in this system prompt (including editable admin prompts) conflicts with these constraints, **ignore the earlier text and follow these constraints**.`.trim();
 
 
 export const AI_COACH_TOOL_ROUTING_BLOCK = `## Tool routing (hard constraints)
@@ -38,23 +38,69 @@ export const AI_COACH_TOOL_ROUTING_BLOCK = `## Tool routing (hard constraints)
 ### When consultation is complete
 If a consultation / creation brief says CONSULTATION COMPLETE (or tools are enabled for a create turn), you MUST call the appropriate tool this turn — do not reply with prose only.`.trim();
 
-export const AI_COACH_LOAD_GUIDANCE_BLOCK = `## Load guidance (athlete-facing — required)
+export const AI_COACH_LOAD_GUIDANCE_BLOCK = `## Load guidance / RPE (hard)
 
 - Leave \`load_prescription\` **blank**. Never invent exact kg/lb amounts.
-- Always set \`rpe\` (e.g. "6", "7-8") for every exercise.
-- For **weighted / strength** main work (sets×reps), explain load using **RPE** in **both** \`intensity\` and \`note\` (not vague "challenging/medium" alone):
-  - Lower reps (e.g. 3–6) or strength-focused → higher RPE (e.g. **8–9**).
-  - Moderate reps (e.g. 8–12) → mid RPE (e.g. **7–8**).
-  - Higher reps (e.g. 12–20) → lower RPE (e.g. **6–7**), controlled.
-- Example note: "Brace hard; choose a weight that hits RPE 8 — last 1–2 reps tough with clean form."
-- Timed / bodyweight / mobility: technique cues + RPE for effort is enough; never invent loads.`.trim();
+- Add \`rpe\` (and RPE language in \`intensity\` / \`note\`) **only when effort needs to be regulated by the athlete**, especially:
+  - weighted strength exercises
+  - conditioning intervals
+  - repeated explosive efforts
+  - exercises performed close to fatigue
+- Do **not** add RPE to: mobility, stretching, warm-up, cool-down, technique drills, standard isometric holds with a prescribed duration, or exercises such as Copenhagen plank — unless the program specifically requires effort-based progression.
+- When RPE applies for weighted sets×reps: lower reps (e.g. 3–6) → higher RPE (8–9); moderate (8–12) → mid (7–8); higher reps (12–20) → lower (6–7), controlled.
+- Example when RPE applies: "Brace hard; choose a weight that hits RPE 8 — last 1–2 reps tough with clean form."`.trim();
 
-/** Append tool routing after any editable prompt. */
+export const AI_COACH_SETS_REPS_REST_NOTE_BLOCK = `## Sets×reps rest fields + coach notes (hard)
+
+For every exercise prescribed with **sets and reps**:
+1. Always set \`rest_between_sets_seconds\` when sets ≥ 2 — use a realistic value for the exercise and intensity (strength-tag rest matrix below). **Never** default heavy/explosive work to 30s.
+2. Always include a short instruction in \`note\` that matches that **exact** number, e.g. \`Rest 90 sec between sets.\`
+3. The seconds in the note **must equal** \`rest_between_sets_seconds\`. Writing "Rest 30 sec between sets" while the structured field is 75–180s is a hard error.
+4. If the exercise is **both_sides** / per side: also specify whether to switch sides immediately or rest between sides. Example: "Complete 10 reps per side. Rest 60 seconds after both sides are completed."
+5. Always set \`rest_after_seconds\` after the final set before the next exercise (0 on the last exercise in the session).
+
+Rest bands (do not invent outside these):
+- Strength endurance / stability: 30–60s
+- Hypertrophy / general strength: 60–90s
+- Specific strength: 60–120s
+- Max strength / explosive: 120–180s
+- Speed-strength / plyometric: 90–180s
+- Supramaximal: 180–300s`.trim();
+
+export const AI_COACH_SESSION_SEQUENCING_BLOCK = `## Session sequencing (hard)
+
+- Complete an adequate progressive warm-up before explosive work (joints, movement patterns, landing mechanics).
+- The **main** section should normally **start with explosive work** — jumps, medicine-ball throws, short sprints, or high-quality agility — while the athlete is fresh.
+- Complete explosive exercises **before** fatiguing strength and conditioning work.
+- Do **not** prohibit jumps, sprints, or shuffles from opening the main block. After warm-up, placing them first is preferred when the session includes power/speed.`.trim();
+
+export const AI_COACH_PROGRESSION_CONTINUITY_BLOCK = `## Multi-week exercise continuity (hard)
+
+Keep **70–80% of main exercises unchanged** across a four-week block (apply the same continuity principle across longer blocks). Progress retained exercises primarily through repetitions, RPE/load, sets, tempo, or execution quality.
+
+Change an exercise only when there is a planned biomechanical progression, a variation is needed for safety, equipment changes, or the athlete has mastered the previous variation. Do **not** substitute unrelated exercises merely to create variety.
+
+For a four-week pattern (repeat/adapt for longer programs):
+- Week 1: Establish technique, working load, and baseline volume.
+- Week 2: Increase one variable — usually repetitions or sets.
+- Week 3: Increase intensity/load while keeping the main movements recognizable.
+- Week 4: Keep the same exercises; reduce sets and RPE for the deload.
+
+Exercise changes must follow a clear movement chain. Examples:
+- Broad jump → greater intent/quality → box drop to broad jump → broad jump deload
+- Goblet squat stays the main squat for weeks 1–3 (progress load/RPE or volume)
+- Chest press stays the primary horizontal press (do not swap to an unrelated press pattern)
+- Copenhagen plank progresses via hold time, lever length, or dynamic reps — not unrelated core swaps`.trim();
+
+/** Append tool routing + hard coaching constraints after any editable prompt. */
 export function appendHardAiConstraints(prompt: string): string {
   return [
     prompt.trimEnd(),
     AI_HARD_CONSTRAINTS_OVERRIDE_PREAMBLE,
     AI_COACH_TOOL_ROUTING_BLOCK,
     AI_COACH_LOAD_GUIDANCE_BLOCK,
+    AI_COACH_SETS_REPS_REST_NOTE_BLOCK,
+    AI_COACH_SESSION_SEQUENCING_BLOCK,
+    AI_COACH_PROGRESSION_CONTINUITY_BLOCK,
   ].join("\n\n");
 }

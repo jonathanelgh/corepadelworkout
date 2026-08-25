@@ -6,14 +6,12 @@ import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { loadAiPrompt } from "@/lib/programs/ai-prompts";
 import {
   chatWithAiCoach,
-  buildSystemInstruction,
   type ChatHistoryMessage,
   type AiCoachChatResult,
   type ProgramProposal,
   type WorkoutProposal,
 } from "@/lib/programs/ai-coach-gemini";
-import { getAiCoachOpenAiTools } from "@/lib/programs/ai-coach-openai";
-import { resolveOpenAiModel } from "@/lib/openai-config";
+import { chatWithAiCoachOpenAI } from "@/lib/programs/ai-coach-openai";
 import {
   resolveAiCoachProvider,
   type AiCoachProvider,
@@ -139,7 +137,9 @@ export async function sendAiCoachMessage(input: {
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
   const provider = resolveAiCoachProvider(input.provider);
-  async function chatWithAiCoachOpenAIviaEdge(params: {
+
+  /** OpenAI runs in-process on Vercel (see also POST /api/ai-coach/generate for native). */
+  async function chatWithAiCoachOpenAIResolved(params: {
     history: ChatHistoryMessage[];
     programsCatalog: unknown[];
     exerciseCatalog: string;
@@ -154,122 +154,34 @@ export async function sendAiCoachMessage(input: {
     forcedTool?: string | undefined;
     audience?: "admin" | "member";
   }): Promise<AiCoachChatResult> {
-    const systemPrompt = buildSystemInstruction(
-      params.systemPromptTemplate,
-      {
-        programsCatalog: params.programsCatalog as never[],
-        exerciseCatalog: params.exerciseCatalog,
-        exerciseCount: params.catalogById.size,
-        userContextBlock: params.userContextBlock,
-        extraTemplateVars: params.extraTemplateVars,
-      },
-      {
-        creationOnly: params.creationOnly,
-        consultationBrief: params.consultationBrief,
-        toolsEnabled: params.toolsEnabled,
-        omitProgramsCatalog: params.forcedTool != null,
-        audience: params.audience,
-      }
-    );
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
-    if (!supabaseUrl) throw new Error("NEXT_PUBLIC_SUPABASE_URL not set.");
-
-    const edgeUrl = `${supabaseUrl}/functions/v1/ai-coach-openai-generate`;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-
-    const toolsEnabled = params.toolsEnabled !== false;
-    const forcedTool = params.forcedTool ?? null;
-    const tools = getAiCoachOpenAiTools();
-
-    async function attempt(callHistory: ChatHistoryMessage[]): Promise<AiCoachChatResult> {
-      const res = await fetch(edgeUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(serviceKey ? { Authorization: `Bearer ${serviceKey}` } : {}),
-        },
-        body: JSON.stringify({
-          history: callHistory,
-          systemPrompt,
-          toolsEnabled,
-          forcedTool,
-          tools,
-          model: resolveOpenAiModel(),
-        }),
-      });
-
-      const payload = (await res.json().catch(() => null)) as
-        | { type?: string; error?: string; name?: string; args?: Record<string, unknown>; text?: string }
-        | null;
-
-      if (!payload) {
-        throw new Error(`Edge function returned invalid JSON (HTTP ${res.status}).`);
-      }
-      // Edge function errors should always include { type: "error" }, but keep a fallback
-      // for older deployments that may return `{ error: "..." }` without `type`.
-      if (payload.type === "error" || typeof payload.error === "string") {
-        throw new Error(payload.error ?? "Edge generation failed.");
-      }
-      if (payload.type === "text") {
-        const text = typeof payload.text === "string" ? payload.text : "";
-        return { type: "text", text };
-      }
-      if (payload.type === "functionCall") {
-        const name = typeof payload.name === "string" ? payload.name : "";
-        if (!name) throw new Error("Edge function returned functionCall without name.");
-        if (typeof payload.args !== "object" || payload.args == null) {
-          throw new Error(`Edge function returned functionCall ${name} without args.`);
-        }
-        return {
-          type: "functionCall",
-          name: name as any,
-          args: payload.args as any,
-        };
-      }
-      const preview = (() => {
-        try {
-          return JSON.stringify(payload).slice(0, 500);
-        } catch {
-          return "[unserializable payload]";
-        }
-      })();
+    if (!process.env.OPENAI_API_KEY?.trim()) {
       throw new Error(
-        `Edge function returned unknown payload (type=${String(payload.type)}). Payload preview: ${preview}`
+        "OPENAI_API_KEY is not configured on the Next.js server. Add it to Vercel env to enable AI Coach generation."
       );
     }
-
-    // Minimal tool-call retry to cover empty/incomplete tool calls until we add QC fix-loop.
-    if (!toolsEnabled || !forcedTool) {
-      return await attempt(params.history);
-    }
-
-    try {
-      return await attempt(params.history);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      const isToolParseError =
-        msg.includes("parse") || msg.includes("empty") || msg.includes("tool");
-      if (!isToolParseError) throw e;
-
-      if (!forcedTool) throw e;
-      const retryHistory: ChatHistoryMessage[] = [
-        ...params.history,
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Call ${forcedTool} now and return ONLY a valid tool call with JSON args (no prose).`,
-            },
-          ],
-        },
-      ];
-      return await attempt(retryHistory);
-    }
+    return chatWithAiCoachOpenAI({
+      history: params.history,
+      programsCatalog: params.programsCatalog as never[],
+      exerciseCatalog: params.exerciseCatalog,
+      catalogById: params.catalogById,
+      bothSidesByExerciseId: params.bothSidesByExerciseId,
+      systemPromptTemplate: params.systemPromptTemplate,
+      userContextBlock: params.userContextBlock,
+      extraTemplateVars: params.extraTemplateVars,
+      creationOnly: params.creationOnly,
+      consultationBrief: params.consultationBrief,
+      toolsEnabled: params.toolsEnabled,
+      forcedTool: params.forcedTool as
+        | "generate_program"
+        | "generate_workout"
+        | "recommend_programs"
+        | undefined,
+      audience: params.audience,
+    });
   }
 
   const runCoach =
-    provider === "openai" ? chatWithAiCoachOpenAIviaEdge : chatWithAiCoach;
+    provider === "openai" ? chatWithAiCoachOpenAIResolved : chatWithAiCoach;
 
   const userMessage = input.userMessage.trim();
   if (!userMessage) return { error: "Message cannot be empty." };

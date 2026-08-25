@@ -61,7 +61,7 @@ const EXERCISE_PROPERTIES = {
   rest_between_sets_seconds: {
     type: "number",
     description:
-      "Rest between sets/rounds when sets > 1. Choose an appropriate value for the training goal.",
+      "Rest between sets/rounds when sets > 1. Use the strength-tag rest matrix (often 60–180s for strength/power — never blanket 30s for heavy/explosive work). The coach note must quote this exact number.",
   },
   rest_between_sides_seconds: {
     type: "number",
@@ -86,17 +86,17 @@ const EXERCISE_PROPERTIES = {
   note: {
     type: "string",
     description:
-      "Coach note shown in-workout. Include technique cues AND RPE-based load guidance for weighted work (e.g. \"Choose a weight that hits RPE 8 — last 2 reps should feel hard\"). Align with the exercise `rpe` field: lower reps → higher RPE; higher reps → lower RPE. Never invent exact kg/lb. No week-to-week progression text.",
+      "Coach note shown in-workout. For sets×reps with 2+ sets always include \"Rest N sec between sets\" (or for both_sides: \"Rest N seconds after both sides are completed\") where N matches rest_between_sets_seconds exactly. Add RPE load guidance only when effort must be athlete-regulated (weighted strength, conditioning, repeated explosive work) — not for mobility/warm-up/cool-down/technique/standard isometric holds. Never invent kg/lb or week-to-week progression text.",
   },
   rpe: {
     type: "string",
     description:
-      "Rate of Perceived Exertion for this exercise slot (e.g. \"7\", \"8-9\"). Required for QC / player display.",
+      "Rate of Perceived Exertion when effort must be regulated (e.g. \"7\", \"8-9\"). Omit for mobility, warm-up, cool-down, technique drills, and standard isometric holds unless effort-based progression is required.",
   },
   intensity: {
     type: "string",
     description:
-      "Short RPE/load cue for the athlete (e.g. \"RPE 7-8\", \"RPE 8-9\"). Align with sets×reps (low reps → higher RPE). Never invent exact kg/lb.",
+      "Short RPE/load cue when RPE applies (e.g. \"RPE 7-8\"). Omit when RPE is not used. Never invent exact kg/lb.",
   },
   load_prescription: {
     type: "string",
@@ -157,8 +157,6 @@ const OPENAI_TOOLS: FunctionTool[] = [
                       "exercise_id",
                       "rest_after_seconds",
                       "phase",
-                      "rpe",
-                      "intensity",
                     ],
                   },
                 },
@@ -202,8 +200,6 @@ const OPENAI_TOOLS: FunctionTool[] = [
                 "exercise_id",
                 "rest_after_seconds",
                 "phase",
-                "rpe",
-                "intensity",
               ],
             },
           },
@@ -416,7 +412,7 @@ export async function chatWithAiCoachOpenAI(params: {
     let history = initialHistory;
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
-      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds, rpe, intensity, plus sets/reps or duration as appropriate. For multi-set work include rest_between_sets_seconds; for both_sides timed work include rest_between_sides_seconds > 0.`,
+      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds, plus sets/reps or duration as appropriate. For multi-set work include rest_between_sets_seconds AND a matching \"Rest N sec between sets\" (or both_sides after-both-sides cue) in note. Set rpe/intensity only when effort must be athlete-regulated. For both_sides timed work include rest_between_sides_seconds > 0.`,
       `Your previous response was empty or incomplete. Call ${toolName} again with a compact but complete payload. For programs: return ALL sessions for ALL weeks (duration_weeks × sessions_per_week) — not week-1 templates only. You decide structure and progression.`,
       `Final attempt: call ${toolName} only — no prose. Keep the payload complete and valid. For programs include every week.`,
     ];

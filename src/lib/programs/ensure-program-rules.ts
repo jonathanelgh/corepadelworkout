@@ -8,7 +8,6 @@ import {
   defaultStrengthSetsRepsForEntry,
   detectFootworkSpecialtyFocus,
   detectRehabFocus,
-  exerciseIsHighIntensityStart,
   exerciseIsStrength,
   exerciseMatchesBodyPart,
   exerciseMatchesLocation,
@@ -143,14 +142,6 @@ function kineticChainScore(entry: ExerciseCatalogEntry, part: string): number {
   if (exerciseMatchesBodyPart(entry, part)) score -= 50;
   if (catalogEntryHasTag(entry, "prehab")) score -= 25;
   if (catalogEntryHasTag(entry, "mobility")) score -= 10;
-  return score;
-}
-
-function safeMainStartScore(entry: ExerciseCatalogEntry): number {
-  let score = 100;
-  if (exerciseIsHighIntensityStart(entry)) score += 200;
-  if (catalogEntryHasTag(entry, "mobility")) score -= 30;
-  if (catalogEntryHasTag(entry, "strength")) score -= 15;
   return score;
 }
 
@@ -392,18 +383,27 @@ function applyMainRest(
 
   const betweenNote =
     targetBetween != null && targetBetween > 0
-      ? `Rest ${Math.round(targetBetween)} sec between sets`
+      ? entry.bothSides
+        ? `Rest ${Math.round(targetBetween)} seconds after both sides are completed.`
+        : `Rest ${Math.round(targetBetween)} sec between sets`
       : null;
 
   const note =
     isSetsRepsMulti &&
-    !entry.bothSides &&
     betweenNote &&
-    !(ex.note && /rest\s+\d+\s*sec(?:onds)?\s+between\s+sets/i.test(ex.note))
+    !(ex.note && /rest\s+\d+\s*sec(?:onds)?\s+(?:between\s+sets|after\s+both\s+sides)/i.test(ex.note))
       ? ex.note?.trim()
         ? `${ex.note.trim()} ${betweenNote}`
         : betweenNote
-      : ex.note;
+      : isSetsRepsMulti &&
+          betweenNote &&
+          ex.note &&
+          /rest\s+\d+\s*sec(?:onds)?\s+(?:between\s+sets|after\s+both\s+sides)/i.test(ex.note)
+        ? ex.note.replace(
+            /rest\s+\d+\s*sec(?:onds)?\s+(?:between\s+sets|after\s+both\s+sides(?:\s+are\s+completed)?)/i,
+            betweenNote.replace(/\.$/, "")
+          )
+        : ex.note;
 
   return {
     ...ex,
@@ -411,73 +411,6 @@ function applyMainRest(
     rest_between_sets_seconds: targetBetween,
     note,
   };
-}
-
-function ensureSafeMainStart(
-  exercises: WorkoutProposalExercise[],
-  catalog: ExerciseCatalogEntry[],
-  usedIds: Set<string>,
-  locationSlug: string | undefined,
-  sessionLabel: string | undefined,
-  warnings: string[],
-  trainingLevel?: OnboardingLevel | null,
-  preferAvoidIds?: ReadonlySet<string>
-): WorkoutProposalExercise[] {
-  const mainIndices = exercises
-    .map((ex, index) => ({ ex, index }))
-    .filter(({ ex }) => ex.phase === "main");
-  if (mainIndices.length === 0) return exercises;
-
-  const first = mainIndices[0]!;
-  const entry = catalogById(catalog, first.ex.exercise_id);
-  if (!entry || !exerciseIsHighIntensityStart(entry)) return exercises;
-
-  const saferMain = mainIndices
-    .slice(1)
-    .find(({ ex }) => {
-      const e = catalogById(catalog, ex.exercise_id);
-      return e != null && !exerciseIsHighIntensityStart(e);
-    });
-
-  if (saferMain) {
-    const out = [...exercises];
-    const a = out[first.index]!;
-    const b = out[saferMain.index]!;
-    out[first.index] = b;
-    out[saferMain.index] = a;
-    warnings.push(
-      sessionLabel
-        ? `${sessionLabel}: Moved ${b.title} before ${a.title} — sessions must not start main work with sprint/shuffle/jump.`
-        : `Moved ${b.title} before ${a.title} — sessions must not start main work with sprint/shuffle/jump.`
-    );
-    return out;
-  }
-
-  const pick = pickFromCatalog(
-    catalog,
-    usedIds,
-    safeMainStartScore,
-    1,
-    locationSlug,
-    trainingLevel,
-    { preferAvoidIds }
-  )[0];
-  if (!pick) {
-    warnings.push(
-      sessionLabel
-        ? `${sessionLabel}: Main block starts with a high-intensity move and no safer alternative was found.`
-        : "Main block starts with a high-intensity move and no safer alternative was found."
-    );
-    return exercises;
-  }
-
-  usedIds.add(pick.id);
-  warnings.push(
-    sessionLabel
-      ? `${sessionLabel}: Added ${pick.title} before main work — never start with sprint/shuffle/jump.`
-      : `Added ${pick.title} before main work — never start with sprint/shuffle/jump.`
-  );
-  return insertIntoMain(exercises, [defaultMainExercise(pick, trainingLevel ?? "beginner")]);
 }
 
 function ensureKineticChain(
@@ -794,16 +727,7 @@ export function applyProgramRulesToSession(
     );
   });
 
-  out = ensureSafeMainStart(
-    out,
-    catalog,
-    usedIds,
-    options?.locationSlug,
-    sessionLabel,
-    warnings,
-    level,
-    preferAvoidIds
-  );
+  // Explosive / jump / sprint work may open the main block after warm-up — do not reorder it away.
 
   return { exercises: out, warnings };
 }

@@ -1,5 +1,6 @@
 import type { ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
+import { exerciseIsStrength } from "@/lib/programs/program-prescription-rules";
 
 export type AiCoachProposalValidationError = {
   /** Human readable error message (can be shown back to the AI). */
@@ -80,6 +81,66 @@ function hasSubstantialDesignRationale(v: unknown): boolean {
   return typeof v === "string" && v.trim().length >= 120;
 }
 
+function catalogBlob(entry: ExerciseCatalogEntry): string {
+  return [
+    entry.title,
+    ...entry.categoryTypes,
+    ...entry.movementPatterns,
+    ...entry.bodyRegions,
+    ...entry.bodyParts,
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+/**
+ * RPE only when the athlete must regulate effort (weighted strength, conditioning,
+ * repeated explosive work, near-fatigue). Not for mobility / warm-up / cool-down /
+ * technique / standard isometric holds / Copenhagen-style work unless effort-based.
+ */
+function exerciseNeedsRpeGuidance(
+  entry: ExerciseCatalogEntry,
+  ex: WorkoutProposalExercise,
+  isTimed: boolean,
+  sets: number | null,
+  reps: number | null
+): boolean {
+  if (ex.phase === "warmup" || ex.phase === "cooldown") return false;
+
+  const blob = catalogBlob(entry);
+  if (/\bmobility\b|\bstretch\b|\btechnique\b/.test(blob)) return false;
+  if (/\bcopenhagen\b/.test(blob)) return false;
+  if (entry.programPrescriptionMode === "time_only" && !/\bexplosive\b|\bplyometric\b|\bconditioning\b/.test(blob)) {
+    return false;
+  }
+
+  if (/\bexplosive\b|\bplyometric\b|\bconditioning\b|\bspeedstrength\b|\bspeed-strength\b/.test(blob)) {
+    return true;
+  }
+
+  // Weighted / strength sets×reps main work.
+  if (ex.phase === "main" && !isTimed && sets != null && reps != null && exerciseIsStrength(entry)) {
+    return true;
+  }
+
+  return false;
+}
+
+function noteHasMatchingBetweenSetsRest(
+  note: string,
+  restSeconds: number,
+  bothSides: boolean
+): boolean {
+  const n = Math.round(restSeconds);
+  if (bothSides) {
+    return new RegExp(
+      `rest\\s+${n}\\s*sec(?:onds)?\\s+after\\s+both\\s+sides`,
+      "i"
+    ).test(note);
+  }
+  return new RegExp(`rest\\s+${n}\\s*sec(?:onds)?\\s+between\\s+sets`, "i").test(note);
+}
+
 function validateExerciseTechnical(
   ex: WorkoutProposalExercise,
   opts: ValidatorOptions,
@@ -129,8 +190,8 @@ function validateExerciseTechnical(
     }
   }
 
-  // Sets×reps main work needs RPE-based load guidance in coach explanations (not exact kg/lb).
-  if (ex.phase === "main" && !isTimed && sets != null && reps != null) {
+  // RPE only when effort must be athlete-regulated.
+  if (exerciseNeedsRpeGuidance(catalogEntry, ex, isTimed, sets, reps)) {
     const noteText = typeof ex.note === "string" ? ex.note : "";
     const intensityText =
       typeof getOptionalIntensity(ex) === "string" ? String(getOptionalIntensity(ex)) : "";
@@ -141,7 +202,7 @@ function validateExerciseTechnical(
       errors.push({
         path,
         message:
-          "Sets×reps main exercise must set rpe and include RPE-based load guidance in note and/or intensity (e.g. \"choose a weight that hits RPE 8\") — never exact kg/lb.",
+          "Effort-regulated exercise must set rpe and include RPE-based load guidance in note and/or intensity (e.g. \"choose a weight that hits RPE 8\") — never exact kg/lb. Skip RPE for mobility, warm-up, cool-down, technique, and standard isometric holds.",
       });
     }
   }
@@ -186,16 +247,30 @@ function validateExerciseTechnical(
         message: "Sets×reps exercise with multiple sets must include rest_between_sets_seconds > 0.",
       });
     }
+
+    if (sets != null && sets > 1 && hasRestBetweenSets(ex)) {
+      const noteText = typeof ex.note === "string" ? ex.note : "";
+      const restSecs = Math.round(ex.rest_between_sets_seconds!);
+      if (!noteHasMatchingBetweenSetsRest(noteText, restSecs, bothSides)) {
+        errors.push({
+          path,
+          message: bothSides
+            ? `Sets×reps both_sides note must include "Rest ${restSecs} seconds after both sides are completed" matching rest_between_sets_seconds=${restSecs}.`
+            : `Sets×reps note must include "Rest ${restSecs} sec between sets" matching rest_between_sets_seconds=${restSecs} (do not invent a mismatched 30s cue).`,
+        });
+      }
+    }
   }
 
-  // RPE/intensity are optional until tool schema + DB columns are wired up.
-  // When the model includes these keys, they must be non-empty strings.
+  // When RPE/intensity keys are present with non-empty intent required only if guidance applies.
+  // Empty strings on exercises that do not need RPE are ignored.
+  const needsRpe = exerciseNeedsRpeGuidance(catalogEntry, ex, isTimed, sets, reps);
   const rpeKeyPresent = hasOwnKey(ex as unknown, "rpe");
   const intensityKeyPresent = hasOwnKey(ex as unknown, "intensity");
   const rpeVal = getOptionalRpe(ex);
   const intensityVal = getOptionalIntensity(ex);
 
-  if (rpeKeyPresent || intensityKeyPresent) {
+  if (needsRpe && (rpeKeyPresent || intensityKeyPresent)) {
     if (!requireNonEmptyString(rpeVal)) {
       errors.push({ path, message: "Exercise is missing required rpe (non-empty string)." });
     }

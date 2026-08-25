@@ -56,8 +56,12 @@ const DEFAULT_REST_AFTER: Record<SessionPhase, number> = {
 
 const DEFAULT_REST_AFTER_TIMED = 30;
 const DEFAULT_REST_BETWEEN_SETS = 30;
-/** Fixed between-set rest for sets×reps prescriptions (shown as coach note + structured field). */
+/**
+ * Fallback between-set rest only when the AI omits the field entirely.
+ * Prefer the AI value / strength-tag band — never treat 30s as correct for heavy/explosive work.
+ */
 export const SETS_REPS_REST_BETWEEN_SETS_SECONDS = 30;
+/** @deprecated Prefer formatSetsRepsBetweenSetsNote(restSeconds) so the note matches the structured rest. */
 export const SETS_REPS_BETWEEN_SETS_NOTE = "Rest 30 sec between sets";
 const DEFAULT_REST_BETWEEN_SIDES = DEFAULT_REST_BETWEEN_SIDES_SECONDS;
 
@@ -67,7 +71,20 @@ export const MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS = 30;
 /** Default hold length when catalog is time_only and AI/admin omit duration (e.g. Pallof Press Hold). */
 export const MAIN_TIMED_HOLD_DEFAULT_SECONDS = 30;
 
-const BETWEEN_SETS_NOTE_RE = /rest\s+\d+\s*sec(?:onds)?\s+between\s+sets/i;
+const BETWEEN_SETS_NOTE_RE =
+  /rest\s+\d+\s*sec(?:onds)?\s+(?:between\s+sets|after\s+both\s+sides(?:\s+are\s+completed)?)/i;
+
+/** Coach-note cue that matches the structured \`rest_between_sets_seconds\` value. */
+export function formatSetsRepsBetweenSetsNote(
+  restSeconds: number,
+  opts?: { bothSides?: boolean }
+): string {
+  const n = Math.max(1, Math.round(restSeconds));
+  if (opts?.bothSides) {
+    return `Rest ${n} seconds after both sides are completed.`;
+  }
+  return `Rest ${n} sec between sets`;
+}
 
 function hasTimedDuration(ex: AiExerciseFields): boolean {
   return (
@@ -145,20 +162,28 @@ export function isMultiSetSetsReps(ex: AiExerciseFields): boolean {
   return type === "sets_reps" && sets > 1;
 }
 
-/** Ensure sets×reps multi-set exercises carry the between-sets rest coach note. Skip both_sides. */
+/**
+ * Ensure sets×reps multi-set exercises carry a between-sets rest coach note whose
+ * seconds match \`rest_between_sets_seconds\` (including both_sides / per-side work).
+ */
 export function ensureSetsRepsBetweenSetsNote(
   note: string | null | undefined,
   ex: AiExerciseFields,
   opts?: { bothSides?: boolean }
 ): string | null {
-  if (opts?.bothSides || !isMultiSetSetsReps(ex)) {
+  if (!isMultiSetSetsReps(ex)) {
     const trimmed = note?.trim();
     return trimmed || null;
   }
+  const rest =
+    parseNonNegInt(ex.rest_between_sets_seconds) ?? SETS_REPS_REST_BETWEEN_SETS_SECONDS;
+  const cue = formatSetsRepsBetweenSetsNote(rest, { bothSides: opts?.bothSides });
   const existing = note?.trim() || "";
-  if (BETWEEN_SETS_NOTE_RE.test(existing)) return existing || null;
-  if (!existing) return SETS_REPS_BETWEEN_SETS_NOTE;
-  return `${existing} ${SETS_REPS_BETWEEN_SETS_NOTE}`;
+  if (!existing) return cue;
+  if (BETWEEN_SETS_NOTE_RE.test(existing)) {
+    return existing.replace(BETWEEN_SETS_NOTE_RE, cue.replace(/\.$/, "")).replace(/\s+/g, " ").trim();
+  }
+  return `${existing} ${cue}`.trim();
 }
 
 /** Rest between left and right on bilateral timed exercises. Catalog both_sides only. */

@@ -112,4 +112,4 @@ between: 0 · after: 10–15
 4. Apply \`rest_after_seconds\` from the rest matrix (same band).
 5. Never invent rest values outside these bands.
 6. If multiple tags exist, pick one by session objective — do not blend.
-7. For sets×reps with 2+ sets (and not both_sides), include coach note \`Rest {N} sec between sets\` using the chosen between-sets value.`.trim();
+7. For sets×reps with 2+ sets, include coach note \`Rest {N} sec between sets\` (or both_sides: \`Rest {N} seconds after both sides are completed\`) using the **same** N as \`rest_between_sets_seconds\` — never a mismatched 30s cue on heavy/explosive work.`.trim();

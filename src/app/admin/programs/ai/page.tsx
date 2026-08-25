@@ -6,6 +6,8 @@ import { listMembersForAiPicker } from "@/lib/programs/profile-ai-context";
 import { AiCoachClient } from "./ai-coach-client";
 
 export const dynamic = "force-dynamic";
+/** Full multi-week OpenAI program generation regularly exceeds default serverless limits. */
+export const maxDuration = 300;
 
 export default async function AdminAiCoachPage() {
   const supabase = await createClient();

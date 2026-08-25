@@ -224,19 +224,55 @@ serve(async (req) => {
       );
     }
 
-    const result = await callOpenAi({
-      apiKey,
-      model: body.model ?? "gpt-5.6",
-      systemPrompt,
-      history,
-      toolsEnabled: Boolean(body.toolsEnabled),
-      forcedTool: body.forcedTool ?? null,
-      tools: body.tools,
+    const encoder = new TextEncoder();
+    // Return the response immediately and stream heartbeats while OpenAI runs.
+    // Without this, platform IDLE_TIMEOUT (150s with no bytes) kills long generate_program calls.
+    const stream = new ReadableStream({
+      async start(controller) {
+        const heartbeat = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(`${JSON.stringify({ type: "ping" })}\n`));
+          } catch {
+            /* stream already closed */
+          }
+        }, 10_000);
+        try {
+          // Immediate first byte so the idle timer never starts empty.
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: "ping" })}\n`));
+          const result = await callOpenAi({
+            apiKey,
+            model: body.model ?? "gpt-5.6",
+            systemPrompt,
+            history,
+            toolsEnabled: Boolean(body.toolsEnabled),
+            forcedTool: body.forcedTool ?? null,
+            tools: body.tools,
+          });
+          clearInterval(heartbeat);
+          controller.enqueue(encoder.encode(`${JSON.stringify(result)}\n`));
+          controller.close();
+        } catch (e) {
+          clearInterval(heartbeat);
+          const msg = e instanceof Error ? e.message : String(e);
+          try {
+            controller.enqueue(
+              encoder.encode(`${JSON.stringify({ type: "error", error: `Edge handler exception: ${msg}` })}\n`)
+            );
+            controller.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      },
     });
 
-    return new Response(JSON.stringify(result), {
-      status: result.type === "error" ? 400 : 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache",
+      },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

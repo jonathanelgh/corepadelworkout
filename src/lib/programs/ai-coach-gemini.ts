@@ -212,7 +212,7 @@ const TOOLS: FunctionDeclaration[] = [
               rest_between_sets_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Rest between sets of the same exercise. For sets×reps with sets >= 2 use 30. For timed intervals match tag band.",
+                  "Rest between sets of the same exercise. Use strength-tag rest bands (often 60–180s for strength/power — never blanket 30s for heavy/explosive). Coach note must quote this exact number.",
               },
               rest_after_seconds: {
                 type: SchemaType.NUMBER,
@@ -231,16 +231,17 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Coach note shown in-workout. Include technique + RPE-based load guidance for weighted sets×reps (e.g. choose a weight that hits RPE 7–8). Align with the rpe field. Never invent kg/lb or week-to-week progression.",
+                  "Coach note. For sets×reps with 2+ sets include \"Rest N sec between sets\" (or both_sides: \"Rest N seconds after both sides are completed\") matching rest_between_sets_seconds. Add RPE only when effort must be athlete-regulated — not mobility/warm-up/cool-down/technique/standard isometric holds. Never invent kg/lb.",
               },
               rpe: {
                 type: SchemaType.STRING,
-                description: 'Rate of Perceived Exertion (e.g. "7", "8-9").',
+                description:
+                  'RPE when effort must be regulated (e.g. "7", "8-9"). Omit for mobility, warm-up, cool-down, technique, and standard isometric holds unless effort-based progression is required.',
               },
               intensity: {
                 type: SchemaType.STRING,
                 description:
-                  'Short RPE/load cue (e.g. "RPE 7-8", "RPE 8-9"). Align with sets×reps — lower reps → higher RPE. Never invent kg/lb.',
+                  'Short RPE/load cue when RPE applies (e.g. "RPE 7-8"). Omit when RPE is not used. Never invent kg/lb.',
               },
               load_prescription: {
                 type: SchemaType.STRING,
@@ -306,7 +307,7 @@ const TOOLS: FunctionDeclaration[] = [
               rest_between_sets_seconds: {
                 type: SchemaType.NUMBER,
                 description:
-                  "Rest between sets. For sets×reps with sets >= 2 use 30. For timed intervals match tag rest band.",
+                  "Rest between sets. Use strength-tag rest bands (often 60–180s for strength/power — never blanket 30s for heavy/explosive). Coach note must quote this exact number.",
               },
               rest_after_seconds: {
                 type: SchemaType.NUMBER,
@@ -325,16 +326,17 @@ const TOOLS: FunctionDeclaration[] = [
               note: {
                 type: SchemaType.STRING,
                 description:
-                  "Coach note shown in-workout. Include technique + RPE-based load guidance for weighted sets×reps (e.g. choose a weight that hits RPE 7–8). Align with the rpe field. Never invent kg/lb or week-to-week progression.",
+                  "Coach note. For sets×reps with 2+ sets include \"Rest N sec between sets\" (or both_sides after-both-sides cue) matching rest_between_sets_seconds. Add RPE only when effort must be athlete-regulated. Never invent kg/lb.",
               },
               rpe: {
                 type: SchemaType.STRING,
-                description: 'Rate of Perceived Exertion (e.g. "7", "8-9").',
+                description:
+                  'RPE when effort must be regulated (e.g. "7", "8-9"). Omit for mobility/warm-up/cool-down/technique/standard isometric holds unless effort-based progression is required.',
               },
               intensity: {
                 type: SchemaType.STRING,
                 description:
-                  'Short RPE/load cue (e.g. "RPE 7-8", "RPE 8-9"). Align with sets×reps — lower reps → higher RPE. Never invent kg/lb.',
+                  'Short RPE/load cue when RPE applies (e.g. "RPE 7-8"). Omit when RPE is not used. Never invent kg/lb.',
               },
               load_prescription: {
                 type: SchemaType.STRING,
@@ -717,7 +719,7 @@ export async function chatWithAiCoach(params: {
     let history = initialHistory;
     const toolName = params.forcedTool ?? "generate_program";
     const retryMessages = [
-      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), rest_between_sets_seconds=30 for sets×reps with sets >= 2 (plus note "Rest 30 sec between sets"), and rest_between_sets_seconds when using timed sets (duration + sets >= 2).`,
+      `Call ${toolName} now with a complete payload. Copy every exercise_id exactly from catalog UUIDs in square brackets. Include title, description, and exercises with phase, rest_after_seconds (between exercises), rest_between_sets_seconds for sets×reps with sets >= 2 plus a matching note cue (\"Rest N sec between sets\" or both_sides after-both-sides), and rest_between_sets_seconds when using timed sets (duration + sets >= 2). Set rpe only when effort must be athlete-regulated.`,
       `Your previous response was empty or incomplete. Call ${toolName} again with a compact payload. For programs: return ALL sessions for ALL weeks (duration_weeks × sessions_per_week). Each session needs warmup/main/cooldown phases (do not hard-code exact counts), and it must include required technical fields.`,
       `Final attempt: call ${toolName} only — no prose. Use fewer exercises per session if needed, but return a valid complete tool call.`,
     ];

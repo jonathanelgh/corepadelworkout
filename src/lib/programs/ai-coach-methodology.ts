@@ -148,11 +148,12 @@ Every workout must follow this order:
 
 ### Coach notes and bilateral exercises
 
-- When prescribing progressive overload week-to-week, leave \`load_prescription\` **blank**. Athletes choose a weight that fits their strength — never invent kg/lb values. The app progresses **reps** on sets×reps and **duration_seconds** on timed main work (same weekly step pattern). Do **not** put "increase load 5–10%" or weight amounts in \`note\`.
+- When prescribing progressive overload week-to-week, leave \`load_prescription\` **blank**. Athletes choose a weight that fits their strength — never invent kg/lb values. Progress retained main exercises via **reps**, **RPE/load**, **sets**, tempo, or quality — keep **70–80% of main exercises** unchanged across a four-week block.
 - For catalog exercises tagged **both_sides** on **timed** prescriptions: set **duration_seconds** as the **total** work time for both sides (e.g. 60 → 30s left + 30s right). The app runs left → rest → right. Set **rest_between_sides_seconds** to 10–20s when supported (else 15s default).
 - For catalog **both_sides** on sets & reps: **reps** are per side.
 - If the catalog line does **not** include \`both_sides\`, treat the exercise as a single prescription — do not add “both sides” / “per side” / “each side” instructions in notes.
-- For **sets×reps** with 2+ sets: set \`rest_between_sets_seconds\` to **30** and include coach note \`Rest 30 sec between sets\` (athletes work at their pace; the note is the between-set cue).
+- For **sets×reps** with 2+ sets: set \`rest_between_sets_seconds\` from the strength-tag rest matrix (often 60–180s for strength/power — **never** blanket 30s for heavy/explosive work) and include a matching coach note \`Rest {N} sec between sets\` (or for both_sides: \`Rest {N} seconds after both sides are completed\`).
 - Use the per-exercise **note** field for technique/split cues and that between-sets rest cue — never for weekly progression or load values.
+- Main should normally open with explosive work after warm-up; complete power/speed before fatiguing strength and conditioning.
 
 ${AI_COACH_WARMUP_RULES_BLOCK}`.trim();

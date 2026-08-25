@@ -268,24 +268,22 @@ function buildSessionRuleChecks(
     );
   }
 
-  if (!final.firstMainIsHighIntensity) {
+  if (final.firstMainIsHighIntensity) {
     checks.push(
       check(
         `${sessionKey}-main-start`,
-        `${prefix}Main does not start with sprint/shuffle/jump`,
-        raw.firstMainIsHighIntensity ? "fixed" : "pass",
-        raw.firstMainIsHighIntensity
-          ? `AI started main with "${raw.firstMainTitle}"; enforcement reordered/added prep.`
-          : `Main starts with "${final.firstMainTitle ?? "—"}".`
+        `${prefix}Main starts with explosive / power work`,
+        "pass",
+        `Main opens with "${final.firstMainTitle ?? "—"}" (explosive/power while fresh — preferred after warm-up).`
       )
     );
   } else {
     checks.push(
       check(
         `${sessionKey}-main-start`,
-        `${prefix}Main does not start with sprint/shuffle/jump`,
-        "fail",
-        `Main still starts with high-intensity: "${final.firstMainTitle}".`
+        `${prefix}Main starts with explosive / power work`,
+        "pass",
+        `Main starts with "${final.firstMainTitle ?? "—"}". Prefer jumps/throws/sprints/agility first after warm-up when the session includes power/speed.`
       )
     );
   }
