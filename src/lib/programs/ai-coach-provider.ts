@@ -5,7 +5,7 @@ export const AI_COACH_PROVIDERS: {
   label: string;
   shortLabel: string;
 }[] = [
-  { id: "openai", label: "ChatGPT (GPT-5.6)", shortLabel: "ChatGPT" },
+  { id: "openai", label: "ChatGPT (GPT-5.6 Terra)", shortLabel: "ChatGPT" },
 ];
 
 export function isAiCoachProvider(v: unknown): v is AiCoachProvider {

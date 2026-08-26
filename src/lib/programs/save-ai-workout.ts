@@ -1,25 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkoutProposal } from "./ai-coach-gemini";
 import { aiExerciseToProgramPayload } from "./normalize-ai-exercise-prescription";
+import { estimateWorkoutProposalMinutes } from "./estimate-workout-minutes";
 import { insertProgramCurriculum, type ProgramExercisePayload } from "./program-curriculum";
 import { slugifyTitle, uniqueProgramSlug } from "./program-slug";
-
-function estimateTotalMinutes(proposal: WorkoutProposal): number {
-  let total = 0;
-  for (let i = 0; i < proposal.exercises.length; i++) {
-    const ex = proposal.exercises[i]!;
-    const payload = aiExerciseToProgramPayload(
-      { ...ex, choice_group: ex.choice_group ?? null, note: ex.note ?? null },
-      { isLastInSession: i === proposal.exercises.length - 1 }
-    );
-    if (payload.duration_seconds) total += payload.duration_seconds / 60;
-    if (payload.rest_after_seconds) total += payload.rest_after_seconds / 60;
-    if (payload.rest_between_sets_seconds && payload.sets && payload.sets > 1) {
-      total += ((payload.rest_between_sets_seconds * (payload.sets - 1)) / 60);
-    }
-  }
-  return Math.ceil(total) || 15;
-}
 
 async function resolveLocationId(supabase: SupabaseClient, slug: string): Promise<string> {
   const { data, error } = await supabase
@@ -81,7 +65,7 @@ export async function saveAiWorkoutProgram(
     (existingRows ?? []).map((row) => [row.id as string, Boolean(row.both_sides)])
   );
 
-  const totalMinutes = estimateTotalMinutes(proposal);
+  const totalMinutes = estimateWorkoutProposalMinutes(proposal);
   const locationSlug = options?.locationSlug?.trim() || "home";
   const locationId = await resolveLocationId(supabase, locationSlug);
   const slug = await uniqueProgramSlug(supabase, slugifyTitle(proposal.title));

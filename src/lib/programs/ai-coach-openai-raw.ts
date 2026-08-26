@@ -3,6 +3,7 @@ import {
   OPENAI_CHAT_LIKE,
   requireOpenAiApiKey,
   resolveOpenAiModel,
+  resolveOpenAiReasoningEffort,
 } from "@/lib/openai-config";
 import {
   getAiCoachOpenAiTools,
@@ -74,6 +75,7 @@ export async function runAiCoachOpenAiGenerate(
 ): Promise<AiCoachGenerateResult> {
   const apiKey = requireOpenAiApiKey();
   const model = input.model?.trim() || resolveOpenAiModel();
+  const reasoningEffort = resolveOpenAiReasoningEffort();
   const toolsEnabled = input.toolsEnabled !== false;
   const history = Array.isArray(input.history) ? input.history : [];
   const systemPrompt = typeof input.systemPrompt === "string" ? input.systemPrompt : "";
@@ -98,7 +100,7 @@ export async function runAiCoachOpenAiGenerate(
       tool_choice: forced
         ? { type: "function" as const, name: forced }
         : ("auto" as const),
-      reasoning: { effort: OPENAI_CHAT_LIKE.reasoningEffort },
+      reasoning: { effort: reasoningEffort },
       max_output_tokens: OPENAI_CHAT_LIKE.maxOutputTokensTools,
     });
 

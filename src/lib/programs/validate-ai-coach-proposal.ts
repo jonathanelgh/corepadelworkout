@@ -1,5 +1,10 @@
 import type { ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
+import {
+  estimateWorkoutMinutes,
+  estimateWorkoutProposalMinutes,
+  minMainExercisesForTargetMinutes,
+} from "@/lib/programs/estimate-workout-minutes";
 import { coerceRpeField } from "@/lib/programs/rpe";
 import { exerciseNeedsRpeGuidance } from "@/lib/programs/ai-rpe-guidance";
 
@@ -16,7 +21,53 @@ export type AiCoachProposalValidationResult =
 
 type ValidatorOptions = {
   exerciseCatalogById: Map<string, ExerciseCatalogEntry>;
+  /** Consultation / brief target session length in minutes. */
+  targetMinutes?: number | null;
 };
+
+/** Minimum fraction of target minutes the estimated session must reach. */
+const MIN_DURATION_FRACTION = 0.75;
+/** Soft ceiling so sessions aren't wildly overfilled. */
+const MAX_DURATION_FRACTION = 1.4;
+
+function countMainExercises(
+  exercises: Array<Pick<WorkoutProposalExercise, "phase">>
+): number {
+  return exercises.filter((ex) => ex.phase === "main").length;
+}
+
+function validateSessionDurationFit(
+  exercises: WorkoutProposalExercise[],
+  targetMinutes: number,
+  label: string
+): AiCoachProposalValidationError[] {
+  const errors: AiCoachProposalValidationError[] = [];
+  if (!Number.isFinite(targetMinutes) || targetMinutes < 8) return errors;
+
+  const estimated = estimateWorkoutMinutes(exercises);
+  const minOk = Math.ceil(targetMinutes * MIN_DURATION_FRACTION);
+  const maxOk = Math.ceil(targetMinutes * MAX_DURATION_FRACTION);
+  const minMains = minMainExercisesForTargetMinutes(targetMinutes);
+  const mains = countMainExercises(exercises);
+
+  if (estimated < minOk) {
+    errors.push({
+      message: `${label} is too short: estimated ~${estimated} min vs target ~${targetMinutes} min (need ≥${minOk}). Add more main-block work (extra exercises and/or more sets) so total work+rest fills the session. Do not pad only with warm-up/cool-down.`,
+    });
+  } else if (estimated > maxOk) {
+    errors.push({
+      message: `${label} is too long: estimated ~${estimated} min vs target ~${targetMinutes} min (keep ≤${maxOk}). Trim volume or rest so it fits.`,
+    });
+  }
+
+  if (mains < minMains) {
+    errors.push({
+      message: `${label} has only ${mains} main exercise(s); for a ~${targetMinutes}-minute session include at least ${minMains} distinct main-phase exercises (not just warm-up/cool-down).`,
+    });
+  }
+
+  return errors;
+}
 
 function isFinitePositiveNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v) && v > 0;
@@ -236,6 +287,29 @@ export function validateWorkoutProposal(
     );
   });
 
+  const target =
+    opts.targetMinutes != null && Number.isFinite(opts.targetMinutes)
+      ? Math.round(opts.targetMinutes)
+      : null;
+  if (target != null && target >= 8) {
+    errors.push(...validateSessionDurationFit(proposal.exercises, target, "Workout"));
+    const estimated = estimateWorkoutProposalMinutes(proposal);
+    if (
+      requireNonEmptyString(proposal.title) &&
+      /\b\d{1,3}\s*[- ]?\s*min(ute)?s?\b/i.test(proposal.title)
+    ) {
+      const claimed = Number.parseInt(
+        proposal.title.match(/\b(\d{1,3})\s*[- ]?\s*min(ute)?s?\b/i)?.[1] ?? "",
+        10
+      );
+      if (Number.isFinite(claimed) && Math.abs(claimed - estimated) > Math.max(8, target * 0.25)) {
+        errors.push({
+          message: `Title claims ~${claimed} minutes but the session estimates to ~${estimated} min. Either fill the session to match the title/target (~${target} min) or rename the title to the real duration — do not advertise a longer workout than you prescribe.`,
+        });
+      }
+    }
+  }
+
   return errors.length ? { ok: false, errors } : { ok: true };
 }
 
@@ -286,6 +360,14 @@ export function validateProgramProposal(
     }
   }
 
+  const target =
+    opts.targetMinutes != null && Number.isFinite(opts.targetMinutes)
+      ? Math.round(opts.targetMinutes)
+      : typeof proposal.minutes_per_session === "number" &&
+          Number.isFinite(proposal.minutes_per_session)
+        ? Math.round(proposal.minutes_per_session)
+        : null;
+
   proposal.sessions.forEach((session, sIdx) => {
     if (!requireNonEmptyString(session.name)) {
       errors.push({ message: `Session[${sIdx}] is missing a non-empty name.` });
@@ -300,6 +382,11 @@ export function validateProgramProposal(
         ...validateExerciseTechnical(ex, opts, `program.sessions[${sIdx}]`, eIdx)
       );
     });
+
+    if (target != null && target >= 8) {
+      const label = `Session[${sIdx}] (${session.name || "unnamed"})`;
+      errors.push(...validateSessionDurationFit(session.exercises, target, label));
+    }
   });
 
   return errors.length ? { ok: false, errors } : { ok: true };

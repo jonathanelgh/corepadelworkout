@@ -34,6 +34,7 @@ Rules for fields:
 ### Session shape
 - Every exercise must have a \`phase\`.
 - You decide how many warmup / main / cooldown exercises fit the goal and duration.
+- **Fill the target session length** with real work + rest. Do not advertise "45-Minute" (or similar) while only prescribing a short primer. Longer sessions need a denser main block, not a longer title.
 - Warm up thoroughly, then normally **start main with explosive work** (jumps, throws, short sprints, high-quality agility) while fresh — before fatiguing strength/conditioning. Do not ban explosive openers.
 
 ### Rest

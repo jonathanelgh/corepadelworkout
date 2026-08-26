@@ -400,7 +400,8 @@ export async function sendAiCoachMessage(input: {
       let proposal = rawProposal;
       let structureWarnings: string[] = [];
 
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // At most one AI fix pass — full regenerations are expensive.
+      for (let attempt = 0; attempt < 2; attempt++) {
         // Fill rests/RPE defaults before validating so missing rpe does not force a full AI regen.
         const enforced = ensureWorkoutProposalStructure(
           rawProposal,
@@ -410,10 +411,13 @@ export async function sendAiCoachMessage(input: {
         proposal = enforced.proposal;
         structureWarnings = enforced.warnings;
 
-        const validation = validateWorkoutProposal(proposal, { exerciseCatalogById });
+        const validation = validateWorkoutProposal(proposal, {
+          exerciseCatalogById,
+          targetMinutes: consultation.minutes ?? null,
+        });
         if (validation.ok) break;
 
-        if (attempt >= 2) {
+        if (attempt >= 1) {
           const first = validation.errors[0]?.message ?? "unknown validation error";
           throw new Error(
             `AI workout proposal failed validation after ${attempt + 1} attempts. First error: ${first}`
@@ -494,7 +498,8 @@ export async function sendAiCoachMessage(input: {
     let proposal = rawProgramArgs as ProgramProposal;
     let structureWarnings: string[] = [];
 
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // At most one AI fix pass — an 8-week regenerate is the main cost driver.
+    for (let attempt = 0; attempt < 2; attempt++) {
       // Enforce rests/RPE defaults first — missing rpe used to trigger multi-week AI regenerations.
       const enforced = ensureProgramProposalStructure(
         rawProgramArgs,
@@ -504,10 +509,13 @@ export async function sendAiCoachMessage(input: {
       proposal = enforced.proposal;
       structureWarnings = enforced.warnings;
 
-      const validation = validateProgramProposal(proposal, { exerciseCatalogById });
+      const validation = validateProgramProposal(proposal, {
+        exerciseCatalogById,
+        targetMinutes: consultation.minutes ?? proposal.minutes_per_session ?? null,
+      });
       if (validation.ok) break;
 
-      if (attempt >= 2) {
+      if (attempt >= 1) {
         const first = validation.errors[0]?.message ?? "unknown validation error";
         throw new Error(
           `AI program proposal failed validation after ${attempt + 1} attempts. First error: ${first}`

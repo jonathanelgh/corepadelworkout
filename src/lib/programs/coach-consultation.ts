@@ -1023,7 +1023,7 @@ export function formatConsultationBrief(state: ConsultationState, isProgram: boo
       "Do not ask more consultation questions. Do not describe the program in prose only — return the tool call so the admin can review and save it.",
       isProgram
         ? "- generate_program sessions[]: return ALL sessions for ALL weeks (duration_weeks × sessions_per_week), in order. Name them clearly (e.g. Week 1 — Day 1). Do not return only one week of templates."
-        : "- generate_workout: one session filling the target minutes with warmup, main, and cooldown."
+        : "- generate_workout: one session whose total work+rest fills the target minutes with warmup, a dense main block, and cooldown. Title minute claims must match the real length."
     );
   }
   return lines.join("\n");
@@ -1088,8 +1088,9 @@ export function formatGenerationCoachBrief(
 ${
   isProgram
     ? `- sessions[] must contain exactly ${(state.durationWeeks ?? 8) * (state.sessionsPerWeek ?? 3)} sessions = duration_weeks (${state.durationWeeks ?? 8}) × sessions_per_week (${state.sessionsPerWeek ?? "sessions_per_week"}) — every week of the block, in order.
-- Progress, vary, and deload across weeks as you decide. Do NOT return week-1 templates only.`
-    : `- Target ~${state.minutes ?? 30} minutes for this single workout.`
+- Progress, vary, and deload across weeks as you decide. Do NOT return week-1 templates only.
+- Each session should fill ~${state.minutes ?? "the consulted"} minutes of work+rest with a real main block (not warm-up/cool-down only).`
+    : `- Target ~${state.minutes ?? 30} minutes for this single workout. Estimated work+rest must fill that length; use enough main exercises (not warm-up/cool-down only). If the title includes a minute count, it must match.`
 }`;
 }
 

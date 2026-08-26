@@ -31,9 +31,9 @@ type RequestBody = {
   model?: string;
 };
 
-/** Match ChatGPT chat defaults (omit temperature; medium reasoning). */
+/** Cost-aware defaults (override via request body.model / env on the Next path). */
 const CHAT_LIKE = {
-  reasoningEffort: "medium",
+  reasoningEffort: "low",
   maxOutputTokensTools: 32768,
   maxOutputTokensChat: 8192,
 } as const;
@@ -241,7 +241,7 @@ serve(async (req) => {
           controller.enqueue(encoder.encode(`${JSON.stringify({ type: "ping" })}\n`));
           const result = await callOpenAi({
             apiKey,
-            model: body.model ?? "gpt-5.6",
+            model: body.model ?? "gpt-5.6-terra",
             systemPrompt,
             history,
             toolsEnabled: Boolean(body.toolsEnabled),

@@ -92,6 +92,14 @@ Exercise changes must follow a clear movement chain. Examples:
 - Chest press stays the primary horizontal press (do not swap to an unrelated press pattern)
 - Copenhagen plank progresses via hold time, lever length, or dynamic reps — not unrelated core swaps`.trim();
 
+export const AI_COACH_SESSION_DURATION_BLOCK = `## Session duration vs target (hard)
+
+When the brief includes a target length in minutes (single workout or minutes per session):
+- Total work + rest must fill about that length (roughly 75–140% of target). Do **not** title a ~45-minute session and only prescribe ~15 minutes of content.
+- For longer sessions (≥20 min), put most of the time in the **main** block with enough distinct main exercises and realistic sets/rest — do not pad only with warm-up/cool-down.
+- Approximate main-block density: ~12 min → ≥3 mains; ~20 → ≥4; ~30 → ≥5; ~40+ → ≥6 (adjust for goal, but do not under-fill).
+- If the title includes a minute count (e.g. "45-Minute …"), that claim must match the actual prescribed session length.`.trim();
+
 /** Append tool routing + hard coaching constraints after any editable prompt. */
 export function appendHardAiConstraints(prompt: string): string {
   return [
@@ -101,6 +109,7 @@ export function appendHardAiConstraints(prompt: string): string {
     AI_COACH_LOAD_GUIDANCE_BLOCK,
     AI_COACH_SETS_REPS_REST_NOTE_BLOCK,
     AI_COACH_SESSION_SEQUENCING_BLOCK,
+    AI_COACH_SESSION_DURATION_BLOCK,
     AI_COACH_PROGRESSION_CONTINUITY_BLOCK,
   ].join("\n\n");
 }

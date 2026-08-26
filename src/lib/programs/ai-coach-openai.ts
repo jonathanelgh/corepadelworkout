@@ -3,7 +3,12 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions";
-import { OPENAI_CHAT_LIKE, requireOpenAiApiKey, resolveOpenAiModel } from "@/lib/openai-config";
+import {
+  OPENAI_CHAT_LIKE,
+  requireOpenAiApiKey,
+  resolveOpenAiModel,
+  resolveOpenAiReasoningEffort,
+} from "@/lib/openai-config";
 import {
   buildSystemInstruction,
   IncompleteToolCallError,
@@ -288,6 +293,7 @@ export async function chatWithAiCoachOpenAI(params: {
 
   const client = new OpenAI({ apiKey });
   const model = resolveOpenAiModel();
+  const reasoningEffort = resolveOpenAiReasoningEffort();
 
   async function runTurn(
     creationOnly: boolean,
@@ -313,8 +319,8 @@ export async function chatWithAiCoachOpenAI(params: {
     );
 
     // Chat Completions + function tools requires reasoning_effort "none" on GPT-5.6,
-    // which is not ChatGPT-like. Use Responses with medium reasoning (ChatGPT default)
-    // and omit temperature/top_p so sampling matches chat.
+    // which is not ChatGPT-like. Use Responses with configurable reasoning effort
+    // (default low for cost) and omit temperature/top_p so sampling matches chat.
     if (turnToolsEnabled) {
       const response = await client.responses.create({
         model,
@@ -327,7 +333,7 @@ export async function chatWithAiCoachOpenAI(params: {
         tool_choice: params.forcedTool
           ? { type: "function" as const, name: params.forcedTool }
           : ("auto" as const),
-        reasoning: { effort: OPENAI_CHAT_LIKE.reasoningEffort },
+        reasoning: { effort: reasoningEffort },
         max_output_tokens: OPENAI_CHAT_LIKE.maxOutputTokensTools,
       });
 
