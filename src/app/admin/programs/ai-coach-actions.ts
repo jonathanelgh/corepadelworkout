@@ -397,8 +397,20 @@ export async function sendAiCoachMessage(input: {
 
     if (result.name === "generate_workout") {
       let rawProposal = result.args;
+      let proposal = rawProposal;
+      let structureWarnings: string[] = [];
+
       for (let attempt = 0; attempt < 3; attempt++) {
-        const validation = validateWorkoutProposal(rawProposal, { exerciseCatalogById });
+        // Fill rests/RPE defaults before validating so missing rpe does not force a full AI regen.
+        const enforced = ensureWorkoutProposalStructure(
+          rawProposal,
+          generationExercises,
+          enforcementOptions
+        );
+        proposal = enforced.proposal;
+        structureWarnings = enforced.warnings;
+
+        const validation = validateWorkoutProposal(proposal, { exerciseCatalogById });
         if (validation.ok) break;
 
         if (attempt >= 2) {
@@ -445,25 +457,19 @@ export async function sendAiCoachMessage(input: {
         rawProposal = retry.args;
       }
 
-      const { proposal, warnings: structureWarnings } = ensureWorkoutProposalStructure(
-        rawProposal,
-        generationExercises,
-        enforcementOptions
-      );
       if (proposal.exercises.length === 0) {
         throw new Error(
           "Workout ended up with no exercises after catalog/level checks. Try again or widen the training level."
         );
       }
-      const allWarnings = [...structureWarnings];
-      if (allWarnings.length > 0) {
-        console.info("[ai-coach] workout enforcement:", allWarnings.join(" "));
+      if (structureWarnings.length > 0) {
+        console.info("[ai-coach] workout enforcement:", structureWarnings.join(" "));
       }
       const debugLog = debugLogFromWorkout({
         catalog: generationExercises,
-        raw: rawProposal,
+        raw: result.args,
         final: proposal,
-        enforcementChanges: allWarnings,
+        enforcementChanges: structureWarnings,
         trainingLevel: enforcementOptions.trainingLevel ?? null,
         locationSlug: enforcementOptions.locationSlug ?? null,
         goal: consultation.goal ?? null,
@@ -485,8 +491,20 @@ export async function sendAiCoachMessage(input: {
           : result.args.location_slug,
     };
 
+    let proposal = rawProgramArgs as ProgramProposal;
+    let structureWarnings: string[] = [];
+
     for (let attempt = 0; attempt < 3; attempt++) {
-      const validation = validateProgramProposal(rawProgramArgs, { exerciseCatalogById });
+      // Enforce rests/RPE defaults first — missing rpe used to trigger multi-week AI regenerations.
+      const enforced = ensureProgramProposalStructure(
+        rawProgramArgs,
+        generationExercises,
+        enforcementOptions
+      );
+      proposal = enforced.proposal;
+      structureWarnings = enforced.warnings;
+
+      const validation = validateProgramProposal(proposal, { exerciseCatalogById });
       if (validation.ok) break;
 
       if (attempt >= 2) {
@@ -545,26 +563,20 @@ export async function sendAiCoachMessage(input: {
       };
     }
 
-    const { proposal, warnings: structureWarnings } = ensureProgramProposalStructure(
-      rawProgramArgs,
-      generationExercises,
-      enforcementOptions
-    );
     const exerciseCount = proposal.sessions.reduce((n, s) => n + s.exercises.length, 0);
     if (exerciseCount === 0) {
       throw new Error(
         "Program ended up with no exercises after catalog/level checks. Try again or widen the training level."
       );
     }
-    const allWarnings = [...structureWarnings];
-    if (allWarnings.length > 0) {
-      console.info("[ai-coach] program enforcement:", allWarnings.join(" "));
+    if (structureWarnings.length > 0) {
+      console.info("[ai-coach] program enforcement:", structureWarnings.join(" "));
     }
     const debugLog = debugLogFromProgram({
       catalog: generationExercises,
-      raw: rawProgramArgs,
+      raw: result.args,
       final: proposal,
-      enforcementChanges: allWarnings,
+      enforcementChanges: structureWarnings,
       trainingLevel: enforcementOptions.trainingLevel ?? null,
       locationSlug: proposal.location_slug ?? null,
       goal: consultation.goal ?? null,
