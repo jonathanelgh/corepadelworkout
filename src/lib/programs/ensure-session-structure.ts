@@ -370,6 +370,8 @@ export function ensureGeminiDraftStructure(
         rest_after_seconds: ex.rest_after_seconds ?? 0,
         rest_between_sets_seconds: ex.rest_between_sets_seconds ?? undefined,
         load_prescription: ex.load_prescription ?? undefined,
+        rpe: ex.rpe ?? undefined,
+        intensity: ex.intensity ?? undefined,
         note: ex.note ?? undefined,
       }));
 
@@ -405,6 +407,8 @@ export function ensureGeminiDraftStructure(
         rest_between_sets_seconds: ex.rest_between_sets_seconds ?? null,
         rest_after_seconds: ex.rest_after_seconds,
         load_prescription: ex.load_prescription ?? null,
+        rpe: ex.rpe ?? null,
+        intensity: ex.intensity ?? null,
         note: ex.note ?? null,
       }));
       return { ...source, exercises };

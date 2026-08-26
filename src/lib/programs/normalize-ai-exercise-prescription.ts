@@ -11,7 +11,7 @@ import {
   clearAiLoadPrescription,
   sanitizeBothSidesCoachNote,
 } from "@/lib/programs/sanitize-coach-note";
-import { coerceRpeField, extractRpeValue } from "@/lib/programs/rpe";
+import { coerceRpeField, defaultRpeForEffort, extractRpeValue } from "@/lib/programs/rpe";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
@@ -289,11 +289,21 @@ export function aiExerciseToProgramPayload(
     bothSides: opts.bothSides,
   });
   const intensity = ex.intensity?.trim() || null;
-  const rpe =
+  let rpe =
     coerceRpeField(ex.rpe) ||
     extractRpeValue(note) ||
     extractRpeValue(intensity) ||
     null;
+  // Safety net when structured rpe was dropped (e.g. older save payloads).
+  if (
+    !rpe &&
+    ex.phase === "main" &&
+    sets != null &&
+    reps != null &&
+    (durationSeconds == null || durationSeconds <= 0)
+  ) {
+    rpe = defaultRpeForEffort({ reps });
+  }
 
   return {
     exercise_id: ex.exercise_id,

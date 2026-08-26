@@ -43,6 +43,8 @@ function slimProposal(proposal: ProgramProposal): ProgramProposal {
         rest_between_sides_seconds: ex.rest_between_sides_seconds,
         rest_after_seconds: ex.rest_after_seconds ?? 0,
         load_prescription: ex.load_prescription,
+        rpe: ex.rpe,
+        intensity: ex.intensity,
         note: ex.note,
       })),
     })),
