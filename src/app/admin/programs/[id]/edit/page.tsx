@@ -103,7 +103,7 @@ function mapSessionRow(
           ? String(e.rest_after_seconds)
           : "",
       loadPrescription: e.load_prescription?.trim() ?? "",
-      rpe: e.rpe?.trim() || extractRpeValue(e.note) || "",
+      rpe: e.rpe?.trim() || extractRpeValue(e.note) || extractRpeValue(e.intensity) || "",
       intensity: e.intensity?.trim() ?? "",
       note: e.note?.trim() ?? "",
     };

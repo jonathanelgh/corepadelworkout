@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ExercisePrescriptionType } from "@/lib/programs/program-exercises";
 import {
   allowedProgramPrescriptionTypesForPhase,
@@ -88,8 +88,48 @@ function exerciseBothSides(exercises: ExerciseOption[], exerciseId: string): boo
 }
 
 /** Prefer structured RPE; fall back to a target parsed from the coach note. */
-function exerciseRpeLabel(entry: Pick<SessionExerciseEntry, "rpe" | "note">): string {
-  return entry.rpe.trim() || extractRpeValue(entry.note) || "";
+function exerciseRpeLabel(entry: Pick<SessionExerciseEntry, "rpe" | "note" | "intensity">): string {
+  const structured = (entry.rpe ?? "").trim();
+  return (
+    structured ||
+    extractRpeValue(entry.rpe) ||
+    extractRpeValue(entry.note) ||
+    extractRpeValue(entry.intensity) ||
+    ""
+  );
+}
+
+/** Fill empty RPE inputs from note/intensity so admin cards show the target. */
+function hydrateExerciseRpe(entry: SessionExerciseEntry): SessionExerciseEntry {
+  const current = (entry.rpe ?? "").trim();
+  const rpe = exerciseRpeLabel(entry);
+  if (!rpe || current === rpe) {
+    return current === entry.rpe ? entry : { ...entry, rpe: current };
+  }
+  return { ...entry, rpe };
+}
+
+function hydrateTracksRpe(tracks: TrackBlock[]): TrackBlock[] {
+  let changed = false;
+  const next = tracks.map((t) => ({
+    ...t,
+    sessions: t.sessions.map((s) => ({
+      ...s,
+      exercises: s.exercises.map((e) => {
+        const hydrated = hydrateExerciseRpe({
+          ...e,
+          rpe: e.rpe ?? "",
+          intensity: e.intensity ?? "",
+          note: e.note ?? "",
+        });
+        if (hydrated.rpe !== (e.rpe ?? "") || hydrated.intensity !== (e.intensity ?? "")) {
+          changed = true;
+        }
+        return hydrated;
+      }),
+    })),
+  }));
+  return changed ? next : tracks;
 }
 
 function prescriptionOptionsForMode(
@@ -335,7 +375,7 @@ export function CreateProgramForm({
 
   const [tracks, setTracks] = useState<TrackBlock[]>(() =>
     initial?.tracks?.length
-      ? initial.tracks
+      ? hydrateTracksRpe(initial.tracks)
       : [
           {
             key: crypto.randomUUID(),
@@ -368,6 +408,11 @@ export function CreateProgramForm({
     sessionKey: string;
     index: number;
   } | null>(null);
+
+  // Populate empty RPE inputs from coach notes after mount (covers note-only data).
+  useEffect(() => {
+    setTracks((prev) => hydrateTracksRpe(prev));
+  }, []);
 
   function toggleWeekCollapsed(weekKey: string) {
     setCollapsedWeeks((prev) => {
@@ -441,7 +486,7 @@ export function CreateProgramForm({
             restBetweenSidesSeconds: ex.restBetweenSidesSeconds ?? "",
             restAfterSeconds: ex.restAfterSeconds,
             loadPrescription: ex.loadPrescription ?? "",
-            rpe: ex.rpe ?? "",
+            rpe: (ex.rpe ?? "").trim() || extractRpeValue(ex.note) || "",
             intensity: ex.intensity ?? "",
             note: ex.note ?? "",
           };
@@ -449,7 +494,7 @@ export function CreateProgramForm({
       })),
     }));
 
-    setTracks(newTracks);
+    setTracks(hydrateTracksRpe(newTracks));
     setSessionPicks({});
     setActiveLocationTabKey(newTracks[0]?.key ?? null);
     setActiveTab("curriculum");
@@ -2574,7 +2619,7 @@ export function CreateProgramForm({
                                             <input
                                               id={`ex-rpe-${entry.key}`}
                                               type="text"
-                                              value={entry.rpe}
+                                              value={entry.rpe ?? ""}
                                               onChange={(e) =>
                                                 setTracks((prev) =>
                                                   prev.map((t) => {
@@ -2596,6 +2641,31 @@ export function CreateProgramForm({
                                                   })
                                                 )
                                               }
+                                              onBlur={() => {
+                                                // If the field was left blank, pull RPE from the coach note.
+                                                if ((entry.rpe ?? "").trim()) return;
+                                                const fromNote = extractRpeValue(entry.note);
+                                                if (!fromNote) return;
+                                                setTracks((prev) =>
+                                                  prev.map((t) => {
+                                                    if (t.key !== activeTrack.key) return t;
+                                                    return {
+                                                      ...t,
+                                                      sessions: t.sessions.map((s) => {
+                                                        if (s.key !== session.key) return s;
+                                                        return {
+                                                          ...s,
+                                                          exercises: s.exercises.map((ex) =>
+                                                            ex.key === entry.key && !(ex.rpe ?? "").trim()
+                                                              ? { ...ex, rpe: fromNote }
+                                                              : ex
+                                                          ),
+                                                        };
+                                                      }),
+                                                    };
+                                                  })
+                                                );
+                                              }}
                                               placeholder='e.g. 7-8'
                                               className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
                                             />
