@@ -15,6 +15,8 @@ import {
   WARMUP_DURATION_SECONDS,
   WARMUP_REST_AFTER_SECONDS,
 } from "@/lib/programs/warmup-prescription";
+import { exerciseNeedsRpeGuidance } from "@/lib/programs/validate-ai-coach-proposal";
+import { coerceRpeField, defaultRpeForEffort, extractRpeValue } from "@/lib/programs/rpe";
 
 const PHASE_ORDER: Record<SessionPhase, number> = {
   warmup: 0,
@@ -211,6 +213,47 @@ function sortExercisesByPhase(exercises: WorkoutProposalExercise[]): WorkoutProp
   return [...exercises].sort((a, b) => PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]);
 }
 
+/** Fill missing structured RPE on effort-regulated exercises so athletes see Target RPE. */
+function ensureExerciseRpeFields(
+  exercises: WorkoutProposalExercise[],
+  catalog: ExerciseCatalogEntry[],
+  warnings: string[],
+  sessionLabel?: string
+): WorkoutProposalExercise[] {
+  const byId = new Map(catalog.map((e) => [e.id, e]));
+  return exercises.map((ex) => {
+    const entry = byId.get(ex.exercise_id);
+    if (!entry) return ex;
+
+    const isTimed =
+      (ex.duration_seconds != null && ex.duration_seconds > 0) ||
+      (ex.duration_minutes != null && ex.duration_minutes > 0);
+    const sets = ex.sets != null && ex.sets > 0 ? Math.ceil(ex.sets) : null;
+    const reps = ex.reps != null && ex.reps > 0 ? Math.ceil(ex.reps) : null;
+    if (!exerciseNeedsRpeGuidance(entry, ex, isTimed, sets, reps)) {
+      return ex;
+    }
+
+    const existing =
+      coerceRpeField(ex.rpe) ||
+      extractRpeValue(ex.note) ||
+      extractRpeValue(ex.intensity);
+    if (existing) {
+      return existing === ex.rpe ? ex : { ...ex, rpe: existing };
+    }
+
+    const blob = [entry.title, ...entry.categoryTypes].join(" ").toLowerCase().replace(/_/g, " ");
+    const explosive = /\bexplosive\b|\bplyometric\b|\bjump\b/.test(blob);
+    const rpe = defaultRpeForEffort({ reps, explosive });
+    warnings.push(
+      sessionLabel
+        ? `${sessionLabel}: Set default RPE ${rpe} on ${entry.title} (AI omitted rpe).`
+        : `Set default RPE ${rpe} on ${entry.title} (AI omitted rpe).`
+    );
+    return { ...ex, rpe };
+  });
+}
+
 export function ensureSessionExerciseStructure(
   exercises: WorkoutProposalExercise[],
   catalog: ExerciseCatalogEntry[],
@@ -248,6 +291,7 @@ export function ensureSessionExerciseStructure(
   out = sortExercisesByPhase(out.map((ex) => normalizeCooldownPrescription(normalizeWarmupPrescription(ex))));
   const bothSidesByExerciseId = new Map(catalog.map((entry) => [entry.id, entry.bothSides]));
   out = normalizeAiExerciseRest(out, { bothSidesByExerciseId });
+  out = ensureExerciseRpeFields(out, catalog, warnings, sessionLabel);
   return { exercises: out, warnings };
 }
 

@@ -96,7 +96,7 @@ const EXERCISE_PROPERTIES = {
   intensity: {
     type: "string",
     description:
-      "Short RPE/load cue when RPE applies (e.g. \"RPE 7-8\"). Omit when RPE is not used. Never invent exact kg/lb.",
+      "Optional legacy field — prefer structured rpe instead. Omit when unused.",
   },
   load_prescription: {
     type: "string",

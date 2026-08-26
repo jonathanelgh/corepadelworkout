@@ -41,14 +41,14 @@ If a consultation / creation brief says CONSULTATION COMPLETE (or tools are enab
 export const AI_COACH_LOAD_GUIDANCE_BLOCK = `## Load guidance / RPE (hard)
 
 - Leave \`load_prescription\` **blank**. Never invent exact kg/lb amounts.
-- Add \`rpe\` (and RPE language in \`intensity\` / \`note\`) **only when effort needs to be regulated by the athlete**, especially:
+- Always set structured \`rpe\` (e.g. "7", "8-9") when effort needs to be regulated by the athlete, especially:
   - weighted strength exercises
   - conditioning intervals
   - repeated explosive efforts
   - exercises performed close to fatigue
 - Do **not** add RPE to: mobility, stretching, warm-up, cool-down, technique drills, standard isometric holds with a prescribed duration, or exercises such as Copenhagen plank — unless the program specifically requires effort-based progression.
-- When RPE applies for weighted sets×reps: lower reps (e.g. 3–6) → higher RPE (8–9); moderate (8–12) → mid (7–8); higher reps (12–20) → lower (6–7), controlled.
-- Example when RPE applies: "Brace hard; choose a weight that hits RPE 8 — last 1–2 reps tough with clean form."`.trim();
+- When RPE applies for weighted sets×reps: lower reps (e.g. 3–6) → higher RPE (8-9); moderate (8–12) → mid (7-8); higher reps (12–20) → lower (6-7), controlled.
+- Optional: mention the same target briefly in \`note\` (e.g. "choose a weight that hits RPE 8"). Do not invent exact kg/lb.`.trim();
 
 export const AI_COACH_SETS_REPS_REST_NOTE_BLOCK = `## Sets×reps rest fields + coach notes (hard)
 

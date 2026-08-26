@@ -1,6 +1,6 @@
 import type { ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
-import { exerciseIsStrength } from "@/lib/programs/program-prescription-rules";
+import { coerceRpeField } from "@/lib/programs/rpe";
 
 export type AiCoachProposalValidationError = {
   /** Human readable error message (can be shown back to the AI). */
@@ -64,18 +64,6 @@ function hasOptionalCoachNote(ex: WorkoutProposalExercise): boolean {
   return requireNonEmptyString(ex.note);
 }
 
-function getOptionalRpe(ex: WorkoutProposalExercise): unknown {
-  return (ex as unknown as { rpe?: unknown }).rpe;
-}
-function getOptionalIntensity(ex: WorkoutProposalExercise): unknown {
-  return (ex as unknown as { intensity?: unknown }).intensity;
-}
-
-function hasOwnKey(obj: unknown, key: string): boolean {
-  if (!obj || (typeof obj !== "object" && typeof obj !== "function")) return false;
-  return Object.prototype.hasOwnProperty.call(obj, key);
-}
-
 /** Admin-facing coaching summary — require enough substance for a real explanation. */
 function hasSubstantialDesignRationale(v: unknown): boolean {
   return typeof v === "string" && v.trim().length >= 120;
@@ -98,7 +86,7 @@ function catalogBlob(entry: ExerciseCatalogEntry): string {
  * repeated explosive work, near-fatigue). Not for mobility / warm-up / cool-down /
  * technique / standard isometric holds / Copenhagen-style work unless effort-based.
  */
-function exerciseNeedsRpeGuidance(
+export function exerciseNeedsRpeGuidance(
   entry: ExerciseCatalogEntry,
   ex: WorkoutProposalExercise,
   isTimed: boolean,
@@ -107,10 +95,13 @@ function exerciseNeedsRpeGuidance(
 ): boolean {
   if (ex.phase === "warmup" || ex.phase === "cooldown") return false;
 
-  const blob = catalogBlob(entry);
+  const blob = catalogBlob(entry).replace(/_/g, " ");
   if (/\bmobility\b|\bstretch\b|\btechnique\b/.test(blob)) return false;
   if (/\bcopenhagen\b/.test(blob)) return false;
-  if (entry.programPrescriptionMode === "time_only" && !/\bexplosive\b|\bplyometric\b|\bconditioning\b/.test(blob)) {
+  if (
+    entry.programPrescriptionMode === "time_only" &&
+    !/\bexplosive\b|\bplyometric\b|\bconditioning\b/.test(blob)
+  ) {
     return false;
   }
 
@@ -118,8 +109,8 @@ function exerciseNeedsRpeGuidance(
     return true;
   }
 
-  // Weighted / strength sets×reps main work.
-  if (ex.phase === "main" && !isTimed && sets != null && reps != null && exerciseIsStrength(entry)) {
+  // Main sets×reps work needs a Target RPE (strength / weighted / general effort).
+  if (ex.phase === "main" && !isTimed && sets != null && reps != null) {
     return true;
   }
 
@@ -190,19 +181,13 @@ function validateExerciseTechnical(
     }
   }
 
-  // RPE only when effort must be athlete-regulated.
+  // RPE only when effort must be athlete-regulated — structured `rpe` is enough for UI.
   if (exerciseNeedsRpeGuidance(catalogEntry, ex, isTimed, sets, reps)) {
-    const noteText = typeof ex.note === "string" ? ex.note : "";
-    const intensityText =
-      typeof getOptionalIntensity(ex) === "string" ? String(getOptionalIntensity(ex)) : "";
-    const rpeText = typeof getOptionalRpe(ex) === "string" ? String(getOptionalRpe(ex)) : "";
-    const explanation = `${noteText} ${intensityText}`.toLowerCase();
-    const hasRpeInExplanation = /\brpe\b/.test(explanation);
-    if (!requireNonEmptyString(rpeText) || !hasRpeInExplanation) {
+    if (!coerceRpeField(ex.rpe)) {
       errors.push({
         path,
         message:
-          "Effort-regulated exercise must set rpe and include RPE-based load guidance in note and/or intensity (e.g. \"choose a weight that hits RPE 8\") — never exact kg/lb. Skip RPE for mobility, warm-up, cool-down, technique, and standard isometric holds.",
+          'Effort-regulated exercise must set rpe (e.g. "7" or "8-9"). Skip RPE for mobility, warm-up, cool-down, technique, and standard isometric holds.',
       });
     }
   }
@@ -262,22 +247,8 @@ function validateExerciseTechnical(
     }
   }
 
-  // When RPE/intensity keys are present with non-empty intent required only if guidance applies.
-  // Empty strings on exercises that do not need RPE are ignored.
-  const needsRpe = exerciseNeedsRpeGuidance(catalogEntry, ex, isTimed, sets, reps);
-  const rpeKeyPresent = hasOwnKey(ex as unknown, "rpe");
-  const intensityKeyPresent = hasOwnKey(ex as unknown, "intensity");
-  const rpeVal = getOptionalRpe(ex);
-  const intensityVal = getOptionalIntensity(ex);
-
-  if (needsRpe && (rpeKeyPresent || intensityKeyPresent)) {
-    if (!requireNonEmptyString(rpeVal)) {
-      errors.push({ path, message: "Exercise is missing required rpe (non-empty string)." });
-    }
-    if (!requireNonEmptyString(intensityVal)) {
-      errors.push({ path, message: "Exercise is missing required intensity (non-empty string)." });
-    }
-  }
+  // Empty/omitted rpe on effort-regulated work is already covered above.
+  // Intensity is optional (removed from athlete/admin UI).
 
   return errors;
 }

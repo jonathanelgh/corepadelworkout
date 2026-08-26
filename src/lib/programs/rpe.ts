@@ -26,6 +26,33 @@ export function extractRpeValue(text: string | null | undefined): string | null 
   return null;
 }
 
+/** Coerce AI tool args (string or number) into a structured RPE label. */
+export function coerceRpeField(value: unknown): string | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return extractRpeValue(String(value));
+  }
+  if (typeof value === "string") {
+    return extractRpeValue(value);
+  }
+  return null;
+}
+
+/**
+ * Default Target RPE when the model omits it on effort-regulated work.
+ * Aligns with AI hard-constraint bands (lower reps → higher RPE).
+ */
+export function defaultRpeForEffort(opts: {
+  reps?: number | null;
+  explosive?: boolean;
+}): string {
+  if (opts.explosive) return "8-9";
+  const reps = opts.reps != null && Number.isFinite(opts.reps) ? Math.ceil(opts.reps) : null;
+  if (reps != null && reps <= 6) return "8-9";
+  if (reps != null && reps <= 12) return "7-8";
+  if (reps != null && reps > 12) return "6-7";
+  return "7-8";
+}
+
 function normalizeRpeDigits(raw: string): string {
   return raw
     .replace(/[–—]/g, "-")

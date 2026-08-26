@@ -16,6 +16,7 @@ import {
   type SessionPhase,
 } from "@/lib/programs/session-phase";
 import { normalizeAiExerciseRest } from "@/lib/programs/normalize-ai-exercise-prescription";
+import { coerceRpeField } from "@/lib/programs/rpe";
 import type { ProgramCatalogForAI } from "./programs-catalog";
 import { AI_DESIGN_RATIONALE_FIELD_DESCRIPTION } from "@/lib/programs/ai-program-rules";
 
@@ -402,8 +403,9 @@ function parseExerciseList(
     const restBetween = parseNonNegInt(ex.rest_between_sets_seconds);
     const restBetweenSides = parseNonNegInt(ex.rest_between_sides_seconds);
 
-    const rpe = typeof ex.rpe === "string" ? ex.rpe.trim() : undefined;
-    const intensity = typeof ex.intensity === "string" ? ex.intensity.trim() : undefined;
+    const rpe = coerceRpeField(ex.rpe) ?? undefined;
+    const intensity =
+      typeof ex.intensity === "string" && ex.intensity.trim() ? ex.intensity.trim() : undefined;
 
     exercises.push({
       exercise_id,

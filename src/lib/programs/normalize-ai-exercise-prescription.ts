@@ -11,7 +11,7 @@ import {
   clearAiLoadPrescription,
   sanitizeBothSidesCoachNote,
 } from "@/lib/programs/sanitize-coach-note";
-import { extractRpeValue } from "@/lib/programs/rpe";
+import { coerceRpeField, extractRpeValue } from "@/lib/programs/rpe";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
@@ -290,7 +290,7 @@ export function aiExerciseToProgramPayload(
   });
   const intensity = ex.intensity?.trim() || null;
   const rpe =
-    ex.rpe?.trim() ||
+    coerceRpeField(ex.rpe) ||
     extractRpeValue(note) ||
     extractRpeValue(intensity) ||
     null;
