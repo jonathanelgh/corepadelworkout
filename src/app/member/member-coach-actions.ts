@@ -26,6 +26,7 @@ import {
   loadMemberCoachTrainingContext,
   memberTrainingContextBlock,
 } from "@/lib/programs/load-member-coach-context";
+import { MEMBER_AI_COACH_ENABLED } from "@/lib/member/member-ai-coach";
 import { coachShouldCreateNew, coachShouldRecommendCatalogOnly, coachWantsRehabProgram } from "@/lib/programs/coach-intent";
 import {
   buildConsultationState,
@@ -95,6 +96,10 @@ export type MemberCoachInitialData = {
 export async function loadMemberCoachData(): Promise<
   { ok: true; data: MemberCoachInitialData } | { error: string }
 > {
+  if (!MEMBER_AI_COACH_ENABLED) {
+    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
+  }
+
   const auth = await requireProMember();
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
 
@@ -123,6 +128,10 @@ export async function sendMemberCoachMessage(input: {
   userMessage: string;
   programsCatalog: ProgramCatalogRow[];
 }): Promise<SendMemberCoachMessageResult> {
+  if (!MEMBER_AI_COACH_ENABLED) {
+    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
+  }
+
   const auth = await requireProMember();
   if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
 
@@ -385,6 +394,10 @@ export async function saveMemberCoachWorkout(
   proposal: WorkoutProposal,
   options?: { locationSlug?: string }
 ): Promise<SaveMemberCoachWorkoutResult> {
+  if (!MEMBER_AI_COACH_ENABLED) {
+    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
+  }
+
   const auth = await requireProMember();
   if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
 
@@ -428,6 +441,10 @@ export async function saveMemberCoachProgram(
   proposal: ProgramProposal,
   options?: { locationSlug?: string }
 ): Promise<SaveMemberCoachProgramResult> {
+  if (!MEMBER_AI_COACH_ENABLED) {
+    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
+  }
+
   const auth = await requireProMember();
   if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
 

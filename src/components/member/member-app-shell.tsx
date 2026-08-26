@@ -14,6 +14,7 @@ import {
   User,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { MEMBER_AI_COACH_ENABLED } from "@/lib/member/member-ai-coach";
 import { tabToHref, type MemberTab } from "@/lib/member/member-tabs";
 import type { MemberHubData } from "@/lib/member/load-member-hub-data";
 import { MemberHomeTab } from "@/components/member/member-home-tab";
@@ -71,7 +72,9 @@ export function MemberAppShell({
 
   const displayName = profile?.full_name?.trim() || userEmail?.split("@")[0] || "Member";
   const uploaded = profile?.profile_image_url?.trim();
-  const isCoachTab = Boolean(isHub && tab === "custom" && hubData?.hasActivePro);
+  const isCoachTab = Boolean(
+    isHub && tab === "custom" && hubData?.hasActivePro && MEMBER_AI_COACH_ENABLED
+  );
 
   function selectTab(next: MemberTab) {
     if (isHub) {

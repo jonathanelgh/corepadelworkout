@@ -3,20 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { notifyAdminsMemberFeedback } from "@/lib/emails/notify-admins-member-feedback";
-
-export const FEEDBACK_CATEGORIES = [
-  "general",
-  "bug",
-  "idea",
-  "program",
-  "other",
-] as const;
-
-export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
-
-function isFeedbackCategory(value: string): value is FeedbackCategory {
-  return (FEEDBACK_CATEGORIES as readonly string[]).includes(value);
-}
+import { isFeedbackCategory } from "@/lib/member/feedback-categories";
 
 export async function submitMemberFeedback(input: {
   message: string;

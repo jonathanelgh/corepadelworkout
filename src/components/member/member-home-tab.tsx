@@ -94,6 +94,8 @@ export function MemberHomeTab({
         </div>
       )}
 
+      <MemberFeedbackCard />
+
       {activePrograms.length > 0 && (
         <section>
           <div className="mb-4">
@@ -260,8 +262,6 @@ export function MemberHomeTab({
           ))}
         </ul>
       </section>
-
-      <MemberFeedbackCard />
 
       <section>
         <div className="mb-4 flex items-end justify-between gap-4">

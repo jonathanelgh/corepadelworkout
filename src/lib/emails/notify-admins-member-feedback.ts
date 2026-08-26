@@ -2,9 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendMemberFeedbackEmail } from "./send-member-feedback";
 
 const CATEGORY_LABELS: Record<string, string> = {
+  good: "Good",
+  bad: "Needs work",
+  idea: "Ideas / improvement",
   general: "General",
   bug: "Bug / issue",
-  idea: "Idea / feature",
   program: "Programs / workouts",
   other: "Other",
 };
