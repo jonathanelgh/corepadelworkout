@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getIsAdminUser } from "@/utils/supabase/is-admin";
 import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import {
@@ -473,6 +474,7 @@ export async function loadUserActivePrograms(
   userId: string,
   profile?: ProfileEnv | null
 ): Promise<ActiveProgramSummary[]> {
+  const isAdmin = await getIsAdminUser(supabase, userId);
   const { data: runs, error } = await supabase
     .from("program_runs")
     .select(
@@ -518,7 +520,8 @@ export async function loadUserActivePrograms(
       prog = progRow;
     }
 
-    if (!prog || typeof prog.slug !== "string" || prog.status !== "published") continue;
+    if (!prog || typeof prog.slug !== "string") continue;
+    if (prog.status !== "published" && !(isAdmin && prog.status === "draft")) continue;
     if (prog.program_format === "single_workout") continue;
 
     const progress = await loadProgramProgress(
@@ -534,7 +537,8 @@ export async function loadUserActivePrograms(
     summaries.push({
       programId: prog.id,
       slug: prog.slug,
-      title: prog.title,
+      title:
+        isAdmin && prog.status === "draft" ? `${prog.title} (Draft)` : prog.title,
       coverImageUrl: prog.cover_image_url?.trim() || null,
       completedCount: progress.completedCount,
       totalSessions: progress.totalSessions,

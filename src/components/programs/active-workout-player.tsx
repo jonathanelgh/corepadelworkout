@@ -777,7 +777,6 @@ export function ActiveWorkoutPlayer({
                       intensity={current.intensity}
                       className="mt-4 max-w-md"
                       noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
-                      rpeClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-2.5"
                     />
                   )}
                   <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{prepCountdown}</p>
@@ -806,7 +805,6 @@ export function ActiveWorkoutPlayer({
                       intensity={current.intensity}
                       className="mt-4 max-w-md"
                       noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
-                      rpeClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-2.5"
                     />
                   )}
                   <p className="mt-6 text-sm text-white/60">Preview the demo, then start when ready.</p>
@@ -834,7 +832,6 @@ export function ActiveWorkoutPlayer({
                       intensity={next.intensity}
                       className="mt-4 max-w-md"
                       noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
-                      rpeClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-2.5"
                     />
                   )}
                   <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
@@ -930,7 +927,6 @@ export function ActiveWorkoutPlayer({
                     intensity={displayExercise?.intensity}
                     className="mt-3"
                     noteClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
-                    rpeClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-2.5"
                   />
                 )}
                 <p className="mt-3 text-sm text-white/60">
@@ -986,7 +982,6 @@ export function ActiveWorkoutPlayer({
                     intensity={displayExercise?.intensity}
                     className="mt-3"
                     noteClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
-                    rpeClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-2.5"
                   />
                 )}
 

@@ -17,6 +17,8 @@ type Props = {
   backLabel: string;
   /** Shown under the title on desktop (e.g. “Continue training”) */
   desktopEyebrow?: string;
+  /** Admin-only draft preview notice */
+  draftPreviewBanner?: string | null;
   children: React.ReactNode;
   footer?: React.ReactNode;
 };
@@ -34,11 +36,17 @@ export function ProgramExperienceLayout({
   backHref,
   backLabel,
   desktopEyebrow,
+  draftPreviewBanner,
   children,
   footer,
 }: Props) {
   return (
     <div className="min-h-screen bg-white pb-24 font-sans text-black selection:bg-[#ccff00] selection:text-black md:pb-0">
+      {draftPreviewBanner ? (
+        <div className="sticky top-0 z-[60] bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-black">
+          {draftPreviewBanner}
+        </div>
+      ) : null}
       <div className="fixed top-0 right-0 left-0 z-50 flex items-center justify-between bg-linear-to-b from-white via-white/80 to-transparent px-4 pt-4 pb-6 md:hidden">
         <BackButton
           fallbackHref={backHref}

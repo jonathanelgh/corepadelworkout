@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { fetchProgramExercises } from "@/lib/programs/program-exercises";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
+import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import { loadProgramProgress } from "@/lib/programs/program-progress";
 import { programTrainingHref } from "@/lib/programs/program-routes";
 import { ProgramSchedulePanel } from "@/components/programs/program-schedule-panel";
@@ -23,6 +24,7 @@ type ProgramRow = {
   song_url: string | null;
   price: number | null;
   is_free: boolean;
+  status: string;
   program_format: string | null;
   duration_weeks: number | null;
   sessions_per_week: number | null;
@@ -77,20 +79,19 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("programs")
-    .select("title, description")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  const loaded = await loadProgramBySlugForViewer<{
+    title: string;
+    description: string | null;
+    status: string;
+  }>(supabase, slug, "title, description, status");
 
-  if (!data) {
+  if (!loaded) {
     return { title: "Program" };
   }
 
-  const row = data as { title: string; description: string | null };
+  const row = loaded.program;
   return {
-    title: row.title,
+    title: loaded.isAdminDraftPreview ? `${row.title} (Draft)` : row.title,
     description: row.description?.trim() || undefined,
   };
 }
@@ -100,10 +101,10 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
   const sp = await searchParams;
   const supabase = await createClient();
 
-  const { data: raw, error } = await supabase
-    .from("programs")
-    .select(
-      `
+  const loaded = await loadProgramBySlugForViewer<ProgramRow>(
+    supabase,
+    slug,
+    `
       id,
       title,
       description,
@@ -113,6 +114,7 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
       song_url,
       price,
       is_free,
+      status,
       program_format,
       duration_weeks,
       sessions_per_week,
@@ -120,20 +122,14 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
       outcomes,
       difficulty_levels ( name )
     `
-    )
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  );
 
-  if (error) {
-    console.error("program detail:", error.message);
-    notFound();
-  }
-  if (!raw) {
+  if (!loaded) {
     notFound();
   }
 
-  const program = raw as ProgramRow;
+  const program = loaded.program;
+  const isAdminDraftPreview = loaded.isAdminDraftPreview;
   const programFormat = parseProgramFormat(program.program_format);
   const exercises = await fetchProgramExercises(supabase, program.id);
 
@@ -185,6 +181,11 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
       statMinutes={formatStatMins(program.minutes_per_session)}
       backHref="/programs"
       backLabel="Back to programs"
+      draftPreviewBanner={
+        isAdminDraftPreview
+          ? "Draft preview — only admins can see and test this program."
+          : null
+      }
       footer={
         <ProgramAccessBar
           programId={program.id}
@@ -192,6 +193,7 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
           isFree={program.is_free}
           minutesPerSession={program.minutes_per_session}
           programFormat={programFormat}
+          isAdminDraftPreview={isAdminDraftPreview}
         />
       }
     >

@@ -19,6 +19,7 @@ type Props = {
   minsLabel: string | null;
   kcalLabel: string | null;
   progress: ProgramProgressView | null;
+  isAdminDraftPreview?: boolean;
 };
 
 export function ProgramAccessBarClient({
@@ -30,6 +31,7 @@ export function ProgramAccessBarClient({
   minsLabel,
   kcalLabel,
   progress,
+  isAdminDraftPreview = false,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -46,15 +48,23 @@ export function ProgramAccessBarClient({
         ? playHrefForSession(programSlug, firstSession.id)
         : `/programs/${programSlug}/play`;
 
-  const ctaLabel = isSingleWorkout
-    ? "Start workout"
-    : !progress?.runId
-      ? "Start program"
-      : progress.isComplete
-        ? "Repeat program"
+  const ctaLabel = isAdminDraftPreview
+    ? isSingleWorkout
+      ? "Test draft workout"
+      : !progress?.runId
+        ? "Test draft program"
         : nextSession
-          ? `Continue · ${nextSession.name}`
-          : "Continue";
+          ? `Continue draft · ${nextSession.name}`
+          : "Continue draft"
+    : isSingleWorkout
+      ? "Start workout"
+      : !progress?.runId
+        ? "Start program"
+        : progress.isComplete
+          ? "Repeat program"
+          : nextSession
+            ? `Continue · ${nextSession.name}`
+            : "Continue";
 
   function onStart() {
     setMessage(null);

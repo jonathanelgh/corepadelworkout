@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
+import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import { loadProgramProgress, playHrefForSession } from "@/lib/programs/program-progress";
 import { programCatalogHref } from "@/lib/programs/program-routes";
 import { fetchProgramSessionsForProgram } from "@/lib/programs/program-sessions";
@@ -31,41 +32,35 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
     redirect(`/login?next=${encodeURIComponent(`/programs/${slug}/training`)}`);
   }
 
-  const { data: raw, error } = await supabase
-    .from("programs")
-    .select(
-      `
-      id,
-      title,
-      cover_image_url,
-      is_free,
-      program_format,
-      minutes_per_session,
-      difficulty_levels ( name )
-    `
-    )
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
-
-  if (error) {
-    console.error("program training:", error.message);
-    notFound();
-  }
-  if (!raw) {
-    notFound();
-  }
-
-  const program = raw as {
+  const loaded = await loadProgramBySlugForViewer<{
     id: string;
     title: string;
     cover_image_url: string | null;
     is_free: boolean;
+    status: string;
     program_format: string | null;
     minutes_per_session: number | null;
     difficulty_levels: { name: string } | { name: string }[] | null;
-  };
+  }>(
+    supabase,
+    slug,
+    `
+      id,
+      title,
+      cover_image_url,
+      is_free,
+      status,
+      program_format,
+      minutes_per_session,
+      difficulty_levels ( name )
+    `
+  );
 
+  if (!loaded) {
+    notFound();
+  }
+
+  const program = loaded.program;
   const programFormat = parseProgramFormat(program.program_format);
 
   const { data: profile } = await supabase
@@ -84,7 +79,8 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   }
 
   const hasAccess =
-    program.is_free || (await userHasProgramAccess(supabase, user.id, program.id));
+    (!loaded.isAdminDraftPreview && program.is_free) ||
+    (await userHasProgramAccess(supabase, user.id, program.id));
   if (!hasAccess) {
     redirect(`${programCatalogHref(slug)}?upgrade=1`);
   }
@@ -104,7 +100,9 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
   return (
     <ActiveProgramHub
       programSlug={slug}
-      programTitle={program.title}
+      programTitle={
+        loaded.isAdminDraftPreview ? `${program.title} (Draft)` : program.title
+      }
       coverImageUrl={program.cover_image_url}
       minutesPerSession={program.minutes_per_session}
       difficultyLabel={firstDifficultyName(program.difficulty_levels)}

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { inferExercisePrescriptionType } from "@/lib/programs/program-exercises";
+import { extractRpeValue } from "@/lib/programs/rpe";
 import { parseProgramFormat } from "@/lib/programs/program-format";
 import { loadProgramExerciseOptions } from "@/lib/exercises/program-exercise-options";
 import { clampProgramPrescriptionTypeForPhase } from "@/lib/exercises/program-prescription-mode";
@@ -102,7 +103,7 @@ function mapSessionRow(
           ? String(e.rest_after_seconds)
           : "",
       loadPrescription: e.load_prescription?.trim() ?? "",
-      rpe: e.rpe?.trim() ?? "",
+      rpe: e.rpe?.trim() || extractRpeValue(e.note) || "",
       intensity: e.intensity?.trim() ?? "",
       note: e.note?.trim() ?? "",
     };

@@ -1,9 +1,7 @@
-"use server";
-
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
-import { enrollInPublishedProgram } from "@/app/programs/enroll-actions";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
+import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
 import {
   cancelProgramRun,
@@ -13,6 +11,7 @@ import {
   startProgramSession,
 } from "@/lib/programs/program-progress";
 import { programCatalogHref, programTrainingHref } from "@/lib/programs/program-routes";
+import { enrollInPublishedProgram } from "@/app/programs/enroll-actions";
 
 export async function startProgramTraining(
   programSlug: string
@@ -28,17 +27,18 @@ export async function startProgramTraining(
     return { error: "Sign in to start this program.", code: "SIGN_IN_REQUIRED" };
   }
 
-  const { data: program, error: pErr } = await supabase
-    .from("programs")
-    .select("id, is_free, status, program_format")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  const loaded = await loadProgramBySlugForViewer<{
+    id: string;
+    is_free: boolean;
+    status: string;
+    program_format: string | null;
+  }>(supabase, slug, "id, is_free, status, program_format");
 
-  if (pErr || !program) {
+  if (!loaded) {
     return { error: "Program not found." };
   }
 
+  const { program, isAdminDraftPreview } = loaded;
   const programFormat = parseProgramFormat(program.program_format);
 
   const hasAccess = await userHasProgramAccess(supabase, user.id, program.id);
@@ -46,7 +46,8 @@ export async function startProgramTraining(
     return { error: "This program requires Pro. Upgrade from member settings." };
   }
 
-  if (program.is_free) {
+  // Free published programs get an enrollment row. Draft previews skip enroll (RLS requires published).
+  if (program.is_free && !isAdminDraftPreview) {
     const enrolled = await enrollInPublishedProgram(slug);
     if ("error" in enrolled) {
       return { error: enrolled.error, code: enrolled.code };
@@ -97,23 +98,22 @@ export async function cancelProgramTraining(
     return { error: "Sign in required." };
   }
 
-  const { data: program, error: pErr } = await supabase
-    .from("programs")
-    .select("id, status, program_format")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  const loaded = await loadProgramBySlugForViewer<{
+    id: string;
+    status: string;
+    program_format: string | null;
+  }>(supabase, slug, "id, status, program_format");
 
-  if (pErr || !program) {
+  if (!loaded) {
     return { error: "Program not found." };
   }
 
-  const programFormat = parseProgramFormat(program.program_format);
+  const programFormat = parseProgramFormat(loaded.program.program_format);
   if (!usesProgramProgress(programFormat)) {
     return { error: "This workout cannot be cancelled as a program." };
   }
 
-  const result = await cancelProgramRun(supabase, user.id, program.id);
+  const result = await cancelProgramRun(supabase, user.id, loaded.program.id);
   if ("error" in result) return result;
 
   revalidatePath(`/programs/${slug}`);

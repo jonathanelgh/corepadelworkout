@@ -47,7 +47,7 @@ export function resolveExerciseRpe(opts: {
 }
 
 /**
- * When a dedicated RPE badge is shown, drop matching "RPE 7–8" cues from the note
+ * When a dedicated RPE line is shown, drop matching "RPE 7–8" cues from the note
  * so athletes don't see the same target twice.
  */
 export function noteWithoutLeadingRpeCue(
@@ -70,6 +70,7 @@ export function noteWithoutLeadingRpeCue(
     .replace(cue, " ")
     .replace(/\s{2,}/g, " ")
     .replace(/\s+([.;,!?])/g, "$1")
+    .replace(/([.;,!?])\s*[.;,!?]+/g, "$1")
     .replace(/^[.;,\s]+|[.;,\s]+$/g, "")
     .trim();
   return stripped || null;

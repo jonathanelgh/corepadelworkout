@@ -17,6 +17,7 @@ import {
   MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS,
   SETS_REPS_REST_BETWEEN_SETS_SECONDS,
 } from "@/lib/programs/normalize-ai-exercise-prescription";
+import { extractRpeValue } from "@/lib/programs/rpe";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -84,6 +85,11 @@ function exerciseProgramMode(
 
 function exerciseBothSides(exercises: ExerciseOption[], exerciseId: string): boolean {
   return exercises.find((e) => e.id === exerciseId)?.bothSides ?? false;
+}
+
+/** Prefer structured RPE; fall back to a target parsed from the coach note. */
+function exerciseRpeLabel(entry: Pick<SessionExerciseEntry, "rpe" | "note">): string {
+  return entry.rpe.trim() || extractRpeValue(entry.note) || "";
 }
 
 function prescriptionOptionsForMode(
@@ -1259,7 +1265,7 @@ export function CreateProgramForm({
             }
             const note = e.note.trim() || null;
             const load_prescription = e.loadPrescription.trim() || null;
-            const rpe = e.rpe.trim() || null;
+            const rpe = e.rpe.trim() || extractRpeValue(e.note) || null;
             const intensity = e.intensity.trim() || null;
             return {
               exercise_id: e.exerciseId,
@@ -2492,6 +2498,11 @@ export function CreateProgramForm({
                                               No level
                                             </span>
                                           )}
+                                          {exerciseRpeLabel(entry) ? (
+                                            <span className="inline-flex shrink-0 items-center rounded-md border border-lime-200 bg-lime-50 px-2 py-0.5 text-[11px] font-semibold text-lime-900">
+                                              RPE {exerciseRpeLabel(entry)}
+                                            </span>
+                                          ) : null}
                                         </div>
                                         {entryBothSides && (
                                           <p className="mt-1 text-xs font-medium text-violet-700">

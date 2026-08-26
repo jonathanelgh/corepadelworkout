@@ -105,49 +105,47 @@ type ExerciseCoachGuidanceProps = {
   note?: string | null;
   rpe?: string | null;
   intensity?: string | null;
-  /** Outer card styles for the coach note block */
+  /** Card styles for the combined coach note + RPE block */
   noteClassName?: string;
-  /** Outer styles for the RPE badge row */
+  /** @deprecated Ignored — RPE is shown inside the same card as the note. */
   rpeClassName?: string;
   className?: string;
 };
 
 /**
- * Athlete-facing RPE + coach note. Shows a clear RPE target with info popup when
- * RPE is present (structured field or in the note). Info button only appears when RPE applies.
+ * Athlete-facing coach note with RPE target in the same card.
+ * Info button appears whenever an RPE target applies.
  */
 export function ExerciseCoachGuidance({
   note,
   rpe,
   intensity,
   noteClassName = "",
-  rpeClassName = "",
   className = "",
 }: ExerciseCoachGuidanceProps) {
   const rpeLabel = resolveExerciseRpe({ rpe, intensity, note });
-  const displayNote = noteWithoutLeadingRpeCue(note, rpeLabel);
-  const noteNeedsInfo = !rpeLabel && textMentionsRpe(note);
+  const body = noteWithoutLeadingRpeCue(note, rpeLabel);
+  const showInfo = Boolean(rpeLabel) || textMentionsRpe(note);
+  const fallbackNote = !rpeLabel && !body ? note?.trim() || null : null;
+  const technique = body || fallbackNote;
 
-  if (!rpeLabel && !displayNote) return null;
+  if (!rpeLabel && !technique) return null;
 
   return (
-    <div className={`pointer-events-auto space-y-2 ${className}`}>
-      {rpeLabel && (
-        <div
-          className={`flex items-center justify-center gap-2 text-left ${rpeClassName}`}
-        >
+    <div
+      className={`pointer-events-auto flex items-start gap-2 text-left ${noteClassName} ${className}`}
+    >
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {rpeLabel ? (
           <p className="text-sm font-semibold tracking-wide text-[#ccff00]">
-            RPE {rpeLabel}
+            Target RPE {rpeLabel}
           </p>
-          <RpeInfoButton />
-        </div>
-      )}
-      {displayNote && (
-        <div className={`flex items-start gap-2 text-left ${noteClassName}`}>
-          <p className="min-w-0 flex-1 text-sm leading-relaxed">{displayNote}</p>
-          {noteNeedsInfo && <RpeInfoButton className="mt-0.5" />}
-        </div>
-      )}
+        ) : null}
+        {technique ? (
+          <p className="text-sm leading-relaxed text-inherit">{technique}</p>
+        ) : null}
+      </div>
+      {showInfo ? <RpeInfoButton className="mt-0.5" /> : null}
     </div>
   );
 }

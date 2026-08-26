@@ -281,6 +281,7 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
                               programId={program.id}
                               programTitle={program.title}
                               programSlug={program.slug}
+                              programStatus={program.status}
                             />
                           </td>
                         </tr>

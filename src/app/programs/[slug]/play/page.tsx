@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { ActiveWorkoutPlayer } from "@/components/programs/active-workout-player";
 import { loadSessionWorkout, sessionDisplayLabel, fetchProgramSessionsForProgram } from "@/lib/programs/program-sessions";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
+import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import {
   ensureProgramRun,
   loadProgramProgress,
@@ -19,18 +20,30 @@ type PageProps = {
   searchParams: Promise<{ session?: string }>;
 };
 
+type PlayProgramRow = {
+  id: string;
+  title: string;
+  cover_image_url: string | null;
+  song_url: string | null;
+  status: string;
+  is_free: boolean;
+  program_format: string | null;
+};
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("programs")
-    .select("title")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  const loaded = await loadProgramBySlugForViewer<{ title: string; status: string }>(
+    supabase,
+    slug,
+    "title, status"
+  );
 
-  if (!data) return { title: "Workout" };
-  return { title: `${(data as { title: string }).title} · Workout` };
+  if (!loaded) return { title: "Workout" };
+  const title = loaded.isAdminDraftPreview
+    ? `${loaded.program.title} · Draft workout`
+    : `${loaded.program.title} · Workout`;
+  return { title };
 }
 
 export default async function ProgramPlayPage({ params, searchParams }: PageProps) {
@@ -38,30 +51,23 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
   const { session: sessionId } = await searchParams;
   const supabase = await createClient();
 
-  const { data: program, error } = await supabase
-    .from("programs")
-    .select("id, title, cover_image_url, song_url, status, is_free, program_format")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+  const loaded = await loadProgramBySlugForViewer<PlayProgramRow>(
+    supabase,
+    slug,
+    "id, title, cover_image_url, song_url, status, is_free, program_format"
+  );
 
-  if (error || !program) {
+  if (!loaded) {
     notFound();
   }
 
-  const row = program as {
-    id: string;
-    title: string;
-    cover_image_url: string | null;
-    song_url: string | null;
-    is_free: boolean;
-    program_format: string | null;
-  };
-
+  const row = loaded.program;
   const programFormat = parseProgramFormat(row.program_format);
   const tracksProgress = usesProgramProgress(programFormat);
 
-  await requireProgramWorkoutAccess(row.id, slug, row.is_free);
+  await requireProgramWorkoutAccess(row.id, slug, row.is_free, {
+    isAdminDraftPreview: loaded.isAdminDraftPreview,
+  });
 
   const {
     data: { user },

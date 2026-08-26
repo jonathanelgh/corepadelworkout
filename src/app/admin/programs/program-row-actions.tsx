@@ -12,16 +12,20 @@ export function ProgramRowActions({
   programId,
   programTitle,
   programSlug,
+  programStatus,
 }: {
   programId: string;
   programTitle: string;
   programSlug: string;
+  programStatus?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
   const [menuStyle, setMenuStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const isDraft = programStatus === "draft";
+  const previewLabel = isDraft ? "Test draft" : "View live";
 
   useEffect(() => setMounted(true), []);
 
@@ -66,7 +70,7 @@ export function ProgramRowActions({
             onClick={() => setOpen(false)}
           >
             <Eye className="h-4 w-4 shrink-0 text-gray-500" />
-            View live
+            {previewLabel}
           </Link>
           <Link
             href={`/admin/programs/${programId}/edit`}
