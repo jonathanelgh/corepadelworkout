@@ -93,9 +93,13 @@ export function stripNumericLoadFromNote(note: string | null | undefined): strin
   return out || null;
 }
 
+const BOTH_SIDES_REST_CUE_RE =
+  /rest\s+\d+\s*sec(?:onds)?\s+after\s+both\s+sides(?:\s+are\s+completed)?\.?/gi;
+
 /**
  * Remove both-sides instructional language from notes.
  * Always strip invented bilateral cues; the catalog `both_sides` flag owns that UX.
+ * Preserves rest-after-both-sides coach cues (those are rest timing, not bilateral invent).
  */
 export function sanitizeBothSidesCoachNote(
   note: string | null | undefined,
@@ -104,7 +108,13 @@ export function sanitizeBothSidesCoachNote(
   const raw = note?.trim();
   if (!raw) return null;
 
-  let out = raw;
+  const preserved: string[] = [];
+  let out = raw.replace(BOTH_SIDES_REST_CUE_RE, (match) => {
+    const idx = preserved.length;
+    preserved.push(match.trim());
+    return ` __REST_BOTH_SIDES_${idx}__ `;
+  });
+
   for (const re of BOTH_SIDES_NOTE_PATTERNS) {
     out = out.replace(re, " ");
   }
@@ -113,6 +123,11 @@ export function sanitizeBothSidesCoachNote(
     .replace(/\s+([.,;:!?])/g, "$1")
     .replace(/^[.,;:\s]+|[.,;:\s]+$/g, "")
     .trim();
+
+  for (let i = 0; i < preserved.length; i++) {
+    out = out.replace(`__REST_BOTH_SIDES_${i}__`, preserved[i]!);
+  }
+  out = out.replace(/\s{2,}/g, " ").trim();
 
   return out || null;
 }

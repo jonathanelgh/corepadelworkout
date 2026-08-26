@@ -27,6 +27,8 @@ type ExerciseRow = {
   rest_between_sides_seconds: number | null;
   rest_after_seconds: number | null;
   load_prescription: string | null;
+  rpe: string | null;
+  intensity: string | null;
   session_phase: "warmup" | "main" | "cooldown" | null;
   choice_group: string | null;
   note: string | null;
@@ -100,6 +102,8 @@ function mapSessionRow(
           ? String(e.rest_after_seconds)
           : "",
       loadPrescription: e.load_prescription?.trim() ?? "",
+      rpe: e.rpe?.trim() ?? "",
+      intensity: e.intensity?.trim() ?? "",
       note: e.note?.trim() ?? "",
     };
   });
@@ -281,6 +285,8 @@ export default async function EditProgramPage({ params }: PageProps) {
             rest_between_sides_seconds,
             rest_after_seconds,
             load_prescription,
+            rpe,
+            intensity,
             session_phase,
             choice_group,
             note

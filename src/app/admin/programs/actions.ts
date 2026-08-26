@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseChoiceGroup, parseSessionPhase, type SessionPhase } from "@/lib/programs/session-phase";
 import { promoteProgressionOutOfNote } from "@/lib/programs/sanitize-coach-note";
+import { SETS_REPS_REST_BETWEEN_SETS_SECONDS } from "@/lib/programs/normalize-ai-exercise-prescription";
+import { extractRpeValue } from "@/lib/programs/rpe";
 import {
   insertProgramCurriculum,
   type TrackPayload,
@@ -81,15 +83,9 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
   const exercise_id =
     typeof exercise_id_raw === "string" && exercise_id_raw.length > 0 ? exercise_id_raw : "";
   if (!exercise_id) return null;
-  const duration_minutes = parseOptionalNonNegIntField(
-    row.duration_minutes ?? row.durationMinutes
-  );
-  const duration_seconds = parseOptionalNonNegIntField(
-    row.duration_seconds ?? row.durationSeconds
-  );
   const sets = parseOptionalNonNegIntField(row.sets);
   const reps = parseOptionalNonNegIntField(row.reps);
-  const rest_between_sets_seconds = parseOptionalNonNegIntField(
+  let rest_between_sets_seconds = parseOptionalNonNegIntField(
     row.rest_between_sets_seconds ?? row.restBetweenSetsSeconds
   );
   const rest_between_sides_seconds = parseOptionalNonNegIntField(
@@ -100,12 +96,43 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
   );
   const noteRaw = row.note;
   const loadRaw = row.load_prescription ?? row.loadPrescription;
+  const rpeRaw = row.rpe;
+  const intensityRaw = row.intensity;
   const promoted = promoteProgressionOutOfNote({
     note: typeof noteRaw === "string" && noteRaw.trim().length > 0 ? noteRaw.trim() : null,
     load_prescription:
       typeof loadRaw === "string" && loadRaw.trim().length > 0 ? String(loadRaw).trim() : null,
   });
   const session_phase = parseSessionPhase(row.session_phase ?? row.sessionPhase);
+  const duration_minutes = parseOptionalNonNegIntField(
+    row.duration_minutes ?? row.durationMinutes
+  );
+  const duration_seconds = parseOptionalNonNegIntField(
+    row.duration_seconds ?? row.durationSeconds
+  );
+  // Multi-set sets×reps must carry between-set rest even if the form omitted it.
+  const hasTimedWork =
+    (duration_seconds != null && duration_seconds > 0) ||
+    (duration_minutes != null && duration_minutes > 0);
+  if (
+    !hasTimedWork &&
+    sets != null &&
+    sets > 1 &&
+    (rest_between_sets_seconds == null || rest_between_sets_seconds <= 0)
+  ) {
+    rest_between_sets_seconds = SETS_REPS_REST_BETWEEN_SETS_SECONDS;
+  }
+  const note = promoted.note;
+  let rpe =
+    typeof rpeRaw === "string" && rpeRaw.trim().length > 0 ? rpeRaw.trim() : null;
+  const intensity =
+    typeof intensityRaw === "string" && intensityRaw.trim().length > 0
+      ? intensityRaw.trim()
+      : null;
+  // Promote RPE out of the coach note when the structured field was left blank.
+  if (!rpe) {
+    rpe = extractRpeValue(note) ?? extractRpeValue(intensity);
+  }
   // Manual admin create/edit: keep entered values as-is (do not apply AI round clamps).
   return {
     exercise_id,
@@ -116,12 +143,12 @@ function parseOneProgramExercise(row: Record<string, unknown>): ProgramExerciseP
     rest_between_sets_seconds,
     rest_between_sides_seconds,
     load_prescription: promoted.load_prescription,
-    rpe: null,
-    intensity: null,
+    rpe,
+    intensity,
     rest_after_seconds,
     session_phase,
     choice_group: parseChoiceGroup(row.choice_group ?? row.choiceGroup),
-    note: promoted.note,
+    note,
   };
 }
 

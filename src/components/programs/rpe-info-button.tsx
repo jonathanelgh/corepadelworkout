@@ -2,6 +2,11 @@
 
 import { useEffect, useId, useState } from "react";
 import { Info, X } from "lucide-react";
+import {
+  noteWithoutLeadingRpeCue,
+  resolveExerciseRpe,
+  textMentionsRpe,
+} from "@/lib/programs/rpe";
 
 type RpeInfoButtonProps = {
   className?: string;
@@ -36,7 +41,7 @@ export function RpeInfoButton({ className = "" }: RpeInfoButtonProps) {
 
       {open && (
         <div
-          className="fixed inset-0 z-100 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 sm:items-center"
           role="presentation"
           onClick={() => setOpen(false)}
         >
@@ -96,17 +101,77 @@ export function RpeInfoButton({ className = "" }: RpeInfoButtonProps) {
   );
 }
 
-type CoachNoteWithRpeInfoProps = {
-  note: string;
+type ExerciseCoachGuidanceProps = {
+  note?: string | null;
+  rpe?: string | null;
+  intensity?: string | null;
+  /** Outer card styles for the coach note block */
+  noteClassName?: string;
+  /** Outer styles for the RPE badge row */
+  rpeClassName?: string;
   className?: string;
 };
 
-/** Coach note card with a small RPE info button. */
-export function CoachNoteWithRpeInfo({ note, className = "" }: CoachNoteWithRpeInfoProps) {
+/**
+ * Athlete-facing RPE + coach note. Shows a clear RPE target with info popup when
+ * RPE is present (structured field or in the note). Info button only appears when RPE applies.
+ */
+export function ExerciseCoachGuidance({
+  note,
+  rpe,
+  intensity,
+  noteClassName = "",
+  rpeClassName = "",
+  className = "",
+}: ExerciseCoachGuidanceProps) {
+  const rpeLabel = resolveExerciseRpe({ rpe, intensity, note });
+  const displayNote = noteWithoutLeadingRpeCue(note, rpeLabel);
+  const noteNeedsInfo = !rpeLabel && textMentionsRpe(note);
+
+  if (!rpeLabel && !displayNote) return null;
+
   return (
-    <div className={`pointer-events-auto flex items-start gap-2 text-left ${className}`}>
-      <p className="min-w-0 flex-1 text-sm leading-relaxed">{note}</p>
-      <RpeInfoButton className="mt-0.5" />
+    <div className={`pointer-events-auto space-y-2 ${className}`}>
+      {rpeLabel && (
+        <div
+          className={`flex items-center justify-center gap-2 text-left ${rpeClassName}`}
+        >
+          <p className="text-sm font-semibold tracking-wide text-[#ccff00]">
+            RPE {rpeLabel}
+          </p>
+          <RpeInfoButton />
+        </div>
+      )}
+      {displayNote && (
+        <div className={`flex items-start gap-2 text-left ${noteClassName}`}>
+          <p className="min-w-0 flex-1 text-sm leading-relaxed">{displayNote}</p>
+          {noteNeedsInfo && <RpeInfoButton className="mt-0.5" />}
+        </div>
+      )}
     </div>
+  );
+}
+
+type CoachNoteWithRpeInfoProps = {
+  note: string;
+  rpe?: string | null;
+  intensity?: string | null;
+  className?: string;
+};
+
+/** @deprecated Prefer ExerciseCoachGuidance — kept for call sites that only pass a note. */
+export function CoachNoteWithRpeInfo({
+  note,
+  rpe,
+  intensity,
+  className = "",
+}: CoachNoteWithRpeInfoProps) {
+  return (
+    <ExerciseCoachGuidance
+      note={note}
+      rpe={rpe}
+      intensity={intensity}
+      noteClassName={className}
+    />
   );
 }

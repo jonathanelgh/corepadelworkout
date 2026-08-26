@@ -11,6 +11,7 @@ import {
   clearAiLoadPrescription,
   sanitizeBothSidesCoachNote,
 } from "@/lib/programs/sanitize-coach-note";
+import { extractRpeValue } from "@/lib/programs/rpe";
 
 export type AiExerciseFields = {
   phase: SessionPhase;
@@ -279,6 +280,20 @@ export function aiExerciseToProgramPayload(
     sets,
     reps,
   };
+  const restBetween = defaultRestBetweenSetsSeconds(forNote);
+  const forNoteWithRest: AiExerciseFields = {
+    ...forNote,
+    rest_between_sets_seconds: restBetween,
+  };
+  const note = ensureSetsRepsBetweenSetsNote(noteSansBothSides, forNoteWithRest, {
+    bothSides: opts.bothSides,
+  });
+  const intensity = ex.intensity?.trim() || null;
+  const rpe =
+    ex.rpe?.trim() ||
+    extractRpeValue(note) ||
+    extractRpeValue(intensity) ||
+    null;
 
   return {
     exercise_id: ex.exercise_id,
@@ -286,19 +301,17 @@ export function aiExerciseToProgramPayload(
     duration_seconds: durationSeconds,
     sets,
     reps,
-    rest_between_sets_seconds: defaultRestBetweenSetsSeconds(forNote),
-    rest_between_sides_seconds: defaultRestBetweenSidesSeconds(forNote, {
+    rest_between_sets_seconds: restBetween,
+    rest_between_sides_seconds: defaultRestBetweenSidesSeconds(forNoteWithRest, {
       bothSides: opts.bothSides,
     }),
-    rest_after_seconds: defaultRestAfterSeconds(forNote, opts),
+    rest_after_seconds: defaultRestAfterSeconds(forNoteWithRest, opts),
     load_prescription: cleaned.load_prescription,
-    rpe: ex.rpe?.trim() || null,
-    intensity: ex.intensity?.trim() || null,
+    rpe,
+    intensity,
     session_phase: ex.phase,
     choice_group: ex.choice_group ?? null,
-    note: ensureSetsRepsBetweenSetsNote(noteSansBothSides, forNote, {
-      bothSides: opts.bothSides,
-    }),
+    note,
   };
 }
 

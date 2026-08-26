@@ -21,6 +21,7 @@ import {
   ensureTimeOnlyMainPrescription,
   MAIN_TIMED_HOLD_DEFAULT_SECONDS,
 } from "@/lib/programs/normalize-ai-exercise-prescription";
+import { extractRpeValue } from "@/lib/programs/rpe";
 import { defaultStrengthSetsRepsForEntry } from "@/lib/programs/program-prescription-rules";
 import { exerciseEligibleForTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 
@@ -37,6 +38,8 @@ export type AiProgramExerciseRow = {
   restBetweenSidesSeconds: string;
   restAfterSeconds: string;
   loadPrescription: string;
+  rpe: string;
+  intensity: string;
   note: string;
 };
 
@@ -263,13 +266,17 @@ export function mapGeminiDraftToForm(
           repsOut = null;
         }
 
-        const restBetween =
-          finalPrescriptionType === "timed_intervals" && rounds > 1
+        const needsBetweenRest =
+          setsOut != null &&
+          setsOut > 1 &&
+          (finalPrescriptionType === "timed_intervals" || finalPrescriptionType === "sets_reps");
+        const restBetween = needsBetweenRest
             ? defaultRestBetweenSetsSeconds({
                 ...aiFields,
                 duration_seconds: durationOut,
                 sets: setsOut,
                 reps: repsOut,
+                rest_between_sets_seconds: ex.rest_between_sets_seconds,
               }) ?? ex.rest_between_sets_seconds
             : null;
         const noteWithRest = ensureSetsRepsBetweenSetsNote(
@@ -297,6 +304,14 @@ export function mapGeminiDraftToForm(
           { bothSides: isBothSides }
         );
 
+        const rpeField =
+          (typeof ex.rpe === "string" && ex.rpe.trim()) ||
+          extractRpeValue(noteWithRest) ||
+          extractRpeValue(typeof ex.intensity === "string" ? ex.intensity : null) ||
+          "";
+        const intensityField =
+          typeof ex.intensity === "string" && ex.intensity.trim() ? ex.intensity.trim() : "";
+
         exercises.push({
           exerciseId: ex.exercise_id,
           sessionPhase: ex.phase,
@@ -313,6 +328,8 @@ export function mapGeminiDraftToForm(
           restBetweenSidesSeconds: intToField(restBetweenSides),
           restAfterSeconds: intToField(aiFields.rest_after_seconds),
           loadPrescription: cleaned.load_prescription?.trim() ?? "",
+          rpe: rpeField,
+          intensity: intensityField,
           note: noteWithRest?.trim() ?? "",
         });
       }

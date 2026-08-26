@@ -32,6 +32,8 @@ export type GeminiProgramExercise = {
   rest_between_sets_seconds: number | null;
   rest_after_seconds: number | null;
   load_prescription?: string | null;
+  rpe?: string | null;
+  intensity?: string | null;
   note?: string | null;
 };
 
@@ -140,6 +142,8 @@ function parseExerciseRow(row: unknown): GeminiProgramExercise | null {
     rest_between_sets_seconds: parseOptionalInt(r.rest_between_sets_seconds),
     rest_after_seconds: parseOptionalInt(r.rest_after_seconds),
     load_prescription: null,
+    rpe: typeof r.rpe === "string" && r.rpe.trim() ? r.rpe.trim() : null,
+    intensity: typeof r.intensity === "string" && r.intensity.trim() ? r.intensity.trim() : null,
     note: typeof r.note === "string" && r.note.trim() ? r.note.trim() : null,
   };
 }

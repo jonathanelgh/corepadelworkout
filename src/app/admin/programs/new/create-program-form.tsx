@@ -12,7 +12,11 @@ import type { AiProgramFormDraft } from "@/lib/programs/map-ai-program-draft";
 import type { SessionPhase } from "@/lib/programs/session-phase";
 import { SESSION_PHASE_LABELS } from "@/lib/programs/session-phase";
 import type { ProgramFormat } from "@/lib/programs/program-format";
-import { MAIN_TIMED_HOLD_DEFAULT_SECONDS, MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS } from "@/lib/programs/normalize-ai-exercise-prescription";
+import {
+  MAIN_TIMED_HOLD_DEFAULT_SECONDS,
+  MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS,
+  SETS_REPS_REST_BETWEEN_SETS_SECONDS,
+} from "@/lib/programs/normalize-ai-exercise-prescription";
 import { AiProgramGeneratorModal } from "@/components/admin/ai-program-generator-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -109,6 +113,10 @@ export type SessionExerciseEntry = {
   restAfterSeconds: string;
   /** Suggested external load (e.g. "12 kg") — progression lives here, not in notes */
   loadPrescription: string;
+  /** Target RPE when effort must be athlete-regulated (e.g. "7" or "7-8") */
+  rpe: string;
+  /** Optional short intensity cue */
+  intensity: string;
   /** Optional coach note shown during the workout (technique/setup — never weekly increases) */
   note: string;
 };
@@ -185,6 +193,8 @@ function cloneSessionBlock(src: SessionBlock, name: string): SessionBlock {
       restBetweenSidesSeconds: e.restBetweenSidesSeconds,
       restAfterSeconds: e.restAfterSeconds,
       loadPrescription: e.loadPrescription,
+      rpe: e.rpe,
+      intensity: e.intensity,
       note: e.note,
     })),
   };
@@ -425,6 +435,8 @@ export function CreateProgramForm({
             restBetweenSidesSeconds: ex.restBetweenSidesSeconds ?? "",
             restAfterSeconds: ex.restAfterSeconds,
             loadPrescription: ex.loadPrescription ?? "",
+            rpe: ex.rpe ?? "",
+            intensity: ex.intensity ?? "",
             note: ex.note ?? "",
           };
         }),
@@ -774,6 +786,8 @@ export function CreateProgramForm({
                   restBetweenSidesSeconds: "",
                   restAfterSeconds: "",
                   loadPrescription: "",
+                  rpe: "",
+                  intensity: "",
                   note: "",
                 },
               ],
@@ -934,6 +948,16 @@ export function CreateProgramForm({
                     next.restBetweenSetsSeconds = String(MAIN_TIMED_REST_BETWEEN_ROUNDS_SECONDS);
                   }
                 }
+                if (clamped === "sets_reps") {
+                  const setsN = Number.parseInt(e.sets, 10);
+                  if (
+                    Number.isFinite(setsN) &&
+                    setsN > 1 &&
+                    !e.restBetweenSetsSeconds.trim()
+                  ) {
+                    next.restBetweenSetsSeconds = String(SETS_REPS_REST_BETWEEN_SETS_SECONDS);
+                  }
+                }
                 return next;
               }),
             };
@@ -1014,9 +1038,21 @@ export function CreateProgramForm({
             if (s.key !== sessionKey) return s;
             return {
               ...s,
-              exercises: s.exercises.map((e) =>
-                e.key === entryKey ? { ...e, [field]: value } : e
-              ),
+              exercises: s.exercises.map((e) => {
+                if (e.key !== entryKey) return e;
+                const next: SessionExerciseEntry = { ...e, [field]: value };
+                // Multi-set sets×reps always need between-set rest.
+                if (field === "sets" && e.prescriptionType === "sets_reps") {
+                  const setsN = Number.parseInt(value, 10);
+                  if (Number.isFinite(setsN) && setsN > 1 && !next.restBetweenSetsSeconds.trim()) {
+                    next.restBetweenSetsSeconds = String(SETS_REPS_REST_BETWEEN_SETS_SECONDS);
+                  }
+                  if (Number.isFinite(setsN) && setsN <= 1) {
+                    next.restBetweenSetsSeconds = "";
+                  }
+                }
+                return next;
+              }),
             };
           }),
         };
@@ -1179,6 +1215,15 @@ export function CreateProgramForm({
                 const n = Number.parseInt(e.reps, 10);
                 if (Number.isFinite(n) && n >= 0) reps = n;
               }
+              if (sets != null && sets > 1) {
+                if (e.restBetweenSetsSeconds.trim() !== "") {
+                  const n = Number.parseInt(e.restBetweenSetsSeconds, 10);
+                  if (Number.isFinite(n) && n > 0) rest_between_sets_seconds = n;
+                }
+                if (rest_between_sets_seconds == null) {
+                  rest_between_sets_seconds = SETS_REPS_REST_BETWEEN_SETS_SECONDS;
+                }
+              }
             }
 
             if (prescriptionType === "timed_intervals") {
@@ -1214,6 +1259,8 @@ export function CreateProgramForm({
             }
             const note = e.note.trim() || null;
             const load_prescription = e.loadPrescription.trim() || null;
+            const rpe = e.rpe.trim() || null;
+            const intensity = e.intensity.trim() || null;
             return {
               exercise_id: e.exerciseId,
               duration_seconds,
@@ -1224,6 +1271,8 @@ export function CreateProgramForm({
               rest_between_sides_seconds,
               rest_after_seconds,
               load_prescription,
+              rpe,
+              intensity,
               session_phase: e.sessionPhase,
               choice_group: e.choiceGroup.trim() || null,
               note,
@@ -2503,6 +2552,80 @@ export function CreateProgramForm({
                                             />
                                           </div>
                                         </div>
+                                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                          <div>
+                                            <label
+                                              htmlFor={`ex-rpe-${entry.key}`}
+                                              className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
+                                            >
+                                              RPE
+                                            </label>
+                                            <input
+                                              id={`ex-rpe-${entry.key}`}
+                                              type="text"
+                                              value={entry.rpe}
+                                              onChange={(e) =>
+                                                setTracks((prev) =>
+                                                  prev.map((t) => {
+                                                    if (t.key !== activeTrack.key) return t;
+                                                    return {
+                                                      ...t,
+                                                      sessions: t.sessions.map((s) => {
+                                                        if (s.key !== session.key) return s;
+                                                        return {
+                                                          ...s,
+                                                          exercises: s.exercises.map((ex) =>
+                                                            ex.key === entry.key
+                                                              ? { ...ex, rpe: e.target.value }
+                                                              : ex
+                                                          ),
+                                                        };
+                                                      }),
+                                                    };
+                                                  })
+                                                )
+                                              }
+                                              placeholder='e.g. 7-8'
+                                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label
+                                              htmlFor={`ex-intensity-${entry.key}`}
+                                              className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
+                                            >
+                                              Intensity cue
+                                            </label>
+                                            <input
+                                              id={`ex-intensity-${entry.key}`}
+                                              type="text"
+                                              value={entry.intensity}
+                                              onChange={(e) =>
+                                                setTracks((prev) =>
+                                                  prev.map((t) => {
+                                                    if (t.key !== activeTrack.key) return t;
+                                                    return {
+                                                      ...t,
+                                                      sessions: t.sessions.map((s) => {
+                                                        if (s.key !== session.key) return s;
+                                                        return {
+                                                          ...s,
+                                                          exercises: s.exercises.map((ex) =>
+                                                            ex.key === entry.key
+                                                              ? { ...ex, intensity: e.target.value }
+                                                              : ex
+                                                          ),
+                                                        };
+                                                      }),
+                                                    };
+                                                  })
+                                                )
+                                              }
+                                              placeholder='e.g. last 1–2 reps tough'
+                                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
+                                            />
+                                          </div>
+                                        </div>
                                         <div className="mt-3">
                                           <label
                                             htmlFor={`ex-note-${entry.key}`}
@@ -2579,7 +2702,7 @@ export function CreateProgramForm({
                                         )}
 
                                         {activeType === "sets_reps" && (
-                                          <div className="mt-3 grid grid-cols-2 gap-2 sm:max-w-md">
+                                          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:max-w-xl">
                                             <div>
                                               <label
                                                 className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
@@ -2632,6 +2755,34 @@ export function CreateProgramForm({
                                                 className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                                               />
                                             </div>
+                                            {Number.parseInt(entry.sets, 10) > 1 && (
+                                              <div>
+                                                <label
+                                                  className="block text-[10px] font-medium uppercase tracking-wide text-gray-500 mb-1"
+                                                  htmlFor={`ex-rest-sets-${entry.key}`}
+                                                >
+                                                  Rest between sets (sec)
+                                                </label>
+                                                <input
+                                                  id={`ex-rest-sets-${entry.key}`}
+                                                  type="text"
+                                                  inputMode="numeric"
+                                                  pattern="[0-9]*"
+                                                  value={entry.restBetweenSetsSeconds}
+                                                  onChange={(e) =>
+                                                    setSessionExerciseNumericField(
+                                                      activeTrack.key,
+                                                      session.key,
+                                                      entry.key,
+                                                      "restBetweenSetsSeconds",
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  placeholder={String(SETS_REPS_REST_BETWEEN_SETS_SECONDS)}
+                                                  className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
+                                                />
+                                              </div>
+                                            )}
                                           </div>
                                         )}
 
