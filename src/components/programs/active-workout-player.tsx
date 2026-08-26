@@ -770,11 +770,10 @@ export function ActiveWorkoutPlayer({
                       <WorkoutSideBadge side={current.workoutSide} />
                     </div>
                   )}
-                  {(current.note?.trim() || current.rpe?.trim() || current.intensity?.trim()) && (
+                  {(current.note?.trim() || current.rpe?.trim()) && (
                     <ExerciseCoachGuidance
                       note={current.note}
                       rpe={current.rpe}
-                      intensity={current.intensity}
                       className="mt-4 max-w-md"
                       noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
                     />
@@ -798,11 +797,10 @@ export function ActiveWorkoutPlayer({
                       <WorkoutSideBadge side={current.workoutSide} />
                     </div>
                   )}
-                  {(current.note?.trim() || current.rpe?.trim() || current.intensity?.trim()) && (
+                  {(current.note?.trim() || current.rpe?.trim()) && (
                     <ExerciseCoachGuidance
                       note={current.note}
                       rpe={current.rpe}
-                      intensity={current.intensity}
                       className="mt-4 max-w-md"
                       noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
                     />
@@ -825,11 +823,10 @@ export function ActiveWorkoutPlayer({
                       <BothSidesChip variant="dark" />
                     </div>
                   )}
-                  {(next.note?.trim() || next.rpe?.trim() || next.intensity?.trim()) && (
+                  {(next.note?.trim() || next.rpe?.trim()) && (
                     <ExerciseCoachGuidance
                       note={next.note}
                       rpe={next.rpe}
-                      intensity={next.intensity}
                       className="mt-4 max-w-md"
                       noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
                     />
@@ -918,13 +915,10 @@ export function ActiveWorkoutPlayer({
                   </div>
                 )}
                 <p className="mt-3 text-lg font-medium text-[#ccff00]">{exerciseMeta(current)}</p>
-                {(displayNote ||
-                  displayExercise?.rpe?.trim() ||
-                  displayExercise?.intensity?.trim()) && (
+                {(displayNote || displayExercise?.rpe?.trim()) && (
                   <ExerciseCoachGuidance
                     note={displayNote}
                     rpe={displayExercise?.rpe}
-                    intensity={displayExercise?.intensity}
                     className="mt-3"
                     noteClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
                   />
@@ -972,14 +966,10 @@ export function ActiveWorkoutPlayer({
                     <BothSidesChip variant="dark" />
                   </div>
                 )}
-                {!inRest &&
-                  (displayNote ||
-                    displayExercise?.rpe?.trim() ||
-                    displayExercise?.intensity?.trim()) && (
+                {!inRest && (displayNote || displayExercise?.rpe?.trim()) && (
                   <ExerciseCoachGuidance
                     note={displayNote}
                     rpe={displayExercise?.rpe}
-                    intensity={displayExercise?.intensity}
                     className="mt-3"
                     noteClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
                   />

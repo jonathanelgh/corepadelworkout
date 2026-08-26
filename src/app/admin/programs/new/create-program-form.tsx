@@ -161,7 +161,7 @@ export type SessionExerciseEntry = {
   loadPrescription: string;
   /** Target RPE when effort must be athlete-regulated (e.g. "7" or "7-8") */
   rpe: string;
-  /** Optional short intensity cue */
+  /** Legacy AI intensity cue — hydrated into RPE; not shown in UI */
   intensity: string;
   /** Optional coach note shown during the workout (technique/setup — never weekly increases) */
   note: string;
@@ -1310,8 +1310,11 @@ export function CreateProgramForm({
             }
             const note = e.note.trim() || null;
             const load_prescription = e.loadPrescription.trim() || null;
-            const rpe = e.rpe.trim() || extractRpeValue(e.note) || null;
-            const intensity = e.intensity.trim() || null;
+            const rpe =
+              e.rpe.trim() ||
+              extractRpeValue(e.note) ||
+              extractRpeValue(e.intensity) ||
+              null;
             return {
               exercise_id: e.exerciseId,
               duration_seconds,
@@ -1323,7 +1326,8 @@ export function CreateProgramForm({
               rest_after_seconds,
               load_prescription,
               rpe,
-              intensity,
+              // Intensity cue removed from UI; keep column null going forward.
+              intensity: null,
               session_phase: e.sessionPhase,
               choice_group: e.choiceGroup.trim() || null,
               note,
@@ -2608,104 +2612,66 @@ export function CreateProgramForm({
                                             />
                                           </div>
                                         </div>
-                                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                          <div>
-                                            <label
-                                              htmlFor={`ex-rpe-${entry.key}`}
-                                              className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
-                                            >
-                                              RPE
-                                            </label>
-                                            <input
-                                              id={`ex-rpe-${entry.key}`}
-                                              type="text"
-                                              value={entry.rpe ?? ""}
-                                              onChange={(e) =>
-                                                setTracks((prev) =>
-                                                  prev.map((t) => {
-                                                    if (t.key !== activeTrack.key) return t;
-                                                    return {
-                                                      ...t,
-                                                      sessions: t.sessions.map((s) => {
-                                                        if (s.key !== session.key) return s;
-                                                        return {
-                                                          ...s,
-                                                          exercises: s.exercises.map((ex) =>
-                                                            ex.key === entry.key
-                                                              ? { ...ex, rpe: e.target.value }
-                                                              : ex
-                                                          ),
-                                                        };
-                                                      }),
-                                                    };
-                                                  })
-                                                )
-                                              }
-                                              onBlur={() => {
-                                                // If the field was left blank, pull RPE from the coach note.
-                                                if ((entry.rpe ?? "").trim()) return;
-                                                const fromNote = extractRpeValue(entry.note);
-                                                if (!fromNote) return;
-                                                setTracks((prev) =>
-                                                  prev.map((t) => {
-                                                    if (t.key !== activeTrack.key) return t;
-                                                    return {
-                                                      ...t,
-                                                      sessions: t.sessions.map((s) => {
-                                                        if (s.key !== session.key) return s;
-                                                        return {
-                                                          ...s,
-                                                          exercises: s.exercises.map((ex) =>
-                                                            ex.key === entry.key && !(ex.rpe ?? "").trim()
-                                                              ? { ...ex, rpe: fromNote }
-                                                              : ex
-                                                          ),
-                                                        };
-                                                      }),
-                                                    };
-                                                  })
-                                                );
-                                              }}
-                                              placeholder='e.g. 7-8'
-                                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label
-                                              htmlFor={`ex-intensity-${entry.key}`}
-                                              className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
-                                            >
-                                              Intensity cue
-                                            </label>
-                                            <input
-                                              id={`ex-intensity-${entry.key}`}
-                                              type="text"
-                                              value={entry.intensity}
-                                              onChange={(e) =>
-                                                setTracks((prev) =>
-                                                  prev.map((t) => {
-                                                    if (t.key !== activeTrack.key) return t;
-                                                    return {
-                                                      ...t,
-                                                      sessions: t.sessions.map((s) => {
-                                                        if (s.key !== session.key) return s;
-                                                        return {
-                                                          ...s,
-                                                          exercises: s.exercises.map((ex) =>
-                                                            ex.key === entry.key
-                                                              ? { ...ex, intensity: e.target.value }
-                                                              : ex
-                                                          ),
-                                                        };
-                                                      }),
-                                                    };
-                                                  })
-                                                )
-                                              }
-                                              placeholder='e.g. last 1–2 reps tough'
-                                              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
-                                            />
-                                          </div>
+                                        <div className="mt-3 max-w-xs">
+                                          <label
+                                            htmlFor={`ex-rpe-${entry.key}`}
+                                            className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
+                                          >
+                                            RPE
+                                          </label>
+                                          <input
+                                            id={`ex-rpe-${entry.key}`}
+                                            type="text"
+                                            value={entry.rpe ?? ""}
+                                            onChange={(e) =>
+                                              setTracks((prev) =>
+                                                prev.map((t) => {
+                                                  if (t.key !== activeTrack.key) return t;
+                                                  return {
+                                                    ...t,
+                                                    sessions: t.sessions.map((s) => {
+                                                      if (s.key !== session.key) return s;
+                                                      return {
+                                                        ...s,
+                                                        exercises: s.exercises.map((ex) =>
+                                                          ex.key === entry.key
+                                                            ? { ...ex, rpe: e.target.value }
+                                                            : ex
+                                                        ),
+                                                      };
+                                                    }),
+                                                  };
+                                                })
+                                              )
+                                            }
+                                            onBlur={() => {
+                                              // If the field was left blank, pull RPE from the coach note.
+                                              if ((entry.rpe ?? "").trim()) return;
+                                              const fromNote = extractRpeValue(entry.note);
+                                              if (!fromNote) return;
+                                              setTracks((prev) =>
+                                                prev.map((t) => {
+                                                  if (t.key !== activeTrack.key) return t;
+                                                  return {
+                                                    ...t,
+                                                    sessions: t.sessions.map((s) => {
+                                                      if (s.key !== session.key) return s;
+                                                      return {
+                                                        ...s,
+                                                        exercises: s.exercises.map((ex) =>
+                                                          ex.key === entry.key && !(ex.rpe ?? "").trim()
+                                                            ? { ...ex, rpe: fromNote }
+                                                            : ex
+                                                        ),
+                                                      };
+                                                    }),
+                                                  };
+                                                })
+                                              );
+                                            }}
+                                            placeholder="e.g. 7-8"
+                                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
+                                          />
                                         </div>
                                         <div className="mt-3">
                                           <label

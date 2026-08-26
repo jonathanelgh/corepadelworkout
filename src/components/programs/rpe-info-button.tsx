@@ -104,7 +104,6 @@ export function RpeInfoButton({ className = "" }: RpeInfoButtonProps) {
 type ExerciseCoachGuidanceProps = {
   note?: string | null;
   rpe?: string | null;
-  intensity?: string | null;
   /** Card styles for the combined coach note + RPE block */
   noteClassName?: string;
   /** @deprecated Ignored — RPE is shown inside the same card as the note. */
@@ -119,11 +118,10 @@ type ExerciseCoachGuidanceProps = {
 export function ExerciseCoachGuidance({
   note,
   rpe,
-  intensity,
   noteClassName = "",
   className = "",
 }: ExerciseCoachGuidanceProps) {
-  const rpeLabel = resolveExerciseRpe({ rpe, intensity, note });
+  const rpeLabel = resolveExerciseRpe({ rpe, note });
   const body = noteWithoutLeadingRpeCue(note, rpeLabel);
   const showInfo = Boolean(rpeLabel) || textMentionsRpe(note);
   const fallbackNote = !rpeLabel && !body ? note?.trim() || null : null;
@@ -153,7 +151,6 @@ export function ExerciseCoachGuidance({
 type CoachNoteWithRpeInfoProps = {
   note: string;
   rpe?: string | null;
-  intensity?: string | null;
   className?: string;
 };
 
@@ -161,14 +158,12 @@ type CoachNoteWithRpeInfoProps = {
 export function CoachNoteWithRpeInfo({
   note,
   rpe,
-  intensity,
   className = "",
 }: CoachNoteWithRpeInfoProps) {
   return (
     <ExerciseCoachGuidance
       note={note}
       rpe={rpe}
-      intensity={intensity}
       noteClassName={className}
     />
   );
