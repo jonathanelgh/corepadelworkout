@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Mail, Search, Send } from "lucide-react";
 import type { PreLaunchSignupRow } from "@/lib/pre-launch/early-access";
-import { sendWaitlistLaunchEmail, sendWaitlistLaunchEmailBulk, sendWaitlistLaunchEmailTest } from "./actions";
+import { sendWaitlistLaunchCorrectionBulk, sendWaitlistLaunchEmail, sendWaitlistLaunchEmailBulk, sendWaitlistLaunchEmailTest } from "./actions";
 
 function formatWhen(iso: string | null): string {
   if (!iso) return "—";
@@ -40,6 +40,7 @@ export function WaitlistClient({ initialRows }: { initialRows: PreLaunchSignupRo
   }, [rows, query]);
 
   const unsentCount = rows.filter((r) => !r.launch_email_sent_at).length;
+  const sentCount = rows.filter((r) => Boolean(r.launch_email_sent_at)).length;
   const redeemedCount = rows.filter((r) => r.pro_redeemed_at).length;
 
   async function onSendOne(id: string, email: string) {
@@ -85,20 +86,54 @@ export function WaitlistClient({ initialRows }: { initialRows: PreLaunchSignupRo
     });
   }
 
-  async function onSendTest() {
+  function onSendCorrectionBulk() {
+    if (sentCount === 0) {
+      setError("No previously emailed waitlist signups to correct.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Send apology + correct corepadel.app link to ${sentCount} address${sentCount === 1 ? "" : "es"} who already received the launch email?`
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    startBulk(async () => {
+      const result = await sendWaitlistLaunchCorrectionBulk();
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+      setMessage(
+        `Correction email sent to ${result.sent} address${result.sent === 1 ? "" : "es"}${
+          result.failed ? `; ${result.failed} failed` : ""
+        }.`
+      );
+    });
+  }
+
+  async function onSendTest(correction = false) {
     setError(null);
     setMessage(null);
     setTestPending(true);
     const result = await sendWaitlistLaunchEmailTest({
       to: testEmail,
       signupId: testSignupId || null,
+      correction,
     });
     setTestPending(false);
     if ("error" in result) {
       setError(result.error);
       return;
     }
-    setMessage(`Test launch email sent to ${testEmail.trim()}.`);
+    setMessage(
+      correction
+        ? `Test correction email sent to ${testEmail.trim()}.`
+        : `Test launch email sent to ${testEmail.trim()}.`
+    );
   }
 
   return (
@@ -121,6 +156,15 @@ export function WaitlistClient({ initialRows }: { initialRows: PreLaunchSignupRo
             >
               {bulkPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Email unsent ({unsentCount})
+            </button>
+            <button
+              type="button"
+              disabled={bulkPending || sentCount === 0}
+              onClick={() => onSendCorrectionBulk()}
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-100 disabled:opacity-50"
+            >
+              {bulkPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Resend correct link ({sentCount})
             </button>
           </div>
         </div>
@@ -183,11 +227,20 @@ export function WaitlistClient({ initialRows }: { initialRows: PreLaunchSignupRo
             <button
               type="button"
               disabled={testPending || bulkPending || !testEmail.trim() || rows.length === 0}
-              onClick={() => void onSendTest()}
+              onClick={() => void onSendTest(false)}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 disabled:opacity-50"
             >
               {testPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               Send test
+            </button>
+            <button
+              type="button"
+              disabled={testPending || bulkPending || !testEmail.trim() || rows.length === 0}
+              onClick={() => void onSendTest(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100 disabled:opacity-50"
+            >
+              {testPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Test correction
             </button>
           </div>
           {rows.length === 0 && (

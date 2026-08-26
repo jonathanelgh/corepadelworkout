@@ -32,7 +32,8 @@ export async function loadWaitlistForAdmin(): Promise<
 }
 
 export async function sendWaitlistLaunchEmail(
-  signupId: string
+  signupId: string,
+  options?: { correction?: boolean }
 ): Promise<{ ok: true; sentAt: string } | { error: string }> {
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
@@ -49,6 +50,7 @@ export async function sendWaitlistLaunchEmail(
   const mail = await sendLaunchLiveEmail({
     to: row.email,
     signupToken: row.signup_token,
+    correction: options?.correction === true,
   });
   if (!mail.ok) return { error: mail.error };
 
@@ -94,6 +96,38 @@ export async function sendWaitlistLaunchEmailBulk(
   return { ok: true, sent, failed };
 }
 
+/** Resend apology + correct corepadel.app link to people who already got the launch email. */
+export async function sendWaitlistLaunchCorrectionBulk(): Promise<
+  { ok: true; sent: number; failed: number } | { error: string }
+> {
+  const auth = await requireAdmin();
+  if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
+
+  let rows: PreLaunchSignupRow[];
+  try {
+    rows = await loadPreLaunchSignups(createServiceClient());
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not load waitlist." };
+  }
+
+  const targets = rows.filter((r) => Boolean(r.launch_email_sent_at));
+  if (targets.length === 0) {
+    return { error: "No previously emailed waitlist signups to correct." };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const row of targets) {
+    const result = await sendWaitlistLaunchEmail(row.id, { correction: true });
+    if ("error" in result) failed += 1;
+    else sent += 1;
+  }
+
+  revalidatePath("/admin/waitlist");
+  return { ok: true, sent, failed };
+}
+
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -102,6 +136,7 @@ function isValidEmail(email: string): boolean {
 export async function sendWaitlistLaunchEmailTest(input: {
   to: string;
   signupId?: string | null;
+  correction?: boolean;
 }): Promise<{ ok: true } | { error: string }> {
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
@@ -133,6 +168,7 @@ export async function sendWaitlistLaunchEmailTest(input: {
     to,
     signupToken: row.signup_token,
     test: true,
+    correction: input.correction === true,
   });
   if (!mail.ok) return { error: mail.error };
 

@@ -2,6 +2,23 @@ export function getSiteUrl(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://corepadel.app").replace(/\/$/, "");
 }
 
+/**
+ * Site URL safe for outbound emails / public links.
+ * Never emit localhost even if NEXT_PUBLIC_SITE_URL is set for local dev.
+ */
+export function getPublicSiteUrl(): string {
+  const raw = getSiteUrl();
+  try {
+    const host = new URL(raw).hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".local")) {
+      return "https://corepadel.app";
+    }
+  } catch {
+    return "https://corepadel.app";
+  }
+  return raw;
+}
+
 export function getStripeSecretKey(): string {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) {
