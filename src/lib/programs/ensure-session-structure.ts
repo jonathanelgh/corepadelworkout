@@ -15,7 +15,7 @@ import {
   WARMUP_DURATION_SECONDS,
   WARMUP_REST_AFTER_SECONDS,
 } from "@/lib/programs/warmup-prescription";
-import { exerciseNeedsRpeGuidance } from "@/lib/programs/validate-ai-coach-proposal";
+import { exerciseNeedsRpeGuidance } from "@/lib/programs/ai-rpe-guidance";
 import { coerceRpeField, defaultRpeForEffort, extractRpeValue } from "@/lib/programs/rpe";
 
 const PHASE_ORDER: Record<SessionPhase, number> = {
@@ -261,7 +261,9 @@ export function ensureSessionExerciseStructure(
 ): { exercises: WorkoutProposalExercise[]; warnings: string[] } {
   const warnings: string[] = [];
   const sessionLabel = options?.sessionLabel?.trim();
-  const level = options?.trainingLevel ?? "beginner";
+  // Only filter by level when explicitly set. Defaulting to "beginner" wiped
+  // intermediate/advanced exercises on save and produced empty workouts.
+  const level = options?.trainingLevel ?? null;
 
   const eligibleExercises = exercises.filter((ex) => {
     const entry = catalog.find((c) => c.id === ex.exercise_id);

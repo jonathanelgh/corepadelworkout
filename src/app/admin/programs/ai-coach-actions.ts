@@ -450,6 +450,11 @@ export async function sendAiCoachMessage(input: {
         generationExercises,
         enforcementOptions
       );
+      if (proposal.exercises.length === 0) {
+        throw new Error(
+          "Workout ended up with no exercises after catalog/level checks. Try again or widen the training level."
+        );
+      }
       const allWarnings = [...structureWarnings];
       if (allWarnings.length > 0) {
         console.info("[ai-coach] workout enforcement:", allWarnings.join(" "));
@@ -545,6 +550,12 @@ export async function sendAiCoachMessage(input: {
       generationExercises,
       enforcementOptions
     );
+    const exerciseCount = proposal.sessions.reduce((n, s) => n + s.exercises.length, 0);
+    if (exerciseCount === 0) {
+      throw new Error(
+        "Program ended up with no exercises after catalog/level checks. Try again or widen the training level."
+      );
+    }
     const allWarnings = [...structureWarnings];
     if (allWarnings.length > 0) {
       console.info("[ai-coach] program enforcement:", allWarnings.join(" "));
@@ -670,7 +681,11 @@ export async function saveAiCoachProgram(
 
 export async function saveAiCoachWorkout(
   proposal: WorkoutProposal,
-  options?: { publish?: boolean; generateCover?: boolean }
+  options?: {
+    publish?: boolean;
+    generateCover?: boolean;
+    trainingLevel?: string | null;
+  }
 ): Promise<SaveAiWorkoutResult> {
   const auth = await requireAdmin();
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
@@ -679,8 +694,24 @@ export async function saveAiCoachWorkout(
     const ctx = await loadProgramAiContext(auth.supabase);
     const publishedExercises = ctx.exercises.filter((e) => e.status === "published");
     const allowedExerciseIds = new Set(publishedExercises.map((e) => e.id));
+    const trainingLevel = isOnboardingLevel(options?.trainingLevel)
+      ? options.trainingLevel
+      : null;
 
-    const { proposal: fixed } = ensureWorkoutProposalStructure(proposal, publishedExercises);
+    // Do not re-cap by beginner on save — that stripped intermediate/advanced work
+    // and produced "Workout has no exercises." Keep generation-time filtering only.
+    const { proposal: fixed } = ensureWorkoutProposalStructure(
+      proposal,
+      publishedExercises,
+      { trainingLevel }
+    );
+
+    if (fixed.exercises.length === 0) {
+      return {
+        error:
+          "Workout has no exercises after validation. Regenerate the workout, or check the training level filter.",
+      };
+    }
 
     const saved = await saveAiWorkoutProgram(auth.supabase, fixed, {
       status: options?.publish ? "published" : "draft",

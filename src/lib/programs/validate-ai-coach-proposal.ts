@@ -1,6 +1,7 @@
 import type { ExerciseCatalogEntry } from "@/lib/programs/exercise-catalog";
 import type { ProgramProposal, WorkoutProposal, WorkoutProposalExercise } from "@/lib/programs/ai-coach-gemini";
 import { coerceRpeField } from "@/lib/programs/rpe";
+import { exerciseNeedsRpeGuidance } from "@/lib/programs/ai-rpe-guidance";
 
 export type AiCoachProposalValidationError = {
   /** Human readable error message (can be shown back to the AI). */
@@ -67,54 +68,6 @@ function hasOptionalCoachNote(ex: WorkoutProposalExercise): boolean {
 /** Admin-facing coaching summary — require enough substance for a real explanation. */
 function hasSubstantialDesignRationale(v: unknown): boolean {
   return typeof v === "string" && v.trim().length >= 120;
-}
-
-function catalogBlob(entry: ExerciseCatalogEntry): string {
-  return [
-    entry.title,
-    ...entry.categoryTypes,
-    ...entry.movementPatterns,
-    ...entry.bodyRegions,
-    ...entry.bodyParts,
-  ]
-    .join(" ")
-    .toLowerCase();
-}
-
-/**
- * RPE only when the athlete must regulate effort (weighted strength, conditioning,
- * repeated explosive work, near-fatigue). Not for mobility / warm-up / cool-down /
- * technique / standard isometric holds / Copenhagen-style work unless effort-based.
- */
-export function exerciseNeedsRpeGuidance(
-  entry: ExerciseCatalogEntry,
-  ex: WorkoutProposalExercise,
-  isTimed: boolean,
-  sets: number | null,
-  reps: number | null
-): boolean {
-  if (ex.phase === "warmup" || ex.phase === "cooldown") return false;
-
-  const blob = catalogBlob(entry).replace(/_/g, " ");
-  if (/\bmobility\b|\bstretch\b|\btechnique\b/.test(blob)) return false;
-  if (/\bcopenhagen\b/.test(blob)) return false;
-  if (
-    entry.programPrescriptionMode === "time_only" &&
-    !/\bexplosive\b|\bplyometric\b|\bconditioning\b/.test(blob)
-  ) {
-    return false;
-  }
-
-  if (/\bexplosive\b|\bplyometric\b|\bconditioning\b|\bspeedstrength\b|\bspeed-strength\b/.test(blob)) {
-    return true;
-  }
-
-  // Main sets×reps work needs a Target RPE (strength / weighted / general effort).
-  if (ex.phase === "main" && !isTimed && sets != null && reps != null) {
-    return true;
-  }
-
-  return false;
 }
 
 function noteHasMatchingBetweenSetsRest(

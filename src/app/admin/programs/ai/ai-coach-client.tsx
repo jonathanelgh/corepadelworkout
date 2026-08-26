@@ -522,7 +522,11 @@ export function AiCoachClient({
     setSavingProposalId(proposalMsgId);
     setError(null);
 
-    const res = await saveAiCoachWorkout(proposal, { publish, generateCover: true });
+    const res = await saveAiCoachWorkout(proposal, {
+      publish,
+      generateCover: true,
+      trainingLevel: trainingLevel || null,
+    });
     setSavingProposalId(null);
 
     if ("error" in res) {
