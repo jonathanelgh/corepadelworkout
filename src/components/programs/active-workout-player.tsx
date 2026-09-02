@@ -15,6 +15,7 @@ import {
   restBetweenSetsSeconds,
   restDurationSeconds,
   setsCount,
+  uniqueEquipmentLabels,
   workDurationSeconds,
 } from "@/lib/programs/program-exercises";
 import {
@@ -221,6 +222,11 @@ export function ActiveWorkoutPlayer({
   const resolvedExercises = useMemo(
     () => resolveWorkoutPlaylist(exercises, choiceSelections),
     [exercises, choiceSelections]
+  );
+
+  const sessionEquipment = useMemo(
+    () => uniqueEquipmentLabels(resolvedExercises),
+    [resolvedExercises]
   );
 
   const playbackSteps = useMemo(
@@ -663,6 +669,26 @@ export function ActiveWorkoutPlayer({
             {len} exercise{len === 1 ? "" : "s"} · follows each exercise prescription
           </p>
 
+          <div className="mt-6 rounded-2xl border border-white/15 bg-black/40 p-5 backdrop-blur-md">
+            <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+              Equipment needed
+            </p>
+            {sessionEquipment.length > 0 ? (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {sessionEquipment.map((item) => (
+                  <li
+                    key={item}
+                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white/90"
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-white/70">No equipment needed — bodyweight only.</p>
+            )}
+          </div>
+
           <div className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0">
             <WorkoutVideo
               url={resolvedExercises[0]?.video_url ?? null}
@@ -782,32 +808,6 @@ export function ActiveWorkoutPlayer({
                   <p className="mt-2 text-sm text-white/60">Starting in…</p>
                 </div>
               )}
-              {inTimedPreview && current && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/45 px-6 py-4 text-center backdrop-blur-[2px]">
-                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Up next</p>
-                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
-                  <p className="mt-2 text-sm text-white/80">{exerciseMeta(current)}</p>
-                  {current.bothSides && !current.workoutSide && (
-                    <div className="mt-3">
-                      <BothSidesChip variant="dark" />
-                    </div>
-                  )}
-                  {current.workoutSide && (
-                    <div className="mt-4">
-                      <WorkoutSideBadge side={current.workoutSide} />
-                    </div>
-                  )}
-                  {(current.note?.trim() || current.rpe?.trim()) && (
-                    <ExerciseCoachGuidance
-                      note={current.note}
-                      rpe={current.rpe}
-                      className="mt-4 max-w-md"
-                      noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
-                    />
-                  )}
-                  <p className="mt-6 text-sm text-white/60">Preview the demo, then start when ready.</p>
-                </div>
-              )}
               {inExerciseRest && next && secondsLeft != null && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
                   <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready for</p>
@@ -905,7 +905,8 @@ export function ActiveWorkoutPlayer({
 
             {inTimedPreview && current && (
               <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
-                <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
+                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Up next</p>
+                <p className="mt-1 text-xs font-bold tracking-wider text-white/50 uppercase">
                   Timed exercise · step {currentIndex + 1} of {len}
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold">{current.title}</h2>

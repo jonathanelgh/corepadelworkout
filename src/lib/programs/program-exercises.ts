@@ -12,6 +12,8 @@ export type ProgramExerciseItem = {
   image_url: string | null;
   video_url: string | null;
   bothSides: boolean;
+  /** Gear titles linked on the catalog exercise. */
+  equipmentLabels: string[];
   /** True when the catalog exercise uses loadable weight equipment (DB, KB, bar, etc.). */
   usesExternalLoad: boolean;
   sessionPhase: SessionPhase;
@@ -327,6 +329,7 @@ function equipmentTitlesFromExercise(ex: ExerciseNested): string[] {
 }
 
 function toProgramExerciseItem(pe: ProgramExerciseNested, ex: ExerciseNested): ProgramExerciseItem {
+  const equipmentLabels = equipmentTitlesFromExercise(ex);
   return {
     id: pe.id,
     exerciseId: ex.id,
@@ -334,7 +337,8 @@ function toProgramExerciseItem(pe: ProgramExerciseNested, ex: ExerciseNested): P
     image_url: ex.image_url?.trim() || null,
     video_url: ex.video_url?.trim() || null,
     bothSides: Boolean(ex.both_sides),
-    usesExternalLoad: equipmentUsesExternalLoad(equipmentTitlesFromExercise(ex)),
+    equipmentLabels,
+    usesExternalLoad: equipmentUsesExternalLoad(equipmentLabels),
     sessionPhase: pe.session_phase ?? "main",
     choiceGroup: pe.choice_group?.trim() || null,
     durationMinutes: pe.duration_minutes,
@@ -349,6 +353,23 @@ function toProgramExerciseItem(pe: ProgramExerciseNested, ex: ExerciseNested): P
     intensity: pe.intensity?.trim() || null,
     note: pe.note?.trim() || null,
   };
+}
+
+/** Unique gear titles across a workout playlist (case-insensitive). */
+export function uniqueEquipmentLabels(exercises: Array<Pick<ProgramExerciseItem, "equipmentLabels">>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const ex of exercises) {
+    for (const label of ex.equipmentLabels) {
+      const trimmed = label.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+  }
+  return out.sort((a, b) => a.localeCompare(b));
 }
 
 const EXERCISE_SELECT = `

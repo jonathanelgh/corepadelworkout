@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { CheckCircle2 } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { fetchProgramExercises } from "@/lib/programs/program-exercises";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
 import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import { loadProgramProgress } from "@/lib/programs/program-progress";
@@ -10,7 +9,6 @@ import { programTrainingHref } from "@/lib/programs/program-routes";
 import { ProgramSchedulePanel } from "@/components/programs/program-schedule-panel";
 import { ProgramExperienceLayout } from "../program-experience-layout";
 import { ProgramAccessBar } from "../program-access-bar";
-import { ProgramDetailTabs } from "@/components/programs/program-detail-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -131,7 +129,6 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
   const program = loaded.program;
   const isAdminDraftPreview = loaded.isAdminDraftPreview;
   const programFormat = parseProgramFormat(program.program_format);
-  const exercises = await fetchProgramExercises(supabase, program.id);
 
   const {
     data: { user },
@@ -164,7 +161,6 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
   const subtitle =
     program.description?.trim() ||
     "Structured training to level up your game on and off the court.";
-  const detailsText = program.body?.trim() || program.description?.trim() || null;
 
   return (
     <ProgramExperienceLayout
@@ -200,8 +196,6 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
       {usesProgramProgress(programFormat) && progress && progress.totalSessions > 0 && (
         <ProgramSchedulePanel programSlug={slug} progress={progress} />
       )}
-
-      <ProgramDetailTabs description={detailsText} exercises={exercises} />
 
       {aboutBlocks.length > 0 && (
         <div className="mb-12 mt-12">
