@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { enrollInPublishedProgram } from "@/app/programs/enroll-actions";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 import { redeemEarlyAccessPro } from "@/lib/pre-launch/early-access";
+import { redeemSignupOfferPro } from "@/lib/billing/signup-offer";
 import {
   COURT_WARMUP_PROGRAM_SLUG,
   isCourtWarmupFunnelPath,
@@ -46,6 +47,14 @@ export async function GET(request: Request) {
             userId: user.id,
             email: user.email,
             token,
+          });
+        }
+        const offerRaw = user.user_metadata?.signup_offer_code;
+        const offerCode = typeof offerRaw === "string" ? offerRaw.trim() : "";
+        if (offerCode) {
+          await redeemSignupOfferPro({
+            userId: user.id,
+            code: offerCode,
           });
         }
       }

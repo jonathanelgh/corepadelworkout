@@ -6,6 +6,11 @@ import {
   redeemEarlyAccessPro,
   validateEarlyAccessForEmail,
 } from "@/lib/pre-launch/early-access";
+import {
+  normalizeSignupOfferCode,
+  redeemSignupOfferPro,
+  validateSignupOfferCode,
+} from "@/lib/billing/signup-offer";
 
 export type SignUpResult =
   | { ok: true; needsVerification: true }
@@ -18,6 +23,7 @@ export async function signUpWithPassword(input: {
   password: string;
   origin: string;
   earlyAccessToken?: string | null;
+  signupOfferCode?: string | null;
 }): Promise<SignUpResult> {
   const fullName = input.fullName.trim();
   const email = input.email.trim();
@@ -41,6 +47,12 @@ export async function signUpWithPassword(input: {
     if (!valid.ok) return { error: valid.error };
   }
 
+  const signupOfferCode = normalizeSignupOfferCode(input.signupOfferCode);
+  if (signupOfferCode) {
+    const valid = await validateSignupOfferCode(signupOfferCode);
+    if (!valid.ok) return { error: valid.error };
+  }
+
   const supabase = await createClient();
   const emailRedirectTo = `${input.origin.replace(/\/$/, "")}/auth/callback?next=${encodeURIComponent("/onboarding")}`;
 
@@ -51,6 +63,7 @@ export async function signUpWithPassword(input: {
       data: {
         full_name: fullName,
         ...(earlyAccessToken ? { early_access_token: earlyAccessToken } : {}),
+        ...(signupOfferCode ? { signup_offer_code: signupOfferCode } : {}),
       },
       emailRedirectTo,
     },
@@ -75,9 +88,28 @@ export async function signUpWithPassword(input: {
         return { error: redeem.error };
       }
     }
+    if (signupOfferCode) {
+      const redeem = await redeemSignupOfferPro({
+        userId: data.session.user.id,
+        code: signupOfferCode,
+      });
+      if (!redeem.ok) {
+        return { error: redeem.error };
+      }
+    }
     const redirectTo = await resolvePostAuthRedirect(supabase, data.session.user.id);
     return { ok: true, needsVerification: false, redirectTo };
   }
 
   return { ok: true, needsVerification: true };
+}
+
+export async function previewSignupOffer(
+  codeRaw: string | null | undefined
+): Promise<{ ok: true; months: number; name: string } | { ok: false }> {
+  const code = normalizeSignupOfferCode(codeRaw);
+  if (!code) return { ok: false };
+  const valid = await validateSignupOfferCode(code);
+  if (!valid.ok) return { ok: false };
+  return { ok: true, months: valid.months, name: valid.name };
 }

@@ -14,6 +14,7 @@ import {
   KanbanSquare,
   Bot,
   Mail,
+  Gift,
   Settings, 
   LogOut, 
   ChevronLeft, 
@@ -52,6 +53,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Media", href: "/admin/media", icon: Images },
     { name: "Tasks", href: "/admin/tasks", icon: KanbanSquare },
     { name: "Waitlist", href: "/admin/waitlist", icon: Mail },
+    { name: "Offers", href: "/admin/offers", icon: Gift },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 

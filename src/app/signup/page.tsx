@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Dumbbell, Sparkles, Target } from "lucide-react";
 import { EARLY_ACCESS_OFFER, EARLY_ACCESS_PRO_MONTHS, EARLY_ACCESS_TOKEN_PARAM } from "@/lib/pre-launch/early-access";
 import { PROMO_QUERY_PARAM, normalizePromoCode } from "@/lib/billing/promo-cookie";
-import { signUpWithPassword } from "./actions";
+import { FREE_PRO_OFFER, SIGNUP_OFFER_CODE_PARAM, SIGNUP_OFFER_PARAM, normalizeSignupOfferCode } from "@/lib/billing/signup-offer";
+import { previewSignupOffer, signUpWithPassword } from "./actions";
 
 const perks = [
   {
@@ -37,6 +38,11 @@ function SignUpForm() {
       ? searchParams.get(EARLY_ACCESS_TOKEN_PARAM)?.trim() || null
       : null;
   const hasEarlyAccess = Boolean(earlyAccessToken);
+  const signupOfferCode =
+    searchParams.get(SIGNUP_OFFER_PARAM) === FREE_PRO_OFFER
+      ? normalizeSignupOfferCode(searchParams.get(SIGNUP_OFFER_CODE_PARAM))
+      : null;
+  const hasSignupOffer = Boolean(signupOfferCode) && !hasEarlyAccess;
   const promoCode = normalizePromoCode(searchParams.get(PROMO_QUERY_PARAM));
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -44,6 +50,22 @@ function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [verifySent, setVerifySent] = useState(false);
+  const [offerMonths, setOfferMonths] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!signupOfferCode || hasEarlyAccess) {
+      setOfferMonths(null);
+      return;
+    }
+    let cancelled = false;
+    void previewSignupOffer(signupOfferCode).then((result) => {
+      if (cancelled) return;
+      setOfferMonths(result.ok ? result.months : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [signupOfferCode, hasEarlyAccess]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +78,7 @@ function SignUpForm() {
       password,
       origin: window.location.origin,
       earlyAccessToken,
+      signupOfferCode,
     });
 
     setPending(false);
@@ -146,9 +169,11 @@ function SignUpForm() {
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-zinc-600">
                   {verifySent
-                    ? `We sent a verification link to ${email}. After you confirm, you'll continue to onboarding${hasEarlyAccess ? ` and your ${EARLY_ACCESS_PRO_MONTHS} months of Pro will be activated` : ""}.`
+                    ? `We sent a verification link to ${email}. After you confirm, you'll continue to onboarding${hasEarlyAccess ? ` and your ${EARLY_ACCESS_PRO_MONTHS} months of Pro will be activated` : hasSignupOffer ? " and your free Pro months will be activated" : ""}.`
                     : hasEarlyAccess
                       ? `Use the same waitlist email to unlock ${EARLY_ACCESS_PRO_MONTHS} months of Pro free.`
+                      : hasSignupOffer
+                        ? "Create your account to unlock free Pro access with this invite."
                       : "Free programs are available right away. Upgrade anytime for the full library and AI Coach."}
                 </p>
               </div>
@@ -164,6 +189,16 @@ function SignUpForm() {
                 <div className="mb-4 rounded-xl border border-[#ccff00]/50 bg-[#ccff00]/20 px-4 py-3 text-sm text-zinc-800">
                   Early-access perk: <strong className="font-semibold">{EARLY_ACCESS_PRO_MONTHS} months of Pro</strong>{" "}
                   included when you sign up with your waitlist email.
+                </div>
+              )}
+
+              {hasSignupOffer && !verifySent && (
+                <div className="mb-4 rounded-xl border border-[#ccff00]/50 bg-[#ccff00]/20 px-4 py-3 text-sm text-zinc-800">
+                  Invite perk:{" "}
+                  <strong className="font-semibold">
+                    {offerMonths ?? "…"} months of Pro
+                  </strong>{" "}
+                  included free when you create your account.
                 </div>
               )}
 
