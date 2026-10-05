@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import { PRO_PLAN_SLUG } from "@/lib/stripe/config";
 import { createServiceClient } from "@/utils/supabase/service";
+import { stopProConversionNurture } from "@/lib/emails/pro-conversion-nurture";
 
 type PlanRow = { id: string; slug: string };
 
@@ -88,11 +89,14 @@ export async function syncStripeSubscription(sub: Stripe.Subscription): Promise<
   if (existing?.id) {
     const { error } = await supabase.from("customer_subscriptions").update(row).eq("id", existing.id);
     if (error) throw new Error(error.message);
-    return;
+  } else {
+    const { error } = await supabase.from("customer_subscriptions").insert(row);
+    if (error) throw new Error(error.message);
   }
 
-  const { error } = await supabase.from("customer_subscriptions").insert(row);
-  if (error) throw new Error(error.message);
+  if (row.status === "active" || row.status === "trialing") {
+    await stopProConversionNurture(userId, "pro");
+  }
 }
 
 export async function syncStripeSubscriptionFromCheckoutSession(

@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin/manage-pro-subscription";
 import { getPublicSiteUrl } from "@/lib/stripe/config";
 import { createServiceClient } from "@/utils/supabase/service";
+import { stopProConversionNurture } from "@/lib/emails/pro-conversion-nurture";
 
 export const SIGNUP_OFFER_PARAM = "offer";
 export const SIGNUP_OFFER_CODE_PARAM = "code";
@@ -140,6 +141,7 @@ export async function redeemSignupOfferPro(input: {
     .maybeSingle();
 
   if (existing) {
+    await stopProConversionNurture(input.userId, "offer");
     return { ok: true, months: validation.months };
   }
 
@@ -166,11 +168,13 @@ export async function redeemSignupOfferPro(input: {
   if (redeemErr) {
     // Unique violation = already redeemed (race); treat as success.
     if (redeemErr.code === "23505") {
+      await stopProConversionNurture(input.userId, "offer");
       return { ok: true, months: validation.months };
     }
     return { ok: false, error: redeemErr.message };
   }
 
+  await stopProConversionNurture(input.userId, "offer");
   return { ok: true, months: validation.months };
 }
 

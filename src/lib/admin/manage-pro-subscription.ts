@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/utils/supabase/service";
 import { PRO_PLAN_SLUG } from "@/lib/stripe/config";
+import { stopProConversionNurture } from "@/lib/emails/pro-conversion-nurture";
 
 export const ADMIN_PRO_GRANT_MONTHS = [1, 3, 6, 12] as const;
 export type AdminProGrantMonths = (typeof ADMIN_PRO_GRANT_MONTHS)[number];
@@ -88,6 +89,7 @@ export async function grantProSubscriptionToUser(input: {
       })
       .eq("id", activePro.id);
     if (extendErr) return { ok: false, error: extendErr.message };
+    await stopProConversionNurture(userId, "pro");
     return { ok: true, currentPeriodEnd: extendedEnd.toISOString() };
   }
 
@@ -101,6 +103,7 @@ export async function grantProSubscriptionToUser(input: {
   });
   if (insertErr) return { ok: false, error: insertErr.message };
 
+  await stopProConversionNurture(userId, "pro");
   return { ok: true, currentPeriodEnd: grantEnd.toISOString() };
 }
 
