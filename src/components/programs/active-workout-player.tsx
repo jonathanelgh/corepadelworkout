@@ -15,7 +15,6 @@ import {
   restBetweenSetsSeconds,
   restDurationSeconds,
   setsCount,
-  uniqueEquipmentLabels,
   workDurationSeconds,
 } from "@/lib/programs/program-exercises";
 import {
@@ -32,11 +31,15 @@ import {
   resolveWorkoutPlaylist,
   SESSION_PHASE_LABELS,
 } from "@/lib/programs/session-phase";
-import { logProgramSessionComplete, logProgramSessionStart } from "@/app/programs/program-progress-actions";
+import {
+  logProgramSessionComplete,
+  logProgramSessionProgress,
+  logProgramSessionStart,
+} from "@/app/programs/program-progress-actions";
 import { saveExerciseLoad } from "@/app/programs/exercise-load-actions";
 import type { MemberExerciseLoad, WeightUnit } from "@/lib/programs/member-exercise-loads";
 import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
-import { programTrainingHref } from "@/lib/programs/program-routes";
+import { programDayHref, programCatalogHref } from "@/lib/programs/program-routes";
 import { BackButton } from "@/components/navigation/back-button";
 import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 import { WorkoutCompletionOverlay } from "@/components/programs/workout-completion-overlay";
@@ -65,8 +68,6 @@ function workPeriodFollowedByRest(
 
 const IFRAME_ALLOW =
   "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
-
-const COVER_FALLBACK = "/Padel_coach_standing.webp";
 
 function WorkoutVideo({
   url,
@@ -144,10 +145,11 @@ export function ActiveWorkoutPlayer({
   programFormat,
   sessionId,
   sessionName,
-  coverImageUrl,
+  coverImageUrl: _coverImageUrl,
   songUrl,
   exercises,
   initialLoads = {},
+  resumeStepIndex = null,
   nextSessionHref = null,
   nextSessionLabel = null,
   programComplete = false,
@@ -162,32 +164,43 @@ export function ActiveWorkoutPlayer({
   songUrl: string | null;
   exercises: ProgramExerciseItem[];
   initialLoads?: Record<string, MemberExerciseLoad>;
+  /** When set, continue an in-progress day at this 0-based playback step. */
+  resumeStepIndex?: number | null;
   nextSessionHref?: string | null;
   nextSessionLabel?: string | null;
   programComplete?: boolean;
 }) {
   const detailHref = usesProgramProgress(programFormat)
-    ? programTrainingHref(programSlug)
-    : `/programs/${programSlug}`;
+    ? programDayHref(programSlug, sessionId)
+    : programCatalogHref(programSlug);
 
-  const [workoutStarted, setWorkoutStarted] = useState(false);
+  const shouldResume = resumeStepIndex != null && resumeStepIndex >= 0;
+  const [workoutStarted, setWorkoutStarted] = useState(shouldResume);
   const [workoutFinished, setWorkoutFinished] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() =>
+    shouldResume ? Math.max(0, Math.floor(resumeStepIndex)) : 0
+  );
   const [currentSet, setCurrentSet] = useState(1);
   const [phase, setPhase] = useState<Phase>("work");
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const [isRunning, setIsRunning] = useState(true);
+  const [isRunning, setIsRunning] = useState(!shouldResume);
   const [videoReady, setVideoReady] = useState(false);
   const [musicMuted, setMusicMuted] = useState(false);
   /** Non-null while counting down before the first exercise begins. */
   const [prepCountdown, setPrepCountdown] = useState<number | null>(null);
   /**
-   * After sets×reps → timed: preview the timed exercise until the athlete taps Start now.
-   * Not used for timed→timed or first-exercise prep.
+   * Preview the current exercise until the athlete taps Start/Continue.
+   * Used for timed→timed handoff, resume, and sets×reps → timed.
    */
-  const [awaitingTimedStart, setAwaitingTimedStart] = useState(false);
+  const [awaitingTimedStart, setAwaitingTimedStart] = useState(shouldResume);
+  /** True only for the initial resume landing screen (not later timed previews). */
+  const [resumeEntry, setResumeEntry] = useState(shouldResume);
   const [completionLogged, setCompletionLogged] = useState(false);
-  const [startLogged, setStartLogged] = useState(false);
+  const [startLogged, setStartLogged] = useState(shouldResume);
+  const resumeAppliedRef = useRef(false);
+  const lastSavedStepRef = useRef<number | null>(
+    shouldResume ? Math.max(0, Math.floor(resumeStepIndex)) : null
+  );
 
   type LoadDraft = { value: string; unit: WeightUnit };
   const [loadDrafts, setLoadDrafts] = useState<Record<string, LoadDraft>>(() => {
@@ -222,11 +235,6 @@ export function ActiveWorkoutPlayer({
   const resolvedExercises = useMemo(
     () => resolveWorkoutPlaylist(exercises, choiceSelections),
     [exercises, choiceSelections]
-  );
-
-  const sessionEquipment = useMemo(
-    () => uniqueEquipmentLabels(resolvedExercises),
-    [resolvedExercises]
   );
 
   const playbackSteps = useMemo(
@@ -280,7 +288,68 @@ export function ActiveWorkoutPlayer({
       current.postWorkRestKind === "side_switch")
       ? (next?.video_url ?? null)
       : (current?.video_url ?? null);
-  const cover = coverImageUrl?.trim() || COVER_FALLBACK;
+  const firstStep = playbackSteps[0] ?? null;
+
+  useEffect(() => {
+    if (workoutStarted) return;
+    setVideoReady(false);
+    if (!firstStep?.video_url?.trim()) {
+      setVideoReady(true);
+    }
+  }, [workoutStarted, firstStep?.id, firstStep?.video_url]);
+
+  // Clamp resume index once the resolved playlist length is known.
+  useEffect(() => {
+    if (!shouldResume || resumeAppliedRef.current || len === 0) return;
+    resumeAppliedRef.current = true;
+    const clamped = Math.min(Math.max(0, Math.floor(resumeStepIndex ?? 0)), len - 1);
+    setCurrentIndex(clamped);
+    setWorkoutStarted(true);
+    setAwaitingTimedStart(true);
+    setStartLogged(true);
+    setIsRunning(false);
+    setSecondsLeft(null);
+    setPhase("work");
+    const step = playbackSteps[clamped];
+    if (step) {
+      setCurrentSet(isBilateralPlaybackStep(step) ? step.playbackSet : 1);
+    }
+    lastSavedStepRef.current = clamped;
+  }, [shouldResume, resumeStepIndex, len, playbackSteps]);
+
+  const persistResumeStep = useCallback(
+    (stepIndex: number) => {
+      if (workoutFinished) return;
+      const index = Math.max(0, Math.floor(stepIndex));
+      if (lastSavedStepRef.current === index) return;
+      lastSavedStepRef.current = index;
+      void logProgramSessionProgress({
+        programId,
+        sessionId,
+        stepIndex: index,
+      });
+    },
+    [programId, sessionId, workoutFinished]
+  );
+
+  useEffect(() => {
+    if (!workoutStarted || workoutFinished) return;
+    persistResumeStep(currentIndex);
+  }, [workoutStarted, workoutFinished, currentIndex, persistResumeStep]);
+
+  useEffect(() => {
+    if (!workoutStarted || workoutFinished) return;
+    const flush = () => persistResumeStep(currentIndex);
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [workoutStarted, workoutFinished, currentIndex, persistResumeStep]);
 
   useProgramWorkoutMusic(songUrl, {
     enabled: workoutStarted && Boolean(songUrl?.trim()) && !inPrep && !inTimedPreview,
@@ -550,11 +619,13 @@ export function ActiveWorkoutPlayer({
     restCuePlayedRef.current = false;
     workCuePlayedRef.current = false;
     setAwaitingTimedStart(false);
+    setResumeEntry(false);
     setWorkoutStarted(true);
     setPhase("work");
     setPrepCountdown(FIRST_EXERCISE_PREP_SECONDS);
     setSecondsLeft(null);
     setIsRunning(false);
+    persistResumeStep(0);
     if (!startLogged) {
       setStartLogged(true);
       void logProgramSessionStart({ programId, programSlug, sessionId });
@@ -563,6 +634,8 @@ export function ActiveWorkoutPlayer({
 
   function startTimedFromPreview() {
     if (!current || !awaitingTimedStart) return;
+    prepareWorkoutAudio();
+    setResumeEntry(false);
     beginWorkForCurrent(currentIndex);
   }
 
@@ -632,15 +705,6 @@ export function ActiveWorkoutPlayer({
 
   return (
     <div className="relative flex h-dvh max-h-dvh flex-col overflow-hidden bg-zinc-950 text-white">
-      {!workoutStarted && (
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${cover})` }}
-          aria-hidden
-        />
-      )}
-      {!workoutStarted && <div className="absolute inset-0 bg-black/55" aria-hidden />}
-
       <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-3">
         <BackButton
           fallbackHref={detailHref}
@@ -662,105 +726,110 @@ export function ActiveWorkoutPlayer({
       </header>
 
       {!workoutStarted ? (
-        <div className="relative z-20 mx-auto flex max-w-lg flex-col px-6 pb-32 pt-8">
-          <h1 className="text-2xl font-semibold">{sessionName}</h1>
-          <p className="mt-1 text-sm text-white/60">{programTitle}</p>
-          <p className="mt-2 text-sm text-white/75">
-            {len} exercise{len === 1 ? "" : "s"} · follows each exercise prescription
-          </p>
-
-          <div className="mt-6 rounded-2xl border border-white/15 bg-black/40 p-5 backdrop-blur-md">
-            <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
-              Equipment needed
-            </p>
-            {sessionEquipment.length > 0 ? (
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {sessionEquipment.map((item) => (
-                  <li
-                    key={item}
-                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white/90"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm text-white/70">No equipment needed — bodyweight only.</p>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {firstStep && (
+              <div className="relative z-20 mx-auto max-w-3xl px-4 pt-1 text-center">
+                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+                  {SESSION_PHASE_LABELS[firstStep.sessionPhase]}
+                </p>
+              </div>
             )}
-          </div>
+            <ExerciseVideoFrame className="relative z-10 max-h-[42dvh] aspect-auto! h-[min(100vw,42dvh)] sm:h-auto sm:max-h-none sm:aspect-square!">
+              <WorkoutVideo
+                url={firstStep?.video_url ?? null}
+                playing={false}
+                onReady={() => setVideoReady(true)}
+              />
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
+            </ExerciseVideoFrame>
 
-          <div className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0">
-            <WorkoutVideo
-              url={resolvedExercises[0]?.video_url ?? null}
-              playing={false}
-              onReady={() => setVideoReady(true)}
-            />
-          </div>
-
-          {choiceGroups.length > 0 && (
-            <div className="mt-6 space-y-4">
-              {choiceGroups.map((group) => (
-                <div
-                  key={group.id}
-                  className="rounded-2xl border border-white/15 bg-black/40 p-4 backdrop-blur-md"
-                >
-                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
-                    {SESSION_PHASE_LABELS[group.phase]} · pick one
-                  </p>
-                  <div className="mt-3 flex flex-col gap-2">
-                    {group.options.map((opt) => {
-                      const selected = choiceSelections[group.id] === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() =>
-                            setChoiceSelections((prev) => ({ ...prev, [group.id]: opt.id }))
-                          }
-                          className={`rounded-xl border px-3 py-2.5 text-left text-sm transition ${
-                            selected
-                              ? "border-[#ccff00] bg-[#ccff00]/10 text-white"
-                              : "border-white/15 bg-white/5 text-white/80 hover:border-white/30"
-                          }`}
-                        >
-                          <span className="font-medium">{opt.title}</span>
-                          <span className="mt-0.5 block text-xs text-white/60">
-                            {exerciseMeta(opt)}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+            <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
+              <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
+                Exercise 1 of {len}
+              </p>
+              <h2 className="mt-1 text-2xl font-semibold">{firstStep?.title ?? sessionName}</h2>
+              {firstStep?.workoutSide ? (
+                <div className="mt-3">
+                  <WorkoutSideBadge side={firstStep.workoutSide} />
                 </div>
-              ))}
-            </div>
-          )}
+              ) : firstStep?.bothSides ? (
+                <div className="mt-3">
+                  <BothSidesChip variant="dark" />
+                </div>
+              ) : null}
+              {firstStep && (
+                <p className="mt-3 text-lg font-medium text-[#ccff00]">{exerciseMeta(firstStep)}</p>
+              )}
+              {firstStep && (firstStep.note?.trim() || firstStep.rpe?.trim()) && (
+                <ExerciseCoachGuidance
+                  note={firstStep.note}
+                  rpe={firstStep.rpe}
+                  className="mt-3"
+                  noteClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
+                />
+              )}
+              <p className="mt-3 text-sm text-white/60">
+                Watch the demo, then tap Start workout when you are ready.
+              </p>
 
-          <div className="mt-8 rounded-2xl border border-white/15 bg-black/40 p-5 backdrop-blur-md">
-            <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Up first</p>
-            <p className="mt-2 text-xl font-semibold">{playbackSteps[0]?.title}</p>
-            <p className="mt-1 text-sm text-white/70">
-              {playbackSteps[0] ? exerciseMeta(playbackSteps[0]) : ""}
-            </p>
-            {playbackSteps[0]?.workoutSide ? (
-              <div className="mt-3">
-                <WorkoutSideBadge side={playbackSteps[0].workoutSide} size="md" />
-              </div>
-            ) : playbackSteps[0]?.bothSides ? (
-              <div className="mt-3">
-                <BothSidesChip variant="dark" />
-              </div>
-            ) : null}
+              {choiceGroups.length > 0 && (
+                <div className="mt-6 space-y-4">
+                  {choiceGroups.map((group) => (
+                    <div
+                      key={group.id}
+                      className="rounded-2xl border border-white/15 bg-white/5 p-4"
+                    >
+                      <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+                        {SESSION_PHASE_LABELS[group.phase]} · pick one
+                      </p>
+                      <div className="mt-3 flex flex-col gap-2">
+                        {group.options.map((opt) => {
+                          const selected = choiceSelections[group.id] === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() =>
+                                setChoiceSelections((prev) => ({ ...prev, [group.id]: opt.id }))
+                              }
+                              className={`rounded-xl border px-3 py-2.5 text-left text-sm transition ${
+                                selected
+                                  ? "border-[#ccff00] bg-[#ccff00]/10 text-white"
+                                  : "border-white/15 bg-white/5 text-white/80 hover:border-white/30"
+                              }`}
+                            >
+                              <span className="font-medium">{opt.title}</span>
+                              <span className="mt-0.5 block text-xs text-white/60">
+                                {exerciseMeta(opt)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <button
-            type="button"
-            disabled={!videoReady}
-            onClick={startWorkout}
-            className="mt-8 w-full rounded-xl bg-[#ccff00] py-4 text-base font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-50"
+          <nav
+            className="relative z-30 shrink-0 border-t border-white/10 bg-black/80 px-4 py-3 backdrop-blur-md"
+            style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
           >
-            {videoReady ? "Start now" : "Loading video…"}
-          </button>
+            <div className="mx-auto max-w-lg">
+              <button
+                type="button"
+                disabled={!videoReady && Boolean(firstStep?.video_url)}
+                onClick={startWorkout}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ccff00] py-3.5 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-50"
+              >
+                <Play className="h-4 w-4 fill-current" />
+                {!firstStep?.video_url || videoReady ? "Start workout" : "Loading video…"}
+              </button>
+            </div>
+          </nav>
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -905,9 +974,12 @@ export function ActiveWorkoutPlayer({
 
             {inTimedPreview && current && (
               <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
-                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Up next</p>
+                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+                  {resumeEntry ? "Continue" : "Up next"}
+                </p>
                 <p className="mt-1 text-xs font-bold tracking-wider text-white/50 uppercase">
-                  Timed exercise · step {currentIndex + 1} of {len}
+                  {currentIsTimed ? "Timed exercise · " : ""}
+                  step {currentIndex + 1} of {len}
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold">{current.title}</h2>
                 {current.workoutSide && (
@@ -925,7 +997,9 @@ export function ActiveWorkoutPlayer({
                   />
                 )}
                 <p className="mt-3 text-sm text-white/60">
-                  Watch the demo, then tap Start now when you are ready.
+                  {resumeEntry
+                    ? "Pick up where you left off — tap Continue when you are ready."
+                    : "Watch the demo, then tap Start now when you are ready."}
                 </p>
               </div>
             )}
@@ -1083,7 +1157,11 @@ export function ActiveWorkoutPlayer({
                     disabled={!videoReady}
                     className="flex-1 rounded-xl bg-[#ccff00] py-3 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-50"
                   >
-                    {videoReady ? "Start now" : "Loading video…"}
+                    {videoReady
+                      ? resumeEntry
+                        ? "Continue"
+                        : "Start now"
+                      : "Loading video…"}
                   </button>
                 </div>
               ) : (

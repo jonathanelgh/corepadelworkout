@@ -26,6 +26,7 @@ type SubRow = {
   status: string;
   current_period_end: string;
   cancel_at_period_end: boolean;
+  stripe_subscription_id: string | null;
   subscription_plans:
     | { name: string; grants_all_programs: boolean; price_amount: number | null }
     | { name: string; grants_all_programs: boolean; price_amount: number | null }[]
@@ -43,6 +44,11 @@ function isActiveProSub(row: SubRow, nowMs: number): boolean {
   if (row.status !== "active" && row.status !== "trialing") return false;
   const endMs = new Date(row.current_period_end).getTime();
   return Number.isFinite(endMs) && endMs > nowMs;
+}
+
+/** Paying Stripe customers only — excludes complimentary / offer / admin grants. */
+function isPayingActiveProSub(row: SubRow, nowMs: number): boolean {
+  return isActiveProSub(row, nowMs) && Boolean(row.stripe_subscription_id?.trim());
 }
 
 function bestSubscriptionByUser(rows: SubRow[]): Map<string, { label: string; status: string }> {
@@ -143,6 +149,7 @@ export async function loadAdminDashboardData(
         status,
         current_period_end,
         cancel_at_period_end,
+        stripe_subscription_id,
         subscription_plans ( name, grants_all_programs, price_amount )
       `),
     supabase.from("program_enrollments").select("user_id").eq("status", "active"),
@@ -181,8 +188,12 @@ export async function loadAdminDashboardData(
   ).size;
 
   let mrr = 0;
+  const payingUserIds = new Set<string>();
   for (const s of subs) {
-    if (!isActiveProSub(s, nowMs)) continue;
+    if (!isPayingActiveProSub(s, nowMs)) continue;
+    // One plan price per paying customer (avoid double-counting if they have multiple Stripe rows).
+    if (payingUserIds.has(s.user_id)) continue;
+    payingUserIds.add(s.user_id);
     const plan = planFromSub(s);
     const amount = plan?.price_amount;
     if (amount != null && Number.isFinite(Number(amount))) {
@@ -227,7 +238,10 @@ export async function loadAdminDashboardData(
     {
       title: "Est. monthly revenue",
       value: mrr > 0 ? formatCurrency(mrr) : "—",
-      hint: mrr > 0 ? "From active Pro subscriptions" : "Set plan prices in Stripe sync",
+      hint:
+        mrr > 0
+          ? `${payingUserIds.size} paying subscriber${payingUserIds.size === 1 ? "" : "s"} (Stripe only)`
+          : "No paying Stripe subscribers yet",
     },
     {
       title: "Training activity",

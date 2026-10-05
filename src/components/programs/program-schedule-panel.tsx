@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CheckCircle2, Circle, Play } from "lucide-react";
 import type { ProgramProgressView } from "@/lib/programs/program-progress";
-import { playHrefForSession } from "@/lib/programs/program-progress";
+import { programDayHref } from "@/lib/programs/program-routes";
 import { sessionDisplayLabel } from "@/lib/programs/program-sessions";
 
 function SessionRow({
@@ -12,47 +12,56 @@ function SessionRow({
   flatIndex,
   done,
   isNext,
+  inProgress,
 }: {
   programSlug: string;
   session: ProgramProgressView["sessions"][number];
   flatIndex: number;
   done: boolean;
   isNext: boolean;
+  inProgress: boolean;
 }) {
-  const href = playHrefForSession(programSlug, session.id);
+  const href = programDayHref(programSlug, session.id);
   const label = sessionDisplayLabel(session, flatIndex);
   return (
-    <li
-      className={`flex items-center gap-4 rounded-2xl border bg-white p-4 ${
-        isNext ? "border-[#ccff00] shadow-sm" : "border-gray-100"
-      }`}
-    >
-      {done ? (
-        <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
-      ) : (
-        <Circle className={`h-6 w-6 shrink-0 ${isNext ? "text-[#ccff00]" : "text-gray-300"}`} />
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-gray-900">{label}</p>
-        <p className="mt-0.5 text-xs text-gray-500">
-          {session.exerciseCount} exercise{session.exerciseCount === 1 ? "" : "s"}
-          {session.durationMinutes != null && session.durationMinutes > 0
-            ? ` · ~${session.durationMinutes} min`
-            : ""}
-          {done && session.completedAt
-            ? ` · Completed ${new Date(session.completedAt).toLocaleDateString()}`
-            : ""}
-        </p>
-      </div>
-      {!done && (
-        <Link
-          href={href}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#ccff00] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#b3e600]"
+    <li>
+      <Link
+        href={href}
+        className={`flex items-center gap-4 rounded-2xl border bg-white p-4 transition hover:shadow-sm ${
+          isNext || inProgress ? "border-[#ccff00] shadow-sm" : "border-gray-100 hover:border-gray-200"
+        }`}
+      >
+        {done ? (
+          <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+        ) : (
+          <Circle
+            className={`h-6 w-6 shrink-0 ${isNext || inProgress ? "text-[#ccff00]" : "text-gray-300"}`}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-gray-900">{label}</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {session.exerciseCount} exercise{session.exerciseCount === 1 ? "" : "s"}
+            {session.durationMinutes != null && session.durationMinutes > 0
+              ? ` · ~${session.durationMinutes} min`
+              : ""}
+            {inProgress ? " · In progress" : ""}
+            {done && session.completedAt
+              ? ` · Completed ${new Date(session.completedAt).toLocaleDateString()}`
+              : ""}
+          </p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold ${
+            done
+              ? "border border-zinc-200 bg-white text-zinc-800"
+              : "bg-[#ccff00] text-black"
+          }`}
         >
-          <Play className="h-3.5 w-3.5" />
-          {isNext ? "Continue" : "Start"}
-        </Link>
-      )}
+          {!done && <Play className="h-3.5 w-3.5" />}
+          {done ? "View day" : inProgress ? "Continue" : "Start"}
+        </span>
+      </Link>
     </li>
   );
 }
@@ -85,6 +94,7 @@ export function ProgramSchedulePanel({
                   {week.sessions.map((session) => {
                     const flatIndex = progress.sessions.findIndex((s) => s.id === session.id);
                     const done = Boolean(session.completedAt);
+                    const inProgress = Boolean(session.startedAt && !session.completedAt);
                     const isNext = progress.nextSession?.id === session.id;
                     return (
                       <SessionRow
@@ -94,6 +104,7 @@ export function ProgramSchedulePanel({
                         flatIndex={flatIndex >= 0 ? flatIndex : 0}
                         done={done}
                         isNext={isNext}
+                        inProgress={inProgress}
                       />
                     );
                   })}
@@ -108,6 +119,7 @@ export function ProgramSchedulePanel({
         <ul className="space-y-3">
           {progress.sessions.map((session, index) => {
             const done = Boolean(session.completedAt);
+            const inProgress = Boolean(session.startedAt && !session.completedAt);
             const isNext = progress.nextSession?.id === session.id;
             return (
               <SessionRow
@@ -117,6 +129,7 @@ export function ProgramSchedulePanel({
                 flatIndex={index}
                 done={done}
                 isNext={isNext}
+                inProgress={inProgress}
               />
             );
           })}

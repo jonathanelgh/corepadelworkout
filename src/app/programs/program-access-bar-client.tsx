@@ -9,6 +9,7 @@ import { startProgramTraining } from "./program-progress-actions";
 import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
 import type { ProgramProgressView } from "@/lib/programs/program-progress";
 import { formatActiveWeekProgressLabel, playHrefForSession } from "@/lib/programs/program-progress";
+import { programDayHref } from "@/lib/programs/program-routes";
 
 type Props = {
   programSlug: string;
@@ -43,9 +44,13 @@ export function ProgramAccessBarClient({
   const firstSession = progress?.sessions[0];
   const playHref =
     nextSession != null
-      ? playHrefForSession(programSlug, nextSession.id)
+      ? isSingleWorkout
+        ? playHrefForSession(programSlug, nextSession.id)
+        : programDayHref(programSlug, nextSession.id)
       : firstSession
-        ? playHrefForSession(programSlug, firstSession.id)
+        ? isSingleWorkout
+          ? playHrefForSession(programSlug, firstSession.id)
+          : programDayHref(programSlug, firstSession.id)
         : `/programs/${programSlug}/play`;
 
   const ctaLabel = isAdminDraftPreview

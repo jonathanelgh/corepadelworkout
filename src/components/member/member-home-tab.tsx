@@ -127,9 +127,11 @@ export function MemberHomeTab({
                             <p className="mt-0.5 text-sm text-zinc-600">
                               {p.isComplete
                                 ? "Program complete"
-                                : p.nextSessionName
-                                  ? `Next up · ${p.nextSessionName}`
-                                  : "Continue your plan"}
+                                : p.nextSessionInProgress && p.nextSessionName
+                                  ? `In progress · ${p.nextSessionName}`
+                                  : p.nextSessionName
+                                    ? `Next up · ${p.nextSessionName}`
+                                    : "Continue your plan"}
                             </p>
                           </div>
                           <span className="text-xs font-medium text-zinc-500">
@@ -143,13 +145,27 @@ export function MemberHomeTab({
                           />
                         </div>
                         {!p.isComplete && (
-                          <Link
-                            href={p.trainingHref}
-                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
-                          >
-                            <Play className="h-4 w-4" />
-                            {p.nextSessionHref ? "Continue training" : "Open program"}
-                          </Link>
+                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Link
+                              href={p.nextSessionHref ?? p.trainingHref}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
+                            >
+                              <Play className="h-4 w-4" />
+                              {p.nextSessionInProgress
+                                ? "Continue day"
+                                : p.nextSessionHref
+                                  ? "Start next day"
+                                  : "Open program"}
+                            </Link>
+                            {p.nextSessionHref && (
+                              <Link
+                                href={p.trainingHref}
+                                className="inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900 sm:w-auto"
+                              >
+                                View plan
+                              </Link>
+                            )}
+                          </div>
                         )}
                         {p.isComplete && (
                           <Link

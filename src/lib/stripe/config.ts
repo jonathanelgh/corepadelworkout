@@ -37,8 +37,21 @@ export function getStripeWebhookSecret(): string {
 
 export function getStripeProPriceId(): string {
   const fromEnv = process.env.STRIPE_PRO_PRICE_ID?.trim();
-  if (fromEnv) return fromEnv;
-  throw new Error("STRIPE_PRO_PRICE_ID is not configured.");
+  if (!fromEnv) {
+    throw new Error("STRIPE_PRO_PRICE_ID is not configured.");
+  }
+  // Checkout line_items.price must be a Price ID (price_…), not a Product ID (prod_…).
+  if (fromEnv.startsWith("prod_")) {
+    throw new Error(
+      "STRIPE_PRO_PRICE_ID is set to a Product ID (prod_…). Use the Price ID from Stripe (price_…)."
+    );
+  }
+  if (!fromEnv.startsWith("price_")) {
+    throw new Error(
+      "STRIPE_PRO_PRICE_ID must be a Stripe Price ID starting with price_."
+    );
+  }
+  return fromEnv;
 }
 
 export const PRO_PLAN_SLUG = "pro-monthly";

@@ -3,16 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronRight, Play, Trophy } from "lucide-react";
-import { BackButton } from "@/components/navigation/back-button";
 import { CancelProgramButton } from "@/components/programs/cancel-program-button";
 import { ProgramSchedulePanel } from "@/components/programs/program-schedule-panel";
 import { ProgramTrainingLogPanel } from "@/components/programs/program-training-log-panel";
 import {
   formatActiveWeekProgressLabel,
-  playHrefForSession,
   type ProgramProgressView,
 } from "@/lib/programs/program-progress";
-import { programInfoHref } from "@/lib/programs/program-routes";
+import { programDayHref, programInfoHref } from "@/lib/programs/program-routes";
 import { sessionDisplayLabel } from "@/lib/programs/program-sessions";
 
 const COVER_FALLBACK = "/Padel_coach_standing.webp";
@@ -43,11 +41,15 @@ export function ActiveProgramHub({
       : 0;
   const weekLabel = formatActiveWeekProgressLabel(progress);
   const next = progress.nextSession;
+  const nextWithProgress = next
+    ? progress.sessions.find((s) => s.id === next.id) ?? null
+    : null;
+  const nextInProgress = Boolean(nextWithProgress?.startedAt && !nextWithProgress.completedAt);
   const nextIndex = next ? progress.sessions.findIndex((s) => s.id === next.id) : -1;
   const nextLabel = next && nextIndex >= 0 ? sessionDisplayLabel(next, nextIndex) : null;
-  const nextHref = next ? playHrefForSession(programSlug, next.id) : null;
+  const nextHref = next ? programDayHref(programSlug, next.id) : null;
   const firstSession = progress.sessions[0];
-  const repeatHref = firstSession ? playHrefForSession(programSlug, firstSession.id) : null;
+  const repeatHref = firstSession ? programDayHref(programSlug, firstSession.id) : null;
   const mins =
     minutesPerSession != null && Number.isFinite(minutesPerSession) && minutesPerSession > 0
       ? `${minutesPerSession} min`
@@ -61,14 +63,14 @@ export function ActiveProgramHub({
     <div className="min-h-screen bg-zinc-50 pb-10 font-sans text-zinc-900 selection:bg-[#ccff00] selection:text-black">
       <header className="sticky top-0 z-40 border-b border-zinc-200/80 bg-zinc-50/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4 sm:px-6">
-          <BackButton
-            fallbackHref="/member"
-            ariaLabel="Back to dashboard"
+          <Link
+            href="/member"
+            aria-label="Back to dashboard"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 transition hover:text-zinc-900"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
-          </BackButton>
+          </Link>
           <Link
             href={programInfoHref(programSlug)}
             className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
@@ -131,7 +133,9 @@ export function ActiveProgramHub({
 
         {!progress.isComplete && next && nextHref && (
           <section className="mt-6">
-            <h2 className="mb-3 text-sm font-semibold tracking-wide text-zinc-500 uppercase">Next up</h2>
+            <h2 className="mb-3 text-sm font-semibold tracking-wide text-zinc-500 uppercase">
+              {nextInProgress ? "Continue" : "Next up"}
+            </h2>
             <Link
               href={nextHref}
               className="group flex items-center gap-4 rounded-2xl border-2 border-[#ccff00] bg-white p-5 shadow-sm transition hover:border-[#b3e600] hover:shadow-md"
@@ -142,8 +146,9 @@ export function ActiveProgramHub({
               <div className="min-w-0 flex-1">
                 <p className="text-lg font-semibold text-zinc-900">{nextLabel ?? next.name}</p>
                 <p className="mt-0.5 text-sm text-zinc-500">
-                  {next.exerciseCount} exercise{next.exerciseCount === 1 ? "" : "s"}
-                  {mins ? ` · ${mins}` : ""}
+                  {nextInProgress
+                    ? "Pick up where you left off"
+                    : `${next.exerciseCount} exercise${next.exerciseCount === 1 ? "" : "s"}${mins ? ` · ${mins}` : ""}`}
                 </p>
               </div>
               <ChevronRight className="h-5 w-5 shrink-0 text-zinc-400 transition group-hover:text-zinc-700" />

@@ -2,7 +2,8 @@ import { createClient } from "@/utils/supabase/server";
 import { getIsAdmin } from "@/utils/supabase/is-admin";
 import { redirect } from "next/navigation";
 import { ageFromDateOfBirth } from "@/lib/member/date-of-birth";
-import { UsersListClient, type AdminUserRow } from "./users-list-client";
+import { createServiceClient } from "@/utils/supabase/service";
+import { UsersListClient, type AdminUserRow, type OfferFilterOption } from "./users-list-client";
 
 export const dynamic = "force-dynamic";
 
@@ -19,15 +20,23 @@ type SubRow = {
   user_id: string;
   status: string;
   current_period_end: string;
+  stripe_subscription_id: string | null;
   subscription_plans:
     | { name: string; grants_all_programs: boolean }
     | { name: string; grants_all_programs: boolean }[]
     | null;
 };
 
-function bestSubscriptionByUser(rows: SubRow[]): Map<string, { label: string }> {
+type BestSub = {
+  endMs: number;
+  label: string;
+  isPaying: boolean;
+  grantsPro: boolean;
+};
+
+function bestSubscriptionByUser(rows: SubRow[]): Map<string, BestSub> {
   const now = Date.now();
-  const best = new Map<string, { endMs: number; label: string }>();
+  const best = new Map<string, BestSub>();
   for (const r of rows) {
     const activeLike = r.status === "active" || r.status === "trialing";
     const endMs = new Date(r.current_period_end).getTime();
@@ -36,28 +45,42 @@ function bestSubscriptionByUser(rows: SubRow[]): Map<string, { label: string }> 
     const planRaw = r.subscription_plans;
     const plan = Array.isArray(planRaw) ? planRaw[0] : planRaw;
     const planName = plan?.name?.trim() || "Subscription";
-    const grantsAll = Boolean(plan?.grants_all_programs);
-    const label = grantsAll ? `Pro (${planName})` : planName;
+    const grantsPro = Boolean(plan?.grants_all_programs);
+    const isPaying = Boolean(r.stripe_subscription_id?.trim());
+    const label = grantsPro
+      ? isPaying
+        ? "Paying Pro"
+        : "Complimentary Pro"
+      : planName;
 
     const prev = best.get(r.user_id);
-    if (!prev || endMs > prev.endMs) {
-      best.set(r.user_id, { endMs, label });
+    // Prefer Pro grants, then paying Stripe over complimentary, then longer remaining period.
+    // (Many paying users also have a longer complimentary grant row from offers/admin.)
+    if (
+      !prev ||
+      (grantsPro && !prev.grantsPro) ||
+      (grantsPro === prev.grantsPro && isPaying && !prev.isPaying) ||
+      (grantsPro === prev.grantsPro && isPaying === prev.isPaying && endMs > prev.endMs)
+    ) {
+      best.set(r.user_id, { endMs, label, isPaying, grantsPro });
     }
   }
-  const out = new Map<string, { label: string }>();
-  for (const [uid, v] of best) {
-    out.set(uid, { label: v.label });
-  }
-  return out;
+  return best;
 }
 
 function accessLabel(
   userId: string,
-  subByUser: Map<string, { label: string }>,
-  enrollmentCount: number
+  subByUser: Map<string, BestSub>,
+  enrollmentCount: number,
+  offerCodes: string[]
 ): string {
+  const parts: string[] = [];
   const sub = subByUser.get(userId);
-  if (sub) return sub.label;
+  if (sub) parts.push(sub.label);
+  if (offerCodes.length > 0) {
+    parts.push(`Offer ${offerCodes.join(", ")}`);
+  }
+  if (parts.length > 0) return parts.join(" · ");
   if (enrollmentCount > 0) {
     return `${enrollmentCount} program${enrollmentCount === 1 ? "" : "s"}`;
   }
@@ -70,7 +93,10 @@ export default async function AdminUsersPage() {
     redirect("/login?next=/admin/users");
   }
 
-  const [profilesRes, subsRes, enrollRes, adminRes] = await Promise.all([
+  // Offer redemptions are service-role only (no admin write policy on redemptions insert path).
+  const service = createServiceClient();
+
+  const [profilesRes, subsRes, enrollRes, adminRes, offersRes, redemptionsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -90,13 +116,23 @@ export default async function AdminUsersPage() {
         user_id,
         status,
         current_period_end,
+        stripe_subscription_id,
         subscription_plans ( name, grants_all_programs )
       `),
     supabase.from("program_enrollments").select("user_id").eq("status", "active"),
     supabase.from("admin_users").select("user_id"),
+    service.from("signup_offers").select("id, code, name").order("created_at", { ascending: false }),
+    service.from("signup_offer_redemptions").select("user_id, offer_id"),
   ]);
 
-  const loadError = [profilesRes.error, subsRes.error, enrollRes.error, adminRes.error]
+  const loadError = [
+    profilesRes.error,
+    subsRes.error,
+    enrollRes.error,
+    adminRes.error,
+    offersRes.error,
+    redemptionsRes.error,
+  ]
     .filter(Boolean)
     .map((e) => e!.message)
     .join(" · ");
@@ -109,11 +145,36 @@ export default async function AdminUsersPage() {
     enrollCountByUser.set(uid, (enrollCountByUser.get(uid) ?? 0) + 1);
   }
 
+  const offerById = new Map(
+    (offersRes.data ?? []).map((o) => [
+      o.id as string,
+      { code: String(o.code), name: String(o.name) },
+    ])
+  );
+
+  const offerCodesByUser = new Map<string, string[]>();
+  for (const row of redemptionsRes.data ?? []) {
+    const uid = row.user_id as string;
+    const offer = offerById.get(row.offer_id as string);
+    if (!offer) continue;
+    const list = offerCodesByUser.get(uid) ?? [];
+    if (!list.includes(offer.code)) list.push(offer.code);
+    offerCodesByUser.set(uid, list);
+  }
+
   const subByUser = bestSubscriptionByUser((subsRes.data ?? []) as SubRow[]);
+
+  const offerFilterOptions: OfferFilterOption[] = (offersRes.data ?? []).map((o) => ({
+    code: String(o.code),
+    name: String(o.name),
+  }));
 
   const rows: AdminUserRow[] = (profilesRes.data ?? []).map((p) => {
     const id = p.id as string;
     const dateOfBirth = (p.date_of_birth as string | null) ?? null;
+    const sub = subByUser.get(id) ?? null;
+    const offerCodes = offerCodesByUser.get(id) ?? [];
+    const hasActivePro = Boolean(sub?.grantsPro);
     return {
       id,
       email: (p.email as string | null) ?? null,
@@ -125,7 +186,11 @@ export default async function AdminUsersPage() {
       age: dateOfBirth ? ageFromDateOfBirth(dateOfBirth) : null,
       padelLevelName: firstPadelLevelName(p.padel_levels as PadelLevelRel),
       isAdmin: adminIds.has(id),
-      accessLabel: accessLabel(id, subByUser, enrollCountByUser.get(id) ?? 0),
+      accessLabel: accessLabel(id, subByUser, enrollCountByUser.get(id) ?? 0, offerCodes),
+      hasActivePro,
+      isPayingPro: hasActivePro && Boolean(sub?.isPaying),
+      isComplimentaryPro: hasActivePro && !sub?.isPaying,
+      offerCodes,
     };
   });
 
@@ -143,7 +208,7 @@ export default async function AdminUsersPage() {
             </div>
           )}
 
-          <UsersListClient rows={rows} />
+          <UsersListClient rows={rows} offerOptions={offerFilterOptions} />
         </div>
       </div>
     </div>

@@ -104,5 +104,16 @@ export async function syncStripeSubscriptionFromCheckoutSession(
 
   const { getStripe } = await import("@/lib/stripe/server");
   const sub = await getStripe().subscriptions.retrieve(subscriptionId);
+
+  // Prefer subscription metadata; fall back to checkout session metadata.
+  const sessionUserId = session.metadata?.user_id?.trim();
+  const sessionPlanSlug = session.metadata?.plan_slug?.trim();
+  if (!sub.metadata.user_id && sessionUserId) {
+    sub.metadata.user_id = sessionUserId;
+  }
+  if (!sub.metadata.plan_slug && sessionPlanSlug) {
+    sub.metadata.plan_slug = sessionPlanSlug;
+  }
+
   await syncStripeSubscription(sub);
 }

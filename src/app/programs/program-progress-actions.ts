@@ -10,6 +10,7 @@ import {
   completeProgramSession,
   ensureProgramRun,
   playHrefForSession,
+  saveProgramSessionProgress,
   startProgramSession,
 } from "@/lib/programs/program-progress";
 import { programCatalogHref, programTrainingHref } from "@/lib/programs/program-routes";
@@ -146,6 +147,26 @@ export async function logProgramSessionStart(input: {
 
   revalidatePath(`/programs/${input.programSlug}/training`);
   return { ok: true };
+}
+
+export async function logProgramSessionProgress(input: {
+  programId: string;
+  sessionId: string;
+  stepIndex: number;
+}): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in required." };
+
+  return saveProgramSessionProgress(
+    supabase,
+    user.id,
+    input.programId,
+    input.sessionId,
+    input.stepIndex
+  );
 }
 
 export async function logProgramSessionComplete(input: {

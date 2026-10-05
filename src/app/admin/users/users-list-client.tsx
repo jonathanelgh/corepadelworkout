@@ -17,7 +17,23 @@ export type AdminUserRow = {
   padelLevelName: string | null;
   isAdmin: boolean;
   accessLabel: string;
+  hasActivePro: boolean;
+  isPayingPro: boolean;
+  isComplimentaryPro: boolean;
+  offerCodes: string[];
 };
+
+export type OfferFilterOption = {
+  code: string;
+  name: string;
+};
+
+export type AccessFilter =
+  | "all"
+  | "paying"
+  | "complimentary"
+  | "offer"
+  | "no_pro";
 
 function initials(name: string | null, email: string | null): string {
   const n = (name ?? "").trim();
@@ -39,31 +55,124 @@ function matchesQuery(row: AdminUserRow, q: string): boolean {
   if (row.email?.toLowerCase().includes(n)) return true;
   if (row.fullName?.toLowerCase().includes(n)) return true;
   if (row.id.toLowerCase().includes(n)) return true;
+  if (row.offerCodes.some((c) => c.toLowerCase().includes(n))) return true;
   return false;
 }
 
-export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
+function matchesAccessFilter(
+  row: AdminUserRow,
+  filter: AccessFilter,
+  offerCode: string
+): boolean {
+  switch (filter) {
+    case "paying":
+      return row.isPayingPro;
+    case "complimentary":
+      return row.isComplimentaryPro;
+    case "offer":
+      if (row.offerCodes.length === 0) return false;
+      if (!offerCode) return true;
+      return row.offerCodes.includes(offerCode);
+    case "no_pro":
+      return !row.hasActivePro;
+    case "all":
+    default:
+      return true;
+  }
+}
+
+const FILTERS: { id: AccessFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "paying", label: "Paying Pro" },
+  { id: "complimentary", label: "Complimentary Pro" },
+  { id: "offer", label: "Offer invite" },
+  { id: "no_pro", label: "No Pro" },
+];
+
+export function UsersListClient({
+  rows,
+  offerOptions,
+}: {
+  rows: AdminUserRow[];
+  offerOptions: OfferFilterOption[];
+}) {
   const [query, setQuery] = useState("");
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
+  const [offerCode, setOfferCode] = useState("");
   const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
 
+  const counts = useMemo(() => {
+    return {
+      all: rows.length,
+      paying: rows.filter((r) => r.isPayingPro).length,
+      complimentary: rows.filter((r) => r.isComplimentaryPro).length,
+      offer: rows.filter((r) => r.offerCodes.length > 0).length,
+      no_pro: rows.filter((r) => !r.hasActivePro).length,
+    } satisfies Record<AccessFilter, number>;
+  }, [rows]);
+
   const filtered = useMemo(
-    () => rows.filter((r) => matchesQuery(r, query.trim())),
-    [rows, query]
+    () =>
+      rows.filter(
+        (r) =>
+          matchesQuery(r, query.trim()) && matchesAccessFilter(r, accessFilter, offerCode)
+      ),
+    [rows, query, accessFilter, offerCode]
   );
 
   return (
     <>
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, email, or user id…"
+            placeholder="Search by name, email, offer code, or user id…"
             className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pr-4 pl-10 text-sm transition-all focus:border-transparent focus:ring-2 focus:ring-black focus:outline-none"
             aria-label="Search users"
           />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTERS.map((f) => {
+            const active = accessFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  setAccessFilter(f.id);
+                  if (f.id !== "offer") setOfferCode("");
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  active
+                    ? "bg-zinc-900 text-white"
+                    : "border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {f.label}
+                <span className={active ? "text-white/70" : "text-gray-400"}>{counts[f.id]}</span>
+              </button>
+            );
+          })}
+
+          {accessFilter === "offer" && offerOptions.length > 0 && (
+            <select
+              value={offerCode}
+              onChange={(e) => setOfferCode(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              aria-label="Filter by offer code"
+            >
+              <option value="">All offer codes</option>
+              {offerOptions.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.code} — {o.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -88,7 +197,7 @@ export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
                     {rows.length === 0 ? (
                       <p>No user profiles yet.</p>
                     ) : (
-                      <p>No matches for your search.</p>
+                      <p>No matches for your search or filters.</p>
                     )}
                   </td>
                 </tr>
@@ -164,10 +273,30 @@ export function UsersListClient({ rows }: { rows: AdminUserRow[] }) {
                           {onboarded ? "Complete" : "Incomplete"}
                         </span>
                       </td>
-                      <td className="max-w-[200px] px-6 py-4 text-gray-600">
-                        <span className="line-clamp-2" title={user.accessLabel}>
-                          {user.accessLabel}
-                        </span>
+                      <td className="max-w-[240px] px-6 py-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {user.isPayingPro && (
+                            <span className="inline-flex rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                              Paying Pro
+                            </span>
+                          )}
+                          {user.isComplimentaryPro && (
+                            <span className="inline-flex rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">
+                              Complimentary Pro
+                            </span>
+                          )}
+                          {user.offerCodes.map((code) => (
+                            <span
+                              key={code}
+                              className="inline-flex rounded-md border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900"
+                            >
+                              Offer {code}
+                            </span>
+                          ))}
+                          {!user.hasActivePro && user.offerCodes.length === 0 && (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         {user.isAdmin ? (

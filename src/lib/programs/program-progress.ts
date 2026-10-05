@@ -8,12 +8,14 @@ import {
   type ProgramSessionRow,
   type ProgramWeekRow,
 } from "@/lib/programs/program-sessions";
-import { programTrainingHref } from "@/lib/programs/program-routes";
+import { programDayHref, programTrainingHref } from "@/lib/programs/program-routes";
 import { sessionDisplayLabel } from "@/lib/programs/program-sessions";
 
 export type SessionWithCompletion = ProgramSessionRow & {
   startedAt: string | null;
   completedAt: string | null;
+  /** 0-based playback step to resume; meaningful while in progress. */
+  resumeStepIndex: number;
 };
 
 export type ProgramWeekWithCompletion = Omit<ProgramWeekRow, "sessions"> & {
@@ -41,6 +43,7 @@ type SessionCompletionRow = {
   session_id: string;
   started_at: string | null;
   completed_at: string | null;
+  resume_step_index: number | null;
 };
 
 function attachCompletions(
@@ -54,10 +57,16 @@ function attachCompletions(
 } {
   const withTimestamps = (s: ProgramSessionRow): SessionWithCompletion => {
     const row = completionsBySession.get(s.id);
+    const resumeRaw = row?.resume_step_index;
+    const resumeStepIndex =
+      typeof resumeRaw === "number" && Number.isFinite(resumeRaw) && resumeRaw > 0
+        ? Math.floor(resumeRaw)
+        : 0;
     return {
       ...s,
       startedAt: row?.started_at ?? null,
       completedAt: row?.completed_at ?? null,
+      resumeStepIndex,
     };
   };
 
@@ -93,7 +102,7 @@ export async function loadProgramProgress(
           .maybeSingle(),
         supabase
           .from("program_session_completions")
-          .select("session_id, started_at, completed_at")
+          .select("session_id, started_at, completed_at, resume_step_index")
           .eq("user_id", userId)
           .eq("program_id", programId),
       ]);
@@ -102,7 +111,7 @@ export async function loadProgramProgress(
     } else {
       const { data: completionRows } = await supabase
         .from("program_session_completions")
-        .select("session_id, started_at, completed_at")
+        .select("session_id, started_at, completed_at, resume_step_index")
         .eq("user_id", userId)
         .eq("program_id", programId);
       completions = (completionRows ?? []) as SessionCompletionRow[];
@@ -276,9 +285,15 @@ export async function startProgramSession(
     .maybeSingle();
 
   if (existing) {
+    // Resume or restart: never auto-complete. Only clear completed_at if the day
+    // was never truly finished (null) — keep real completions intact.
+    const patch: { started_at: string; completed_at?: null } = { started_at: now };
+    if (!existing.completed_at) {
+      patch.completed_at = null;
+    }
     const { error: updateErr } = await supabase
       .from("program_session_completions")
-      .update({ started_at: now })
+      .update(patch)
       .eq("id", existing.id);
     if (updateErr) return { error: updateErr.message };
   } else {
@@ -287,10 +302,58 @@ export async function startProgramSession(
       program_id: programId,
       session_id: sessionId,
       started_at: now,
+      completed_at: null,
     });
     if (insertErr) return { error: insertErr.message };
   }
 
+  return { ok: true };
+}
+
+/** Save mid-workout playback step so Continue can resume at the same exercise. */
+export async function saveProgramSessionProgress(
+  supabase: SupabaseClient,
+  userId: string,
+  programId: string,
+  sessionId: string,
+  stepIndex: number
+): Promise<{ ok: true } | { error: string }> {
+  const hasAccess = await userHasProgramAccess(supabase, userId, programId);
+  if (!hasAccess) {
+    return { error: "You do not have access to this program." };
+  }
+
+  const index = Number.isFinite(stepIndex) ? Math.max(0, Math.floor(stepIndex)) : 0;
+
+  const { data: existing } = await supabase
+    .from("program_session_completions")
+    .select("id, completed_at")
+    .eq("user_id", userId)
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  if (existing?.completed_at) {
+    return { ok: true };
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("program_session_completions")
+      .update({ resume_step_index: index })
+      .eq("id", existing.id);
+    if (error) return { error: error.message };
+    return { ok: true };
+  }
+
+  const { error } = await supabase.from("program_session_completions").insert({
+    user_id: userId,
+    program_id: programId,
+    session_id: sessionId,
+    started_at: new Date().toISOString(),
+    completed_at: null,
+    resume_step_index: index,
+  });
+  if (error) return { error: error.message };
   return { ok: true };
 }
 
@@ -328,6 +391,7 @@ export async function completeProgramSession(
       program_id: programId,
       session_id: sessionId,
       completed_at: new Date().toISOString(),
+      resume_step_index: 0,
     },
     { onConflict: "user_id,session_id" }
   );
@@ -455,6 +519,8 @@ export type ActiveProgramSummary = {
   totalSessions: number;
   nextSessionName: string | null;
   nextSessionHref: string | null;
+  /** True when the next day was started but not finished (all exercises). */
+  nextSessionInProgress: boolean;
   trainingHref: string;
   isComplete: boolean;
   startedAt: string | null;
@@ -534,6 +600,12 @@ export async function loadUserActivePrograms(
     if (!progress?.runId) continue;
 
     const next = progress.nextSession;
+    const nextWithProgress = next
+      ? progress.sessions.find((s) => s.id === next.id) ?? null
+      : null;
+    const nextSessionInProgress = Boolean(
+      nextWithProgress?.startedAt && !nextWithProgress.completedAt
+    );
     summaries.push({
       programId: prog.id,
       slug: prog.slug,
@@ -543,7 +615,8 @@ export async function loadUserActivePrograms(
       completedCount: progress.completedCount,
       totalSessions: progress.totalSessions,
       nextSessionName: next?.name ?? null,
-      nextSessionHref: next ? playHrefForSession(prog.slug, next.id) : null,
+      nextSessionHref: next ? programDayHref(prog.slug, next.id) : null,
+      nextSessionInProgress,
       trainingHref: programTrainingHref(prog.slug),
       isComplete: progress.isComplete,
       startedAt: (run.started_at as string | undefined) ?? progress.startedAt,

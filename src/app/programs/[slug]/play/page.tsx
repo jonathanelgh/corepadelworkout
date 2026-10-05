@@ -10,6 +10,7 @@ import {
   loadProgramProgress,
   playHrefForSession,
 } from "@/lib/programs/program-progress";
+import { programDayHref } from "@/lib/programs/program-routes";
 import { requireProgramWorkoutAccess } from "../../program-access-bar";
 import { fetchMemberExerciseLoads } from "@/lib/programs/member-exercise-loads";
 
@@ -128,6 +129,13 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
       )
     : {};
 
+  const sessionProgress =
+    progress?.sessions.find((s) => s.id === resolvedSessionId) ?? null;
+  const resumeStepIndex =
+    sessionProgress?.startedAt && !sessionProgress.completedAt
+      ? sessionProgress.resumeStepIndex
+      : null;
+
   return (
     <ActiveWorkoutPlayer
       programId={row.id}
@@ -140,7 +148,14 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
       songUrl={row.song_url}
       exercises={workout.exercises}
       initialLoads={initialLoads}
-      nextSessionHref={nextSession ? playHrefForSession(slug, nextSession.id) : null}
+      resumeStepIndex={resumeStepIndex}
+      nextSessionHref={
+        nextSession
+          ? tracksProgress
+            ? programDayHref(slug, nextSession.id)
+            : playHrefForSession(slug, nextSession.id)
+          : null
+      }
       nextSessionLabel={nextSession?.name ?? null}
       programComplete={
         tracksProgress &&
