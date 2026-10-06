@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Music2, Pause, Play, SkipForward, VolumeX } from "lucide-react";
+import { ArrowLeft, Check, Info, Minus, Pause, Play, Plus, SkipForward, X, ChevronLeft, ChevronRight, Moon, Music2, VolumeX } from "lucide-react";
 import type { ProgramExerciseItem } from "@/lib/programs/program-exercises";
 import {
   exerciseUsesTimedPlayback,
@@ -228,6 +228,8 @@ export function ActiveWorkoutPlayer({
     defaultChoiceSelections(listChoiceGroups(exercises))
   );
 
+  const [showTips, setShowTips] = useState(false);
+
   useEffect(() => {
     setChoiceSelections(defaultChoiceSelections(choiceGroups));
   }, [choiceGroups]);
@@ -280,6 +282,8 @@ export function ActiveWorkoutPlayer({
       ? current.playbackSetsTotal > 1
       : hasTimedSets(current));
 
+  const showProgressDots = !inPrep && !inTimedPreview;
+
   const displayVideoUrl =
     inExerciseRest ||
     (inSetRest &&
@@ -289,6 +293,11 @@ export function ActiveWorkoutPlayer({
       ? (next?.video_url ?? null)
       : (current?.video_url ?? null);
   const firstStep = playbackSteps[0] ?? null;
+
+  useEffect(() => {
+    // Hide tips when moving between steps
+    setShowTips(false);
+  }, [currentIndex]);
 
   useEffect(() => {
     if (workoutStarted) return;
@@ -705,32 +714,66 @@ export function ActiveWorkoutPlayer({
 
   return (
     <div className="relative flex h-dvh max-h-dvh flex-col overflow-hidden bg-zinc-950 text-white">
-      <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-3">
-        <BackButton
-          fallbackHref={detailHref}
-          ariaLabel="Go back"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </BackButton>
-        {workoutStarted && songUrl?.trim() && (
-          <button
-            type="button"
-            onClick={() => setMusicMuted((m) => !m)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-md"
-            aria-label={musicMuted ? "Unmute music" : "Mute music"}
+      <header className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 py-3 h-16">
+        <div className="flex-none w-12">
+          <BackButton
+            fallbackHref={detailHref}
+            ariaLabel="Go back"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md"
           >
-            {musicMuted ? <VolumeX className="h-5 w-5" /> : <Music2 className="h-5 w-5" />}
-          </button>
+            <ArrowLeft className="h-5 w-5" />
+          </BackButton>
+        </div>
+        
+        {workoutStarted && showProgressDots && (
+          <div className="flex-1 flex flex-col justify-center px-4 max-w-sm">
+            {showPhaseBanner && current && (
+              <p className="text-[10px] font-bold tracking-widest text-white/80 uppercase text-center mb-1.5 drop-shadow-md">
+                {SESSION_PHASE_LABELS[current.sessionPhase]}
+              </p>
+            )}
+            <div className="flex w-full gap-1 drop-shadow-md">
+              {playbackSteps.map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 flex-1 rounded-full ${i <= currentIndex ? "bg-[#ccff00]" : "bg-white/40"}`}
+                />
+              ))}
+            </div>
+          </div>
         )}
+        
+        <div className="flex-none w-12 flex justify-end">
+          {workoutStarted && (displayNote || current?.rpe?.trim()) ? (
+            <button
+              type="button"
+              onClick={() => setShowTips((prev) => !prev)}
+              className={`flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition-colors ${showTips ? "bg-[#ccff00] text-black" : "bg-black/40 text-white"}`}
+              aria-label="Exercise info"
+            >
+              <Info className="h-5 w-5" />
+            </button>
+          ) : workoutStarted && songUrl?.trim() ? (
+            <button
+              type="button"
+              onClick={() => setMusicMuted((m) => !m)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-md text-white"
+              aria-label={musicMuted ? "Unmute music" : "Mute music"}
+            >
+              {musicMuted ? <VolumeX className="h-5 w-5" /> : <Music2 className="h-5 w-5" />}
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
+        </div>
       </header>
 
       {!workoutStarted ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {firstStep && (
-              <div className="relative z-20 mx-auto max-w-3xl px-4 pt-1 text-center">
-                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
+              <div className="relative z-20 mx-auto mt-16 max-w-3xl px-4 text-center">
+                <p className="text-xs font-bold tracking-wider text-white/60 uppercase">
                   {SESSION_PHASE_LABELS[firstStep.sessionPhase]}
                 </p>
               </div>
@@ -832,235 +875,151 @@ export function ActiveWorkoutPlayer({
           </nav>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            {showPhaseBanner && current && (
-              <div className="relative z-20 mx-auto max-w-3xl px-4 pt-2 text-center">
-                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
-                  {SESSION_PHASE_LABELS[current.sessionPhase]}
-                </p>
-              </div>
-            )}
-            <ExerciseVideoFrame className="relative z-10 max-h-[42dvh] aspect-auto! h-[min(100vw,42dvh)] sm:h-auto sm:max-h-none sm:aspect-square!">
+        <div className="relative flex min-h-0 flex-1 flex-col bg-black">
+          <div className="absolute inset-0 z-0 bg-zinc-900">
+            <ExerciseVideoFrame className="w-full h-full object-cover [&>video]:object-cover!">
               <WorkoutVideo
                 url={displayVideoUrl}
                 playing={!workoutFinished && (inPrep || inTimedPreview || isRunning)}
                 onReady={() => setVideoReady(true)}
               />
               <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
-              {inPrep && current && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/45 px-6 py-4 text-center backdrop-blur-[2px]">
-                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready</p>
-                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
-                  <p className="mt-2 text-sm text-white/80">
-                    {exerciseMeta(current)}
-                  </p>
-                  {current.bothSides && !current.workoutSide && (
-                    <div className="mt-3">
-                      <BothSidesChip variant="dark" />
-                    </div>
-                  )}
-                  {current.workoutSide && (
-                    <div className="mt-4">
-                      <WorkoutSideBadge side={current.workoutSide} />
-                    </div>
-                  )}
-                  {(current.note?.trim() || current.rpe?.trim()) && (
-                    <ExerciseCoachGuidance
-                      note={current.note}
-                      rpe={current.rpe}
-                      className="mt-4 max-w-md"
-                      noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
-                    />
-                  )}
-                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{prepCountdown}</p>
-                  <p className="mt-2 text-sm text-white/60">Starting in…</p>
-                </div>
-              )}
-              {inExerciseRest && next && secondsLeft != null && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
-                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Get ready for</p>
-                  <p className="mt-2 text-2xl font-semibold">{next.title}</p>
-                  <p className="mt-2 text-sm text-white/80">{exerciseMeta(next)}</p>
-                  {next.workoutSide && (
-                    <div className="mt-4">
-                      <WorkoutSideBadge side={next.workoutSide} />
-                    </div>
-                  )}
-                  {next.bothSides && !next.workoutSide && (
-                    <div className="mt-3">
-                      <BothSidesChip variant="dark" />
-                    </div>
-                  )}
-                  {(next.note?.trim() || next.rpe?.trim()) && (
-                    <ExerciseCoachGuidance
-                      note={next.note}
-                      rpe={next.rpe}
-                      className="mt-4 max-w-md"
-                      noteClassName="rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-white/90"
-                    />
-                  )}
-                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
-                  <p className="mt-2 text-sm text-white/60">Rest</p>
-                </div>
-              )}
-              {inSetRest && current && secondsLeft != null && sideSwitchRest && next && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
-                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Switch sides</p>
-                  <p className="mt-2 text-2xl font-semibold">{next.title}</p>
-                  {next.workoutSide ? (
-                    <div className="mt-4">
-                      <WorkoutSideBadge side={next.workoutSide} />
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-white/80">{exerciseMeta(next)}</p>
-                  )}
-                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
-                  <p className="mt-2 text-sm text-white/60">Rest</p>
-                </div>
-              )}
-              {inSetRest && current && secondsLeft != null && bilateralRoundRest && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
-                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Rest between rounds</p>
-                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
-                  <p className="mt-2 text-sm text-white/80">
-                    Round {current.playbackSet} of {current.playbackSetsTotal} complete
-                  </p>
-                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
-                  <p className="mt-2 text-sm text-white/60">Next round starting soon</p>
-                </div>
-              )}
-              {inSetRest && current && secondsLeft != null && !sideSwitchRest && !bilateralRoundRest && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto bg-black/30 px-6 py-4 text-center">
-                  <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">Rest between sets</p>
-                  <p className="mt-2 text-2xl font-semibold">{current.title}</p>
-                  <p className="mt-2 text-sm text-white/80">
-                    Set {currentSetNumber} of {totalSets} · {exerciseMeta(current)}
-                  </p>
-                  <p className="mt-6 font-mono text-7xl font-bold tabular-nums">{secondsLeft}</p>
-                  <p className="mt-2 text-sm text-white/60">Next set starting soon</p>
-                </div>
-              )}
-              {phase === "work" && !inPrep && currentIsTimed && secondsLeft != null && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-4 z-10 px-6 text-center sm:bottom-6">
-                  <p className="font-mono text-6xl font-bold tabular-nums sm:text-7xl">{secondsLeft}</p>
-                  {current && (
-                    <p className="mt-2 text-sm text-white/80">{exerciseMeta(current)}</p>
-                  )}
-                  {current?.workoutSide && (
-                    <div className="mt-2">
-                      <WorkoutSideBadge side={current.workoutSide} size="md" />
-                    </div>
-                  )}
-                  {showSetProgress && current && (
-                    <p className="mt-1 text-sm text-white/70">
-                      Round {currentSetNumber} of {totalSets}
-                    </p>
-                  )}
+              
+              <div className="absolute inset-x-0 top-16 z-20 px-6 flex flex-col items-center">
+                {showProgressDots && !inRest && (
+                  <div className="w-full flex flex-col items-center">
+                    {current && (
+                      <div className="mt-2 flex flex-col items-center drop-shadow-lg w-full">
+                        <h2 className="flex items-center justify-center gap-2 text-xl font-bold">
+                          {current.title}
+                        </h2>
+                        {current.workoutSide ? (
+                          <div className="mt-2">
+                            <WorkoutSideBadge side={current.workoutSide} size="sm" />
+                          </div>
+                        ) : displayExercise?.bothSides && !displayExercise.workoutSide ? (
+                          <div className="mt-2">
+                            <BothSidesChip variant="dark" />
+                          </div>
+                        ) : null}
+                        
+                        {!inRest && showTips && (displayNote || displayExercise?.rpe?.trim()) && (
+                          <div className="mt-4 w-full max-w-sm text-left rounded-2xl border border-white/15 bg-zinc-900/90 p-4 text-white/90 backdrop-blur-md">
+                            <div className="flex items-center justify-between mb-2 text-[#ccff00]">
+                              <div className="flex items-center gap-1.5">
+                                <Info className="h-4 w-4" />
+                                <span className="text-[10px] font-bold tracking-wider uppercase">Execution Tips</span>
+                              </div>
+                              <button onClick={() => setShowTips(false)} className="p-1 -mr-1 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition">
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <ExerciseCoachGuidance
+                              note={displayNote}
+                              rpe={displayExercise?.rpe}
+                              noteClassName=""
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {inPrep && current && (
+                  <div className="w-full text-center mt-2">
+                    <p className="text-sm font-bold tracking-wider text-white/60 uppercase">Get ready</p>
+                    <p className="mt-1 text-xl font-bold text-white">{current.title}</p>
+                  </div>
+                )}
+
+                {inExerciseRest && next && secondsLeft != null && (
+                  <div className="w-full text-center mt-2">
+                    <p className="text-sm font-bold tracking-wider text-white/60 uppercase">Next</p>
+                    <p className="mt-1 text-xl font-bold text-white tracking-wide">{next.title}</p>
+                    {(next.note?.trim() || next.rpe?.trim()) && (
+                      <div className="mx-auto mt-4 max-w-sm text-left rounded-2xl border border-white/15 bg-zinc-900/90 p-4 text-white/90 backdrop-blur-md">
+                        <div className="flex items-center gap-1.5 mb-2 text-[#ccff00]">
+                          <Info className="h-4 w-4" />
+                          <span className="text-[10px] font-bold tracking-wider uppercase">Execution Tips</span>
+                        </div>
+                        <ExerciseCoachGuidance
+                          note={next.note}
+                          rpe={next.rpe}
+                          noteClassName=""
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {inSetRest && current && secondsLeft != null && sideSwitchRest && next && (
+                  <div className="w-full text-center mt-2">
+                    <p className="text-sm font-bold tracking-wider text-[#ccff00] uppercase">Switch sides</p>
+                    <p className="mt-1 text-xl font-bold text-white">{next.title}</p>
+                  </div>
+                )}
+
+                {inSetRest && current && secondsLeft != null && bilateralRoundRest && (
+                  <div className="w-full text-center mt-2">
+                    <p className="text-sm font-bold tracking-wider text-white/60 uppercase">Rest between rounds</p>
+                    <p className="mt-1 text-xl font-bold text-white">{current.title}</p>
+                  </div>
+                )}
+
+                {inSetRest && current && secondsLeft != null && !sideSwitchRest && !bilateralRoundRest && (
+                  <div className="w-full text-center mt-2">
+                    <p className="text-sm font-bold tracking-wider text-white/60 uppercase">Rest between sets</p>
+                    <p className="mt-1 text-xl font-bold text-white">{current.title}</p>
+                  </div>
+                )}
+              </div>
+
+              {inRest && (
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center pointer-events-none">
+                  <p className="text-5xl font-black tracking-widest text-[#ccff00] drop-shadow-2xl">REST</p>
                 </div>
               )}
             </ExerciseVideoFrame>
-
-            {inPrep && (
-              <div className="relative z-20 mx-auto max-w-lg px-6 py-6 text-center">
-                <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
-                  Exercise 1 of {len}
-                </p>
-                <p className="mt-2 text-sm text-white/60">
-                  Watch the demo above — your timer starts when the countdown ends.
-                </p>
-              </div>
-            )}
-
+          </div>
+          
+          <div className="relative z-10 flex flex-col flex-1 h-full pt-4 pb-48 overflow-y-auto pointer-events-none justify-end">
+            {/* We keep this scrolling container for any notes or inputs that need interaction */}
+            <div className="pointer-events-auto flex flex-col justify-end min-h-full pb-8">
             {inTimedPreview && current && (
-              <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
-                <p className="text-xs font-bold tracking-wider text-[#ccff00] uppercase">
-                  {resumeEntry ? "Continue" : "Up next"}
-                </p>
-                <p className="mt-1 text-xs font-bold tracking-wider text-white/50 uppercase">
-                  {currentIsTimed ? "Timed exercise · " : ""}
-                  step {currentIndex + 1} of {len}
-                </p>
-                <h2 className="mt-1 text-2xl font-semibold">{current.title}</h2>
-                {current.workoutSide && (
-                  <div className="mt-3">
-                    <WorkoutSideBadge side={current.workoutSide} />
-                  </div>
-                )}
-                <p className="mt-3 text-lg font-medium text-[#ccff00]">{exerciseMeta(current)}</p>
-                {(displayNote || displayExercise?.rpe?.trim()) && (
-                  <ExerciseCoachGuidance
-                    note={displayNote}
-                    rpe={displayExercise?.rpe}
-                    className="mt-3"
-                    noteClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
-                  />
-                )}
-                <p className="mt-3 text-sm text-white/60">
-                  {resumeEntry
-                    ? "Pick up where you left off — tap Continue when you are ready."
-                    : "Watch the demo, then tap Start now when you are ready."}
-                </p>
-              </div>
-            )}
+              <div className="relative z-20 mx-auto mb-4 flex w-full max-w-lg flex-col items-center rounded-3xl border border-white/15 bg-black/80 px-6 py-6 text-center shadow-2xl backdrop-blur-xl md:py-8">
+              <p className="text-sm font-bold tracking-widest text-[#ccff00] uppercase mb-1">
+                {resumeEntry ? "Continue workout" : "Up next"}
+              </p>
+              <p className="text-xs font-bold tracking-wider text-white/50 uppercase mb-4">
+                {currentIsTimed ? "Timed exercise · " : ""}
+                step {currentIndex + 1} of {len}
+              </p>
+              <h2 className="text-3xl font-bold text-white tracking-tight">{current.title}</h2>
+              {current.workoutSide && (
+                <div className="mt-4">
+                  <WorkoutSideBadge side={current.workoutSide} />
+                </div>
+              )}
+              <p className="mt-4 text-xl font-semibold text-[#ccff00]">{exerciseMeta(current)}</p>
+              {(displayNote || displayExercise?.rpe?.trim()) && (
+                <ExerciseCoachGuidance
+                  note={displayNote}
+                  rpe={displayExercise?.rpe}
+                  className="mt-6 w-full text-left"
+                  noteClassName="rounded-2xl border border-white/15 bg-white/5 px-5 py-4 text-white/90 w-full"
+                />
+              )}
+              <p className="mt-6 text-sm text-white/50 font-medium">
+                {resumeEntry
+                  ? "Pick up where you left off — tap Continue when you are ready."
+                  : "Watch the demo, then tap Start now when you are ready."}
+              </p>
+            </div>
+          )}
 
             {!inPrep && !inTimedPreview && (
-              <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
-                <div className="mb-4 flex gap-1">
-                  {playbackSteps.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-1 flex-1 rounded-full ${i <= currentIndex ? "bg-[#ccff00]" : "bg-white/20"}`}
-                    />
-                  ))}
-                </div>
-
-                <p className="text-xs font-bold tracking-wider text-white/50 uppercase">
-                  {sideSwitchRest
-                    ? "Switch sides"
-                    : bilateralRoundRest
-                      ? `Rest · round ${currentSetNumber} of ${totalSets}`
-                      : inSetRest
-                        ? `Rest · set ${currentSetNumber} of ${totalSets}`
-                        : inExerciseRest
-                          ? "Rest"
-                          : showSetProgress
-                            ? `Round ${currentSetNumber} of ${totalSets} · step ${currentIndex + 1} of ${len}`
-                            : `Step ${currentIndex + 1} of ${len}`}
-                </p>
-                {!inRest && (
-                  <h2 className="mt-1 text-2xl font-semibold">{current?.title}</h2>
-                )}
-                {!inRest && current?.workoutSide && (
-                  <div className="mt-3">
-                    <WorkoutSideBadge side={current.workoutSide} />
-                  </div>
-                )}
-                {!inRest && displayExercise?.bothSides && !displayExercise.workoutSide && (
-                  <div className="mt-2">
-                    <BothSidesChip variant="dark" />
-                  </div>
-                )}
-                {!inRest && (displayNote || displayExercise?.rpe?.trim()) && (
-                  <ExerciseCoachGuidance
-                    note={displayNote}
-                    rpe={displayExercise?.rpe}
-                    className="mt-3"
-                    noteClassName="rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/10 px-4 py-3 text-white/90"
-                  />
-                )}
-
-                {currentIsTimed && !inRest && phase === "work" && current && (
-                  <p className="mt-3 text-lg font-medium text-[#ccff00]">
-                    {exerciseMeta(current)}
-                  </p>
-                )}
-
-                {!currentIsTimed && current && (
-                  <p className="mt-3 text-lg font-medium text-[#ccff00]">
-                    {formatSetsRepsLabel(current) ?? "Go at your pace"}
-                  </p>
-                )}
+              <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5 flex flex-col items-center mt-auto">
                 {!inRest && current?.usesExternalLoad && (
                   <div className="mt-3 space-y-2">
                     <p className="text-sm text-white/55">{CHOOSE_WEIGHT_HINT}</p>
@@ -1130,69 +1089,131 @@ export function ActiveWorkoutPlayer({
                   </div>
                 )}
                 {!currentIsTimed && (
-                  <p className="mt-2 text-sm text-white/60">Tap Next when you finish this exercise.</p>
+                  <div className="mt-8 mb-32 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      className="rounded-xl bg-[#ccff00] px-8 py-4 text-lg font-bold text-black transition hover:bg-[#b3e600]"
+                    >
+                      {isLast ? "Finish Workout" : "Next Exercise"}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {!inPrep && (
-            <nav
-              className="relative z-30 shrink-0 border-t border-white/10 bg-black/80 px-4 py-3 backdrop-blur-md"
-              style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
-            >
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-12 pt-32 bg-linear-to-t from-black via-black/80 to-transparent flex flex-col items-center">
               {inTimedPreview ? (
-                <div className="mx-auto flex max-w-lg items-center gap-3">
+                <div className="pointer-events-auto mx-auto mb-8 flex w-full max-w-sm items-center justify-center gap-4 px-6">
                   <button
                     type="button"
                     onClick={goPrev}
                     disabled={currentIndex <= 0}
-                    className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold disabled:opacity-30"
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
                   >
-                    Prev
+                    <ChevronLeft className="h-6 w-6" />
                   </button>
                   <button
                     type="button"
                     onClick={startTimedFromPreview}
                     disabled={!videoReady}
-                    className="flex-1 rounded-xl bg-[#ccff00] py-3 text-sm font-semibold text-black transition hover:bg-[#b3e600] disabled:opacity-50"
+                    className="flex h-14 min-w-[168px] items-center justify-center gap-2 rounded-full bg-[#ccff00] px-7 text-base font-bold text-black transition hover:bg-[#b3e600] disabled:opacity-50"
                   >
-                    {videoReady
-                      ? resumeEntry
-                        ? "Continue"
-                        : "Start now"
-                      : "Loading video…"}
+                    <Play className="h-5 w-5 fill-current" />
+                    <span>
+                      {videoReady
+                        ? resumeEntry
+                          ? "Continue"
+                          : "Start now"
+                        : "Loading…"}
+                    </span>
                   </button>
                 </div>
               ) : (
-                <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    disabled={currentIndex <= 0}
-                    className="rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold disabled:opacity-30"
-                  >
-                    Prev
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsRunning((r) => !r)}
-                    className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black"
-                    aria-label={isRunning ? "Pause" : "Play"}
-                  >
-                    {isRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={goNext}
-                    className="inline-flex items-center gap-1 rounded-xl bg-[#ccff00] px-4 py-3 text-sm font-semibold text-black"
-                  >
-                    {!currentIsTimed && isLast ? "Finish" : "Next"}
-                    <SkipForward className="h-4 w-4" />
-                  </button>
+                <div className="relative mx-auto flex w-full max-w-sm items-center justify-center mb-6">
+                  <div className="pointer-events-auto flex items-center justify-center gap-4">
+                    <button
+                      type="button"
+                      onClick={goPrev}
+                      disabled={currentIndex <= 0}
+                      className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-30"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsRunning((r) => !r)}
+                      className="flex h-14 min-w-[120px] items-center justify-center gap-2 rounded-full border border-white/20 bg-black/50 px-6 font-semibold text-white backdrop-blur-md transition hover:bg-black/70"
+                      aria-label={isRunning ? "Pause" : "Play"}
+                    >
+                      {isRunning ? (
+                        <>
+                          <Pause className="h-5 w-5 fill-current" />
+                          <span>Pause</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-5 w-5 fill-current" />
+                          <span>Play</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
+                  </div>
                 </div>
               )}
-            </nav>
+
+              {/* Timer & Meta Text */}
+              {phase === "work" && currentIsTimed && secondsLeft != null && (
+                <div className="px-6 text-center mt-2">
+                  <p className="font-mono text-8xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{secondsLeft}</p>
+                  {current && (
+                    <p className="mt-2 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
+                      {exerciseMeta(current)}
+                    </p>
+                  )}
+                </div>
+              )}
+              {inRest && secondsLeft != null && (
+                <div className="px-6 text-center mt-2">
+                  <p className="font-mono text-8xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{secondsLeft}</p>
+                  {current && (
+                    <p className="mt-2 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
+                      {exerciseMeta(current)}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!currentIsTimed && phase === "work" && current && !inTimedPreview && (
+                <div className="px-6 text-center mt-4">
+                  <p className="text-lg font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
+                    {formatSetsRepsLabel(current) ?? "Go at your pace"}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {inPrep && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-12 pt-32 bg-linear-to-t from-black via-black/80 to-transparent flex flex-col items-center">
+              <div className="px-6 text-center mt-2">
+                <p className="font-mono text-8xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{prepCountdown}</p>
+                {current && (
+                  <p className="mt-2 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
+                    {currentIsTimed ? exerciseMeta(current) : (formatSetsRepsLabel(current) ?? "Go at your pace")}
+                  </p>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -88,8 +88,7 @@ export function ProgramExperienceLayout({
                 <Star className="h-3 w-3 fill-current" /> 4.9 (128 reviews)
               </span>
             </div>
-            <h1 className="mb-2 text-4xl leading-tight font-medium">{programTitle}</h1>
-            <p className="line-clamp-3 text-sm text-gray-300">{subtitle}</p>
+            <h1 className="text-4xl leading-tight font-medium">{programTitle}</h1>
           </div>
         </div>
 
@@ -107,8 +106,7 @@ export function ProgramExperienceLayout({
                   <Star className="h-3 w-3 fill-current text-[#ffc107]" /> 4.9 (128 reviews)
                 </span>
               </div>
-              <h1 className="mb-4 text-5xl leading-tight font-medium tracking-tight lg:text-6xl">{programTitle}</h1>
-              <p className="text-lg text-gray-500">{subtitle}</p>
+              <h1 className="text-5xl leading-tight font-medium tracking-tight lg:text-6xl">{programTitle}</h1>
             </div>
 
             <div className="mb-12 grid grid-cols-3 gap-4 border-y border-gray-100 py-6">
@@ -128,6 +126,10 @@ export function ProgramExperienceLayout({
                 <span className="text-xs text-gray-500">Per Session</span>
               </div>
             </div>
+
+            {subtitle.trim() ? (
+              <p className="mb-12 text-base leading-relaxed text-gray-600 md:text-lg">{subtitle.trim()}</p>
+            ) : null}
 
             {songUrl?.trim() && (
               <div className="mb-10 rounded-2xl border border-gray-100 bg-gray-50/80 p-5">

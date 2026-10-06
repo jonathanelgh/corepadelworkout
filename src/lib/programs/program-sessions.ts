@@ -42,7 +42,7 @@ type SessionDbRow = {
   duration_minutes: number | null;
   sort_order: number;
   week_id: string | null;
-  program_exercises: { id: string } | { id: string }[] | null;
+  program_exercises?: { id: string } | { id: string }[] | null;
   program_weeks: WeekDbRow | WeekDbRow[] | null;
 };
 
@@ -262,11 +262,16 @@ export async function fetchProgramSessionsForProgram(
   return sessionsAndWeeksForTrack(supabase, picked);
 }
 
+export type SessionOwnership = {
+  session: ProgramSessionRow;
+  trackId: string;
+};
+
 export async function getSessionBelongsToProgram(
   supabase: SupabaseClient,
   programId: string,
   sessionId: string
-): Promise<ProgramSessionRow | null> {
+): Promise<SessionOwnership | null> {
   const { data, error } = await supabase
     .from("program_sessions")
     .select(
@@ -277,7 +282,7 @@ export async function getSessionBelongsToProgram(
       duration_minutes,
       sort_order,
       week_id,
-      program_exercises ( id ),
+      track_id,
       program_weeks ( id, week_number, name, sort_order ),
       program_location_tracks!inner ( program_id )
     `
@@ -291,18 +296,23 @@ export async function getSessionBelongsToProgram(
   const trackRow = Array.isArray(track) ? track[0] : track;
   if (trackRow?.program_id !== programId) return null;
 
-  return mapSession(data as SessionDbRow, null);
+  const trackId = typeof data.track_id === "string" ? data.track_id : "";
+  if (!trackId) return null;
+
+  return { session: mapSession(data as SessionDbRow, null), trackId };
 }
 
 export async function loadSessionWorkout(
   supabase: SupabaseClient,
   programId: string,
   sessionId: string
-): Promise<{ session: ProgramSessionRow; exercises: ProgramExerciseItem[] } | null> {
-  const session = await getSessionBelongsToProgram(supabase, programId, sessionId);
-  if (!session) return null;
-  const exercises = await fetchProgramSessionExercises(supabase, sessionId);
-  return { session, exercises };
+): Promise<{ session: ProgramSessionRow; trackId: string; exercises: ProgramExerciseItem[] } | null> {
+  const [owned, exercises] = await Promise.all([
+    getSessionBelongsToProgram(supabase, programId, sessionId),
+    fetchProgramSessionExercises(supabase, sessionId),
+  ]);
+  if (!owned) return null;
+  return { session: owned.session, trackId: owned.trackId, exercises };
 }
 
 export function sessionDisplayLabel(session: ProgramSessionRow, flatIndex: number): string {

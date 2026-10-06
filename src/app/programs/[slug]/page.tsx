@@ -154,13 +154,11 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
   }
 
   const outcomes = normalizeOutcomes(program.outcomes);
-  const aboutBlocks = bodyParagraphs(program.body, program.description);
+  const aboutBlocks = bodyParagraphs(program.body, null);
   const difficultyLabel = firstDifficultyName(program.difficulty_levels) ?? "Program";
   const heroImage =
     program.cover_image_url?.trim() || "/Padel_player_makes_202603231105.jpeg";
-  const subtitle =
-    program.description?.trim() ||
-    "Structured training to level up your game on and off the court.";
+  const subtitle = program.description?.trim() || "";
 
   return (
     <ProgramExperienceLayout
@@ -194,7 +192,11 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
       }
     >
       {usesProgramProgress(programFormat) && progress && progress.totalSessions > 0 && (
-        <ProgramSchedulePanel programSlug={slug} progress={progress} />
+        <ProgramSchedulePanel
+          programSlug={slug}
+          progress={progress}
+          daysInteractive={Boolean(progress.runId)}
+        />
       )}
 
       {aboutBlocks.length > 0 && (

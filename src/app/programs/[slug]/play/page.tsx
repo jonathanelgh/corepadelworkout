@@ -6,12 +6,12 @@ import { loadSessionWorkout, sessionDisplayLabel, fetchProgramSessionsForProgram
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
 import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import {
-  ensureProgramRun,
-  loadProgramProgress,
+  ensureProgramRunForTrack,
+  loadPlaySessionNav,
   playHrefForSession,
 } from "@/lib/programs/program-progress";
 import { programDayHref } from "@/lib/programs/program-routes";
-import { requireProgramWorkoutAccess } from "../../program-access-bar";
+import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { fetchMemberExerciseLoads } from "@/lib/programs/member-exercise-loads";
 
 export const dynamic = "force-dynamic";
@@ -52,11 +52,14 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
   const { session: sessionId } = await searchParams;
   const supabase = await createClient();
 
-  const loaded = await loadProgramBySlugForViewer<PlayProgramRow>(
-    supabase,
-    slug,
-    "id, title, cover_image_url, song_url, status, is_free, program_format"
-  );
+  const [authRes, loaded] = await Promise.all([
+    supabase.auth.getUser(),
+    loadProgramBySlugForViewer<PlayProgramRow>(
+      supabase,
+      slug,
+      "id, title, cover_image_url, song_url, status, is_free, program_format"
+    ),
+  ]);
 
   if (!loaded) {
     notFound();
@@ -65,76 +68,100 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
   const row = loaded.program;
   const programFormat = parseProgramFormat(row.program_format);
   const tracksProgress = usesProgramProgress(programFormat);
+  const user = authRes.data.user;
 
-  await requireProgramWorkoutAccess(row.id, slug, row.is_free, {
-    isAdminDraftPreview: loaded.isAdminDraftPreview,
-  });
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(`/programs/${slug}/play`)}`);
+  }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: profile } = user
-    ? await supabase
-        .from("profiles")
-        .select("training_environment, training_environments")
-        .eq("id", user.id)
-        .maybeSingle()
-    : { data: null };
-
-  let resolvedSessionId = sessionId?.trim() || null;
+  const needsAccessCheck = loaded.isAdminDraftPreview || !row.is_free;
+  const resolvedSessionId = sessionId?.trim() || null;
 
   if (!resolvedSessionId) {
-    if (user && tracksProgress) {
-      const progress = await loadProgramProgress(supabase, user.id, row.id, profile, programFormat);
-      const target = progress?.nextSession ?? progress?.sessions[0];
-      if (target) redirect(playHrefForSession(slug, target.id));
-    } else {
-      const { sessions } = await fetchProgramSessionsForProgram(supabase, row.id, profile);
-      if (sessions[0]) redirect(playHrefForSession(slug, sessions[0].id));
+    const hasAccess = needsAccessCheck
+      ? await userHasProgramAccess(supabase, user.id, row.id)
+      : true;
+    if (!hasAccess) {
+      if (loaded.isAdminDraftPreview) notFound();
+      redirect(`/programs/${slug}?upgrade=1`);
     }
+    const { data: run } = await supabase
+      .from("program_runs")
+      .select("track_id")
+      .eq("user_id", user.id)
+      .eq("program_id", row.id)
+      .maybeSingle();
+    if (run?.track_id && tracksProgress) {
+      const [{ data: sessionRows }, { data: completionRows }] = await Promise.all([
+        supabase
+          .from("program_sessions")
+          .select("id")
+          .eq("track_id", run.track_id)
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("program_session_completions")
+          .select("session_id, completed_at")
+          .eq("user_id", user.id)
+          .eq("program_id", row.id),
+      ]);
+      const done = new Set(
+        (completionRows ?? [])
+          .filter((c) => c.completed_at)
+          .map((c) => c.session_id as string)
+      );
+      const targetId =
+        (sessionRows ?? []).find((s) => !done.has(s.id as string))?.id ??
+        sessionRows?.[0]?.id;
+      if (targetId) redirect(playHrefForSession(slug, targetId as string));
+    }
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("training_environment, training_environments")
+      .eq("id", user.id)
+      .maybeSingle();
+    const { sessions } = await fetchProgramSessionsForProgram(supabase, row.id, profile);
+    if (sessions[0]) redirect(playHrefForSession(slug, sessions[0].id));
     redirect(`/programs/${slug}`);
   }
 
-  const workout = await loadSessionWorkout(supabase, row.id, resolvedSessionId);
+  const [hasAccess, workout] = await Promise.all([
+    needsAccessCheck
+      ? userHasProgramAccess(supabase, user.id, row.id)
+      : Promise.resolve(true),
+    loadSessionWorkout(supabase, row.id, resolvedSessionId),
+  ]);
+
+  if (!hasAccess) {
+    if (loaded.isAdminDraftPreview) notFound();
+    redirect(`/programs/${slug}?upgrade=1`);
+  }
+
   if (!workout) {
     notFound();
   }
 
-  if (user && tracksProgress) {
-    await ensureProgramRun(supabase, user.id, row.id, profile, programFormat);
+  if (tracksProgress) {
+    await ensureProgramRunForTrack(supabase, user.id, row.id, workout.trackId);
   }
 
-  const progress = user
-    ? await loadProgramProgress(supabase, user.id, row.id, profile, programFormat)
-    : null;
-
-  const sessionIndex = progress?.sessions.findIndex((s) => s.id === resolvedSessionId) ?? -1;
-  const nextSession =
-    tracksProgress && progress && sessionIndex >= 0
-      ? progress.sessions.slice(sessionIndex + 1).find((s) => !s.completedAt) ?? null
-      : null;
+  const [initialLoads, nav] = await Promise.all([
+    fetchMemberExerciseLoads(
+      supabase,
+      user.id,
+      workout.exercises.map((e) => e.exerciseId)
+    ),
+    loadPlaySessionNav(
+      supabase,
+      user.id,
+      row.id,
+      workout.trackId,
+      workout.session.id,
+      tracksProgress
+    ),
+  ]);
 
   const displayTitle =
-    workout.session.name?.trim() ||
-    (sessionIndex >= 0
-      ? sessionDisplayLabel(workout.session, sessionIndex)
-      : row.title);
-
-  const initialLoads = user
-    ? await fetchMemberExerciseLoads(
-        supabase,
-        user.id,
-        workout.exercises.map((e) => e.exerciseId)
-      )
-    : {};
-
-  const sessionProgress =
-    progress?.sessions.find((s) => s.id === resolvedSessionId) ?? null;
-  const resumeStepIndex =
-    sessionProgress?.startedAt && !sessionProgress.completedAt
-      ? sessionProgress.resumeStepIndex
-      : null;
+    workout.session.name?.trim() || sessionDisplayLabel(workout.session, nav.sessionIndex);
 
   return (
     <ActiveWorkoutPlayer
@@ -148,21 +175,16 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
       songUrl={row.song_url}
       exercises={workout.exercises}
       initialLoads={initialLoads}
-      resumeStepIndex={resumeStepIndex}
+      resumeStepIndex={nav.resumeStepIndex}
       nextSessionHref={
-        nextSession
+        nav.nextSession
           ? tracksProgress
-            ? programDayHref(slug, nextSession.id)
-            : playHrefForSession(slug, nextSession.id)
+            ? programDayHref(slug, nav.nextSession.id)
+            : playHrefForSession(slug, nav.nextSession.id)
           : null
       }
-      nextSessionLabel={nextSession?.name ?? null}
-      programComplete={
-        tracksProgress &&
-        progress != null &&
-        progress.completedCount + 1 >= progress.totalSessions &&
-        !progress.sessions.find((s) => s.id === resolvedSessionId)?.completedAt
-      }
+      nextSessionLabel={nav.nextSession?.name ?? null}
+      programComplete={nav.programComplete}
     />
   );
 }

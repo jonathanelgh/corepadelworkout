@@ -5,7 +5,7 @@ import { ProgramDayOverview } from "@/components/programs/program-day-overview";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
 import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
-import { loadProgramProgress, playHrefForSession } from "@/lib/programs/program-progress";
+import { playHrefForSession } from "@/lib/programs/program-progress";
 import { programCatalogHref, programDayHref, programTrainingHref } from "@/lib/programs/program-routes";
 import { loadSessionWorkout, sessionDisplayLabel } from "@/lib/programs/program-sessions";
 
@@ -18,43 +18,33 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, sessionId } = await params;
   const supabase = await createClient();
-  const loaded = await loadProgramBySlugForViewer<{ id: string; title: string; status: string }>(
-    supabase,
-    slug,
-    "id, title, status"
-  );
-  if (!loaded) return { title: "Training day" };
-
-  const workout = await loadSessionWorkout(supabase, loaded.program.id, sessionId);
-  const dayName = workout?.session.name?.trim() || "Training day";
-  return { title: `${dayName} · ${loaded.program.title}` };
+  const [{ data: program }, { data: session }] = await Promise.all([
+    supabase.from("programs").select("title").eq("slug", slug.trim()).maybeSingle(),
+    supabase.from("program_sessions").select("name").eq("id", sessionId).maybeSingle(),
+  ]);
+  const dayName = session?.name?.trim() || "Training day";
+  const programTitle = program?.title?.trim();
+  return { title: programTitle ? `${dayName} · ${programTitle}` : dayName };
 }
 
 export default async function ProgramDayPage({ params }: PageProps) {
   const { slug, sessionId } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect(
-      `/login?next=${encodeURIComponent(programDayHref(slug, sessionId))}`
-    );
-  }
-
-  const loaded = await loadProgramBySlugForViewer<{
-    id: string;
-    title: string;
-    cover_image_url: string | null;
-    is_free: boolean;
-    status: string;
-    program_format: string | null;
-    minutes_per_session: number | null;
-  }>(
-    supabase,
-    slug,
-    `
+  const [authRes, loaded] = await Promise.all([
+    supabase.auth.getUser(),
+    loadProgramBySlugForViewer<{
+      id: string;
+      title: string;
+      cover_image_url: string | null;
+      is_free: boolean;
+      status: string;
+      program_format: string | null;
+      minutes_per_session: number | null;
+    }>(
+      supabase,
+      slug,
+      `
       id,
       title,
       cover_image_url,
@@ -63,7 +53,13 @@ export default async function ProgramDayPage({ params }: PageProps) {
       program_format,
       minutes_per_session
     `
-  );
+    ),
+  ]);
+
+  const user = authRes.data.user;
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(programDayHref(slug, sessionId))}`);
+  }
 
   if (!loaded) notFound();
 
@@ -75,42 +71,44 @@ export default async function ProgramDayPage({ params }: PageProps) {
     redirect(playHrefForSession(slug, sessionId));
   }
 
-  const hasAccess =
-    (!loaded.isAdminDraftPreview && program.is_free) ||
-    (await userHasProgramAccess(supabase, user.id, program.id));
+  const needsAccessCheck = loaded.isAdminDraftPreview || !program.is_free;
+
+  const [hasAccess, workout, runRes, completionRes] = await Promise.all([
+    needsAccessCheck
+      ? userHasProgramAccess(supabase, user.id, program.id)
+      : Promise.resolve(true),
+    loadSessionWorkout(supabase, program.id, sessionId),
+    supabase
+      .from("program_runs")
+      .select("id, track_id")
+      .eq("user_id", user.id)
+      .eq("program_id", program.id)
+      .maybeSingle(),
+    supabase
+      .from("program_session_completions")
+      .select("started_at, completed_at")
+      .eq("user_id", user.id)
+      .eq("session_id", sessionId)
+      .maybeSingle(),
+  ]);
+
   if (!hasAccess) {
     redirect(`${programCatalogHref(slug)}?upgrade=1`);
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("training_environment, training_environments")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const progress = await loadProgramProgress(
-    supabase,
-    user.id,
-    program.id,
-    profile,
-    programFormat
-  );
-
-  if (!progress?.runId) {
+  if (!runRes.data) {
     redirect(programCatalogHref(slug));
   }
 
-  const workout = await loadSessionWorkout(supabase, program.id, sessionId);
   if (!workout) notFound();
 
-  const sessionIndex = progress.sessions.findIndex((s) => s.id === sessionId);
-  if (sessionIndex < 0) {
-    // Session exists on another track / not part of this run.
+  if (runRes.data.track_id !== workout.trackId) {
     redirect(programTrainingHref(slug));
   }
 
-  const sessionProgress = progress.sessions[sessionIndex]!;
-  const sessionLabel = sessionDisplayLabel(workout.session, sessionIndex);
+  const startedAt = completionRes.data?.started_at ?? null;
+  const completedAt = completionRes.data?.completed_at ?? null;
+  const sessionLabel = sessionDisplayLabel(workout.session, 0);
   const durationMinutes =
     workout.session.durationMinutes != null && workout.session.durationMinutes > 0
       ? workout.session.durationMinutes
@@ -128,8 +126,8 @@ export default async function ProgramDayPage({ params }: PageProps) {
       description={workout.session.description}
       durationMinutes={durationMinutes}
       exercises={workout.exercises}
-      inProgress={Boolean(sessionProgress.startedAt && !sessionProgress.completedAt)}
-      completed={Boolean(sessionProgress.completedAt)}
+      inProgress={Boolean(startedAt && !completedAt)}
+      completed={Boolean(completedAt)}
     />
   );
 }

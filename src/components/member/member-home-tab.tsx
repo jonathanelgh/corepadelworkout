@@ -10,6 +10,7 @@ import type {
   QuickWorkoutSummary,
 } from "@/lib/member/load-member-hub-data";
 import { MemberFeedbackCard } from "@/components/member/member-feedback-card";
+import { NavPendingCover } from "@/components/programs/nav-pending-cover";
 
 const COVER_FALLBACK = "/Padel_coach_standing.webp";
 
@@ -148,8 +149,13 @@ export function MemberHomeTab({
                           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
                             <Link
                               href={p.nextSessionHref ?? p.trainingHref}
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
+                              className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
                             >
+                              <NavPendingCover
+                                label={
+                                  p.nextSessionInProgress ? "Opening workout…" : "Loading day…"
+                                }
+                              />
                               <Play className="h-4 w-4" />
                               {p.nextSessionInProgress
                                 ? "Continue day"

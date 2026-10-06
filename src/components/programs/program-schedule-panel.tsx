@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, Play } from "lucide-react";
 import type { ProgramProgressView } from "@/lib/programs/program-progress";
 import { programDayHref } from "@/lib/programs/program-routes";
 import { sessionDisplayLabel } from "@/lib/programs/program-sessions";
+import { NavPendingCover } from "@/components/programs/nav-pending-cover";
 
 function SessionRow({
   programSlug,
@@ -13,6 +14,7 @@ function SessionRow({
   done,
   isNext,
   inProgress,
+  interactive,
 }: {
   programSlug: string;
   session: ProgramProgressView["sessions"][number];
@@ -20,37 +22,58 @@ function SessionRow({
   done: boolean;
   isNext: boolean;
   inProgress: boolean;
+  interactive: boolean;
 }) {
-  const href = programDayHref(programSlug, session.id);
   const label = sessionDisplayLabel(session, flatIndex);
+  const icon = done ? (
+    <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+  ) : (
+    <Circle
+      className={`h-6 w-6 shrink-0 ${
+        interactive && (isNext || inProgress) ? "text-[#ccff00]" : "text-gray-300"
+      }`}
+    />
+  );
+  const details = (
+    <>
+      {icon}
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-gray-900">{label}</p>
+        <p className="mt-0.5 text-xs text-gray-500">
+          {session.exerciseCount} exercise{session.exerciseCount === 1 ? "" : "s"}
+          {session.durationMinutes != null && session.durationMinutes > 0
+            ? ` · ~${session.durationMinutes} min`
+            : ""}
+          {interactive && inProgress ? " · In progress" : ""}
+          {interactive && done && session.completedAt
+            ? ` · Completed ${new Date(session.completedAt).toLocaleDateString()}`
+            : ""}
+        </p>
+      </div>
+    </>
+  );
+
+  if (!interactive) {
+    return (
+      <li>
+        <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4">
+          {details}
+        </div>
+      </li>
+    );
+  }
+
+  const href = programDayHref(programSlug, session.id);
   return (
     <li>
       <Link
         href={href}
-        className={`flex items-center gap-4 rounded-2xl border bg-white p-4 transition hover:shadow-sm ${
+        className={`relative flex items-center gap-4 rounded-2xl border bg-white p-4 transition hover:shadow-sm ${
           isNext || inProgress ? "border-[#ccff00] shadow-sm" : "border-gray-100 hover:border-gray-200"
         }`}
       >
-        {done ? (
-          <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
-        ) : (
-          <Circle
-            className={`h-6 w-6 shrink-0 ${isNext || inProgress ? "text-[#ccff00]" : "text-gray-300"}`}
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-900">{label}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {session.exerciseCount} exercise{session.exerciseCount === 1 ? "" : "s"}
-            {session.durationMinutes != null && session.durationMinutes > 0
-              ? ` · ~${session.durationMinutes} min`
-              : ""}
-            {inProgress ? " · In progress" : ""}
-            {done && session.completedAt
-              ? ` · Completed ${new Date(session.completedAt).toLocaleDateString()}`
-              : ""}
-          </p>
-        </div>
+        <NavPendingCover label={inProgress ? "Opening workout…" : "Loading day…"} />
+        {details}
         <span
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold ${
             done
@@ -70,11 +93,14 @@ export function ProgramSchedulePanel({
   programSlug,
   progress,
   embedded = false,
+  daysInteractive = true,
 }: {
   programSlug: string;
   progress: ProgramProgressView;
   /** Hide summary header when nested inside the training hub */
   embedded?: boolean;
+  /** When false, days are preview-only (no Start / Continue links). */
+  daysInteractive?: boolean;
 }) {
   const pct =
     progress.totalSessions > 0
@@ -105,6 +131,7 @@ export function ProgramSchedulePanel({
                         done={done}
                         isNext={isNext}
                         inProgress={inProgress}
+                        interactive={daysInteractive}
                       />
                     );
                   })}
@@ -130,6 +157,7 @@ export function ProgramSchedulePanel({
                 done={done}
                 isNext={isNext}
                 inProgress={inProgress}
+                interactive={daysInteractive}
               />
             );
           })}

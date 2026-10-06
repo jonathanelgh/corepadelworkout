@@ -205,6 +205,103 @@ export async function ensureProgramRun(
   return progress;
 }
 
+/** Create a run for a known track without loading every session. */
+export async function ensureProgramRunForTrack(
+  supabase: SupabaseClient,
+  userId: string,
+  programId: string,
+  trackId: string
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from("program_runs")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("program_id", programId)
+    .maybeSingle();
+
+  if (existing) return;
+
+  const { error } = await supabase.from("program_runs").insert({
+    user_id: userId,
+    program_id: programId,
+    track_id: trackId,
+  });
+  if (error && error.code !== "23505") {
+    throw new Error(error.message);
+  }
+}
+
+export type PlaySessionNav = {
+  sessionIndex: number;
+  resumeStepIndex: number | null;
+  nextSession: { id: string; name: string | null } | null;
+  programComplete: boolean;
+};
+
+/** Neighbor session + resume without nested exercise payloads. */
+export async function loadPlaySessionNav(
+  supabase: SupabaseClient,
+  userId: string,
+  programId: string,
+  trackId: string,
+  sessionId: string,
+  tracksProgress: boolean
+): Promise<PlaySessionNav> {
+  if (!tracksProgress) {
+    return {
+      sessionIndex: 0,
+      resumeStepIndex: null,
+      nextSession: null,
+      programComplete: false,
+    };
+  }
+
+  const [{ data: sessionRows }, { data: completionRows }] = await Promise.all([
+    supabase
+      .from("program_sessions")
+      .select("id, name, sort_order")
+      .eq("track_id", trackId)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("program_session_completions")
+      .select("session_id, started_at, completed_at, resume_step_index")
+      .eq("user_id", userId)
+      .eq("program_id", programId),
+  ]);
+
+  const sessions = (sessionRows ?? []) as { id: string; name: string | null; sort_order: number }[];
+  const completions = (completionRows ?? []) as SessionCompletionRow[];
+  const bySession = new Map(completions.map((c) => [c.session_id, c]));
+  const sessionIndex = sessions.findIndex((s) => s.id === sessionId);
+  const current = bySession.get(sessionId);
+  const resumeRaw = current?.resume_step_index;
+  const resumeStepIndex =
+    current?.started_at &&
+    !current.completed_at &&
+    typeof resumeRaw === "number" &&
+    Number.isFinite(resumeRaw) &&
+    resumeRaw > 0
+      ? Math.floor(resumeRaw)
+      : null;
+
+  const nextSession =
+    sessionIndex >= 0
+      ? sessions.slice(sessionIndex + 1).find((s) => !bySession.get(s.id)?.completed_at) ?? null
+      : null;
+
+  const incompleteOther = sessions.filter(
+    (s) => s.id !== sessionId && !bySession.get(s.id)?.completed_at
+  ).length;
+  const currentAlreadyComplete = Boolean(current?.completed_at);
+
+  return {
+    sessionIndex: sessionIndex >= 0 ? sessionIndex : 0,
+    resumeStepIndex,
+    nextSession: nextSession ? { id: nextSession.id, name: nextSession.name } : null,
+    programComplete: tracksProgress && incompleteOther === 0 && !currentAlreadyComplete && sessions.length > 0,
+  };
+}
+
 export async function cancelProgramRun(
   supabase: SupabaseClient,
   userId: string,

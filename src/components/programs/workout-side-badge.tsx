@@ -5,7 +5,7 @@ type WorkoutSideBadgeProps = {
   side: WorkoutSide;
   className?: string;
   /** Smaller badge for dense overlays; default is large/hero for the active work UI. */
-  size?: "lg" | "md";
+  size?: "lg" | "md" | "sm";
 };
 
 /** High-visibility left/right cue for both_sides playback steps. */
@@ -18,7 +18,9 @@ export function WorkoutSideBadge({
   const sizeClass =
     size === "lg"
       ? "px-5 py-2.5 text-xl sm:text-2xl tracking-wide"
-      : "px-4 py-2 text-base sm:text-lg tracking-wide";
+      : size === "md"
+      ? "px-4 py-2 text-base sm:text-lg tracking-wide"
+      : "px-3 py-1 text-sm tracking-wide";
 
   return (
     <span

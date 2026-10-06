@@ -12,6 +12,7 @@ import {
 } from "@/lib/programs/program-progress";
 import { programDayHref, programInfoHref } from "@/lib/programs/program-routes";
 import { sessionDisplayLabel } from "@/lib/programs/program-sessions";
+import { NavPendingCover } from "@/components/programs/nav-pending-cover";
 
 const COVER_FALLBACK = "/Padel_coach_standing.webp";
 
@@ -138,8 +139,9 @@ export function ActiveProgramHub({
             </h2>
             <Link
               href={nextHref}
-              className="group flex items-center gap-4 rounded-2xl border-2 border-[#ccff00] bg-white p-5 shadow-sm transition hover:border-[#b3e600] hover:shadow-md"
+              className="group relative flex items-center gap-4 rounded-2xl border-2 border-[#ccff00] bg-white p-5 shadow-sm transition hover:border-[#b3e600] hover:shadow-md"
             >
+              <NavPendingCover label={nextInProgress ? "Opening workout…" : "Loading day…"} />
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#ccff00] text-black transition group-hover:bg-[#b3e600]">
                 <Play className="h-6 w-6 fill-current" />
               </div>

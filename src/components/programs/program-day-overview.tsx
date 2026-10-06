@@ -8,6 +8,7 @@ import {
 import { playHrefForSession } from "@/lib/programs/program-progress";
 import { programTrainingHref } from "@/lib/programs/program-routes";
 import { groupExercisesByPhase, SESSION_PHASE_LABELS } from "@/lib/programs/session-phase";
+import { NavPendingCover } from "@/components/programs/nav-pending-cover";
 
 const COVER_FALLBACK = "/Padel_coach_standing.webp";
 
@@ -166,8 +167,9 @@ export function ProgramDayOverview({
         <div className="mx-auto max-w-2xl">
           <Link
             href={playHref}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ccff00] py-3.5 text-base font-semibold text-black shadow-sm transition hover:bg-[#b3e600]"
+            className="relative flex w-full items-center justify-center gap-2 rounded-xl bg-[#ccff00] py-3.5 text-base font-semibold text-black shadow-sm transition hover:bg-[#b3e600]"
           >
+            <NavPendingCover label="Starting workout…" />
             <Play className="h-5 w-5 fill-current" />
             {ctaLabel}
           </Link>
