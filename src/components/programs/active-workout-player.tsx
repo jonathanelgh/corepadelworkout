@@ -784,7 +784,7 @@ export function ActiveWorkoutPlayer({
                 playing={false}
                 onReady={() => setVideoReady(true)}
               />
-              <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-black/30" />
             </ExerciseVideoFrame>
 
             <div className="relative z-20 mx-auto max-w-lg px-6 py-4 md:py-5">
@@ -883,7 +883,7 @@ export function ActiveWorkoutPlayer({
                 playing={!workoutFinished && (inPrep || inTimedPreview || isRunning)}
                 onReady={() => setVideoReady(true)}
               />
-              <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-black/30" />
               
               <div className="absolute inset-x-0 top-16 z-20 px-6 flex flex-col items-center">
                 {showProgressDots && !inRest && (
@@ -1088,26 +1088,44 @@ export function ActiveWorkoutPlayer({
                     </div>
                   </div>
                 )}
-                {!currentIsTimed && (
-                  <div className="mt-8 mb-32 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={goNext}
-                      className="rounded-xl bg-[#ccff00] px-8 py-4 text-lg font-bold text-black transition hover:bg-[#b3e600]"
-                    >
-                      {isLast ? "Finish Workout" : "Next Exercise"}
-                    </button>
-                  </div>
-                )}
               </div>
             )}
             </div>
           </div>
 
           {!inPrep && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-12 pt-32 bg-linear-to-t from-black via-black/80 to-transparent flex flex-col items-center">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-[max(16px,env(safe-area-inset-bottom))] pt-16 bg-linear-to-t from-black/50 via-black/20 to-transparent flex flex-col items-center gap-3">
+              {/* Timer & Meta Text */}
+              {phase === "work" && currentIsTimed && secondsLeft != null && (
+                <div className="px-6 text-center">
+                  <p className="font-mono text-6xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{secondsLeft}</p>
+                  {current && (
+                    <p className="mt-1.5 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
+                      {exerciseMeta(current)}
+                    </p>
+                  )}
+                </div>
+              )}
+              {inRest && secondsLeft != null && (
+                <div className="px-6 text-center">
+                  <p className="font-mono text-6xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{secondsLeft}</p>
+                  {current && (
+                    <p className="mt-1.5 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
+                      {exerciseMeta(current)}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!currentIsTimed && phase === "work" && current && !inTimedPreview && (
+                <div className="px-6 text-center">
+                  <p className="text-lg font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
+                    {formatSetsRepsLabel(current) ?? "Go at your pace"}
+                  </p>
+                </div>
+              )}
+
               {inTimedPreview ? (
-                <div className="pointer-events-auto mx-auto mb-8 flex w-full max-w-sm items-center justify-center gap-4 px-6">
+                <div className="pointer-events-auto mx-auto flex w-full max-w-sm items-center justify-center gap-4 px-6">
                   <button
                     type="button"
                     onClick={goPrev}
@@ -1133,7 +1151,7 @@ export function ActiveWorkoutPlayer({
                   </button>
                 </div>
               ) : (
-                <div className="relative mx-auto flex w-full max-w-sm items-center justify-center mb-6">
+                <div className="relative mx-auto flex w-full max-w-sm items-center justify-center">
                   <div className="pointer-events-auto flex items-center justify-center gap-4">
                     <button
                       type="button"
@@ -1171,42 +1189,13 @@ export function ActiveWorkoutPlayer({
                   </div>
                 </div>
               )}
-
-              {/* Timer & Meta Text */}
-              {phase === "work" && currentIsTimed && secondsLeft != null && (
-                <div className="px-6 text-center mt-2">
-                  <p className="font-mono text-8xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{secondsLeft}</p>
-                  {current && (
-                    <p className="mt-2 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
-                      {exerciseMeta(current)}
-                    </p>
-                  )}
-                </div>
-              )}
-              {inRest && secondsLeft != null && (
-                <div className="px-6 text-center mt-2">
-                  <p className="font-mono text-8xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{secondsLeft}</p>
-                  {current && (
-                    <p className="mt-2 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
-                      {exerciseMeta(current)}
-                    </p>
-                  )}
-                </div>
-              )}
-              {!currentIsTimed && phase === "work" && current && !inTimedPreview && (
-                <div className="px-6 text-center mt-4">
-                  <p className="text-lg font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
-                    {formatSetsRepsLabel(current) ?? "Go at your pace"}
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
           {inPrep && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-12 pt-32 bg-linear-to-t from-black via-black/80 to-transparent flex flex-col items-center">
-              <div className="px-6 text-center mt-2">
-                <p className="font-mono text-8xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{prepCountdown}</p>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-[max(16px,env(safe-area-inset-bottom))] pt-16 bg-linear-to-t from-black/50 via-black/20 to-transparent flex flex-col items-center gap-3">
+              <div className="px-6 text-center">
+                <p className="font-mono text-6xl font-bold tabular-nums tracking-tighter text-white drop-shadow-lg leading-none">{prepCountdown}</p>
                 {current && (
                   <p className="mt-2 text-base font-semibold tracking-wide text-[#ccff00] drop-shadow-md">
                     {currentIsTimed ? exerciseMeta(current) : (formatSetsRepsLabel(current) ?? "Go at your pace")}
