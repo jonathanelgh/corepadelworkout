@@ -4,6 +4,7 @@ import {
   estimateWorkoutMinutes,
   estimateWorkoutProposalMinutes,
   minMainExercisesForTargetMinutes,
+  sessionDurationBounds,
 } from "@/lib/programs/estimate-workout-minutes";
 import { coerceRpeField } from "@/lib/programs/rpe";
 import { exerciseNeedsRpeGuidance } from "@/lib/programs/ai-rpe-guidance";
@@ -25,11 +26,6 @@ type ValidatorOptions = {
   targetMinutes?: number | null;
 };
 
-/** Minimum fraction of target minutes the estimated session must reach. */
-const MIN_DURATION_FRACTION = 0.75;
-/** Soft ceiling so sessions aren't wildly overfilled. */
-const MAX_DURATION_FRACTION = 1.4;
-
 function countMainExercises(
   exercises: Array<Pick<WorkoutProposalExercise, "phase">>
 ): number {
@@ -45,8 +41,7 @@ function validateSessionDurationFit(
   if (!Number.isFinite(targetMinutes) || targetMinutes < 8) return errors;
 
   const estimated = estimateWorkoutMinutes(exercises);
-  const minOk = Math.ceil(targetMinutes * MIN_DURATION_FRACTION);
-  const maxOk = Math.ceil(targetMinutes * MAX_DURATION_FRACTION);
+  const { minOk, maxOk } = sessionDurationBounds(targetMinutes);
   const minMains = minMainExercisesForTargetMinutes(targetMinutes);
   const mains = countMainExercises(exercises);
 

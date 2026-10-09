@@ -17,6 +17,7 @@ import {
 } from "@/lib/programs/warmup-prescription";
 import { exerciseNeedsRpeGuidance } from "@/lib/programs/ai-rpe-guidance";
 import { coerceRpeField, defaultRpeForEffort, extractRpeValue } from "@/lib/programs/rpe";
+import { ensureSessionDurationFit } from "@/lib/programs/ensure-session-duration";
 
 const PHASE_ORDER: Record<SessionPhase, number> = {
   warmup: 0,
@@ -29,6 +30,8 @@ export type SessionStructureOptions = {
   sessionLabel?: string;
   trainingLevel?: OnboardingLevel | null;
   programContext?: ProgramRulesContext;
+  /** Consultation target session length — used to expand under-filled sessions. */
+  targetMinutes?: number | null;
 };
 
 function enrichProgramContext(
@@ -294,6 +297,21 @@ export function ensureSessionExerciseStructure(
   const bothSidesByExerciseId = new Map(catalog.map((entry) => [entry.id, entry.bothSides]));
   out = normalizeAiExerciseRest(out, { bothSidesByExerciseId });
   out = ensureExerciseRpeFields(out, catalog, warnings, sessionLabel);
+
+  const targetMinutes = options?.targetMinutes;
+  if (targetMinutes != null && Number.isFinite(targetMinutes) && targetMinutes >= 8) {
+    const filled = ensureSessionDurationFit(out, catalog, Math.round(targetMinutes), {
+      locationSlug: options?.locationSlug,
+      trainingLevel: level,
+      sessionLabel,
+    });
+    out = filled.exercises;
+    warnings.push(...filled.warnings);
+    // Re-normalize rests/RPE after volume fill may add new mains.
+    out = normalizeAiExerciseRest(out, { bothSidesByExerciseId });
+    out = ensureExerciseRpeFields(out, catalog, warnings, sessionLabel);
+  }
+
   return { exercises: out, warnings };
 }
 
@@ -323,6 +341,11 @@ export function ensureProgramProposalStructure(
 ): { proposal: ProgramProposal; warnings: string[] } {
   const warnings: string[] = [];
   const locationSlug = proposal.location_slug;
+  const targetMinutes =
+    options?.targetMinutes ??
+    (proposal.minutes_per_session != null && Number.isFinite(proposal.minutes_per_session)
+      ? proposal.minutes_per_session
+      : null);
 
   const sessions = proposal.sessions.map((session) => {
     const result = ensureSessionExerciseStructure(session.exercises, catalog, {
@@ -330,6 +353,7 @@ export function ensureProgramProposalStructure(
       sessionLabel: session.name,
       trainingLevel: options?.trainingLevel,
       programContext: options?.programContext,
+      targetMinutes,
     });
     warnings.push(...result.warnings);
     return { ...session, exercises: result.exercises };

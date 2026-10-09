@@ -406,7 +406,10 @@ export async function sendAiCoachMessage(input: {
         const enforced = ensureWorkoutProposalStructure(
           rawProposal,
           generationExercises,
-          enforcementOptions
+          {
+            ...enforcementOptions,
+            targetMinutes: consultation.minutes ?? null,
+          }
         );
         proposal = enforced.proposal;
         structureWarnings = enforced.warnings;
@@ -504,7 +507,11 @@ export async function sendAiCoachMessage(input: {
       const enforced = ensureProgramProposalStructure(
         rawProgramArgs,
         generationExercises,
-        enforcementOptions
+        {
+          ...enforcementOptions,
+          targetMinutes:
+            consultation.minutes ?? rawProgramArgs.minutes_per_session ?? null,
+        }
       );
       proposal = enforced.proposal;
       structureWarnings = enforced.warnings;

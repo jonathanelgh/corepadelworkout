@@ -63,6 +63,21 @@ export function estimateWorkoutProposalMinutes(proposal: WorkoutProposal): numbe
   return estimateWorkoutMinutes(proposal.exercises);
 }
 
+/** Minimum fraction of target minutes the estimated session must reach. */
+export const SESSION_DURATION_MIN_FRACTION = 0.75;
+/** Soft ceiling so sessions aren't wildly overfilled. */
+export const SESSION_DURATION_MAX_FRACTION = 1.4;
+
+export function sessionDurationBounds(targetMinutes: number): {
+  minOk: number;
+  maxOk: number;
+} {
+  return {
+    minOk: Math.ceil(targetMinutes * SESSION_DURATION_MIN_FRACTION),
+    maxOk: Math.ceil(targetMinutes * SESSION_DURATION_MAX_FRACTION),
+  };
+}
+
 /** Minimum main-phase exercises so a target duration is not just warm-up/cool-down. */
 export function minMainExercisesForTargetMinutes(targetMinutes: number): number {
   if (targetMinutes >= 40) return 6;

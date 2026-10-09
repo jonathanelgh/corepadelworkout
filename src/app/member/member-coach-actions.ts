@@ -359,7 +359,10 @@ export async function sendMemberCoachMessage(input: {
       const { proposal } = ensureWorkoutProposalStructure(
         result.args,
         generationExercises,
-        enforcementOptions
+        {
+          ...enforcementOptions,
+          targetMinutes: consultation.minutes ?? null,
+        }
       );
       return {
         type: "workout_proposal",
