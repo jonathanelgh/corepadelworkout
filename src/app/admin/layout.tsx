@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
-  LayoutDashboard, 
+  LayoutDashboard,
+  BarChart3,
   Users, 
   Dumbbell, 
   Activity,
@@ -43,6 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Programs", href: "/admin/programs", icon: Dumbbell },
     { name: "Categories", href: "/admin/programs/categories", icon: Tags },

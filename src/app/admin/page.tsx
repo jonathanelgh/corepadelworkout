@@ -6,6 +6,7 @@ import {
   Activity,
   CreditCard,
   ArrowRight,
+  BarChart3,
   Dumbbell,
   MoreHorizontal,
 } from "lucide-react";
@@ -161,6 +162,18 @@ export default async function AdminDashboard() {
                       <Activity className="h-5 w-5" />
                     </div>
                     <span className="font-medium text-gray-900">View programs</span>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-black" />
+                </Link>
+                <Link
+                  href="/admin/analytics"
+                  className="group flex w-full items-center justify-between rounded-lg border border-gray-200 p-4 transition-all hover:border-gray-300 hover:bg-gray-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gray-100 text-black transition-colors group-hover:bg-black group-hover:text-white">
+                      <BarChart3 className="h-5 w-5" />
+                    </div>
+                    <span className="font-medium text-gray-900">View analytics</span>
                   </div>
                   <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-black" />
                 </Link>

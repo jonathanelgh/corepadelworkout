@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { Play, Video, X } from "lucide-react";
 import { resolveExerciseThumbnailUrl } from "@/lib/media/exercise-thumbnail-url";
 import { resolveVideoPlayer } from "@/lib/media/resolve-video-player";
-import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 
 const MODAL_Z = 10050;
 
@@ -116,7 +115,7 @@ export function ExerciseVideoThumbnail({
             onClick={() => setOpen(false)}
           >
             <div
-              className="relative w-full max-w-4xl overflow-hidden rounded-xl bg-black shadow-2xl"
+              className="relative flex max-h-[min(90vh,920px)] max-w-[min(100%,56rem)] items-center justify-center overflow-hidden rounded-xl bg-black shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -127,25 +126,25 @@ export function ExerciseVideoThumbnail({
               >
                 <X className="h-5 w-5" />
               </button>
-              <ExerciseVideoFrame rounded={false}>
-                {player!.mode === "iframe" ? (
+              {player!.mode === "iframe" ? (
+                <div className="relative aspect-video w-[min(100vw-2rem,56rem)] max-h-[min(90vh,920px)]">
                   <iframe
                     src={player!.src}
                     title={player!.title}
-                    className="absolute top-1/2 left-1/2 h-full w-[177.78%] max-w-none -translate-x-1/2 -translate-y-1/2"
+                    className="absolute inset-0 h-full w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   />
-                ) : (
-                  <video
-                    src={player!.src}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    controls
-                    playsInline
-                    autoPlay
-                  />
-                )}
-              </ExerciseVideoFrame>
+                </div>
+              ) : (
+                <video
+                  src={player!.src}
+                  className="max-h-[min(90vh,920px)] w-auto max-w-full object-contain"
+                  controls
+                  playsInline
+                  autoPlay
+                />
+              )}
             </div>
           </div>,
           document.body

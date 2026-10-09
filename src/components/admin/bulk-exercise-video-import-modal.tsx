@@ -10,6 +10,7 @@ import {
   startBulkExerciseImport,
   type BulkImportUploadedFile,
 } from "@/app/admin/exercises/bulk-import-actions";
+import { compressVideoForWeb } from "@/lib/media/compress-video-client";
 
 type LocationOption = { id: string; name: string };
 
@@ -123,12 +124,31 @@ export function BulkExerciseVideoImportModal({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        setStatusLine(`Uploading ${i + 1} of ${files.length}: ${file.name}`);
         setUploadProgress(Math.round((i / files.length) * 100));
-        const path = `bulk-imports/${groupId}/${i}-${sanitizeFilename(file.name)}`;
-        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKETS.exercises).upload(path, file, {
-          upsert: false,
-        });
+        setStatusLine(`Optimizing ${i + 1} of ${files.length}: ${file.name}`);
+
+        let fileToUpload = file;
+        try {
+          const compressed = await compressVideoForWeb(file, {
+            onStatus: (msg) =>
+              setStatusLine(`Optimizing ${i + 1} of ${files.length}: ${file.name} — ${msg}`),
+          });
+          fileToUpload = compressed.file;
+        } catch (compressErr) {
+          console.warn("[bulk-import] compress failed, uploading original", compressErr);
+          setStatusLine(
+            `Compression skipped for ${file.name} — uploading original (${i + 1}/${files.length})`
+          );
+        }
+
+        setStatusLine(`Uploading ${i + 1} of ${files.length}: ${fileToUpload.name}`);
+        const path = `bulk-imports/${groupId}/${i}-${sanitizeFilename(fileToUpload.name)}`;
+        const { error: upErr } = await supabase.storage
+          .from(STORAGE_BUCKETS.exercises)
+          .upload(path, fileToUpload, {
+            upsert: false,
+            contentType: fileToUpload.type || "video/mp4",
+          });
         if (upErr) throw new Error(upErr.message);
         const { data } = supabase.storage.from(STORAGE_BUCKETS.exercises).getPublicUrl(path);
         uploaded.push({
@@ -280,7 +300,9 @@ export function BulkExerciseVideoImportModal({
               >
                 <UploadCloud className="mb-2 h-8 w-8 text-gray-400" />
                 <span className="text-sm font-medium text-gray-900">Click or drop videos</span>
-                <span className="mt-1 text-xs text-gray-500">MP4, WebM, MOV — up to 20 files</span>
+                <span className="mt-1 text-xs text-gray-500">
+                  MP4, WebM, MOV — up to 20 files. Videos are auto-compressed before upload.
+                </span>
               </label>
 
               {files.length > 0 && (

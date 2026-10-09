@@ -6,6 +6,7 @@ import { FolderOpen, Loader2, RefreshCw, Search, UploadCloud, X } from "lucide-r
 import { createClient } from "@/utils/supabase/client";
 import { STORAGE_BUCKETS, type StorageBucketId } from "@/utils/supabase/storage";
 import { listAdminMediaAction, type AdminMediaRow } from "@/app/admin/media/actions";
+import { compressVideoForWeb } from "@/lib/media/compress-video-client";
 
 export type ExerciseMediaPickerKind = "image" | "video";
 
@@ -73,6 +74,8 @@ export function ExerciseMediaPickerModal({
   const [uploadDragging, setUploadDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [compressProgress, setCompressProgress] = useState(0);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -112,6 +115,8 @@ export function ExerciseMediaPickerModal({
       setQuery("");
       setUploadFile(null);
       setUploadError(null);
+      setUploadStatus(null);
+      setCompressProgress(0);
       setListError(null);
       setSelectedKey(null);
       setUploadDragging(false);
@@ -149,13 +154,32 @@ export function ExerciseMediaPickerModal({
     if (!uploadFile) return;
     setUploading(true);
     setUploadError(null);
+    setUploadStatus(null);
+    setCompressProgress(0);
     try {
+      let fileToUpload = uploadFile;
+      if (kind === "video") {
+        try {
+          const result = await compressVideoForWeb(uploadFile, {
+            onProgress: setCompressProgress,
+            onStatus: setUploadStatus,
+          });
+          fileToUpload = result.file;
+        } catch (compressErr) {
+          // Still allow the original so admins aren't blocked if wasm fails.
+          console.warn("[exercise-media] compress failed, uploading original", compressErr);
+          setUploadStatus("Compression skipped — uploading original file.");
+        }
+      }
+
+      setUploadStatus("Uploading…");
       const supabase = createClient();
       const folder = crypto.randomUUID();
-      const ext = extFromFile(uploadFile, kind === "image" ? "jpg" : "mp4");
+      const ext = extFromFile(fileToUpload, kind === "image" ? "jpg" : "mp4");
       const path = `${folder}/${kind}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(STORAGE_BUCKETS.exercises).upload(path, uploadFile, {
+      const { error: upErr } = await supabase.storage.from(STORAGE_BUCKETS.exercises).upload(path, fileToUpload, {
         upsert: false,
+        contentType: fileToUpload.type || undefined,
       });
       if (upErr) throw new Error(upErr.message);
       const { data } = supabase.storage.from(STORAGE_BUCKETS.exercises).getPublicUrl(path);
@@ -165,6 +189,8 @@ export function ExerciseMediaPickerModal({
       setUploadError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
+      setUploadStatus(null);
+      setCompressProgress(0);
     }
   }
 
@@ -245,7 +271,8 @@ export function ExerciseMediaPickerModal({
           {tab === "upload" && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
-                Files are saved to the exercises bucket (same pattern as other exercise uploads).
+                Files are saved to the exercises bucket. Videos are auto-compressed in your browser
+                (≈1080p, H.264) for faster member loads before upload.
               </p>
               <input
                 id={uploadInputId}
@@ -303,9 +330,29 @@ export function ExerciseMediaPickerModal({
                       onClick={() => void uploadToExercises()}
                       className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
                     >
-                      {uploading ? "Uploading…" : "Upload and use"}
+                      {uploading
+                        ? kind === "video"
+                          ? "Optimizing…"
+                          : "Uploading…"
+                        : "Upload and use"}
                     </button>
                   </div>
+                </div>
+              )}
+              {uploading && kind === "video" && (
+                <div className="space-y-2">
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className="h-full bg-black transition-[width] duration-300"
+                      style={{ width: `${Math.round(compressProgress * 100)}%` }}
+                    />
+                  </div>
+                  {uploadStatus ? (
+                    <p className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                      {uploadStatus}
+                    </p>
+                  ) : null}
                 </div>
               )}
               {uploadError && (
