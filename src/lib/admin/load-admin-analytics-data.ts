@@ -45,7 +45,10 @@ export type AdminAnalyticsData = {
     userEmail: string;
     programTitle: string;
     sessionName: string;
+    startedAt: string | null;
     completedAt: string;
+    /** Milliseconds from start → complete; null if started_at missing or invalid. */
+    durationMs: number | null;
   }[];
   loadError: string | null;
 };
@@ -401,12 +404,24 @@ export async function loadAdminAnalyticsData(
       const p = profileById.get(row.user_id);
       const prog = firstRel(row.programs);
       const session = firstRel(row.program_sessions);
+      const completedAt = row.completed_at!;
+      const startedAt = row.started_at;
+      let durationMs: number | null = null;
+      if (startedAt) {
+        const startMs = new Date(startedAt).getTime();
+        const endMs = new Date(completedAt).getTime();
+        if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
+          durationMs = endMs - startMs;
+        }
+      }
       return {
         userName: p?.full_name?.trim() || "—",
         userEmail: p?.email?.trim() || "—",
         programTitle: prog?.title?.trim() || "Program",
         sessionName: session?.name?.trim() || "Session",
-        completedAt: row.completed_at!,
+        startedAt,
+        completedAt,
+        durationMs,
       };
     });
 

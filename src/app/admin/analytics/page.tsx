@@ -15,15 +15,44 @@ export const dynamic = "force-dynamic";
 
 const kpiIcons = [Users, Dumbbell, Flame, Activity] as const;
 
-function formatWhen(iso: string): string {
+function formatCompletedAt(iso: string): { date: string; time: string } | null {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const d = new Date(iso);
+  return {
+    date: d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    time: d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }),
+  };
+}
+
+function formatClockTime(iso: string | null): string {
+  if (!iso) return "—";
   const t = new Date(iso).getTime();
   if (!Number.isFinite(t)) return "—";
-  return new Date(iso).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
+  return new Date(iso).toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
+}
+
+function formatDuration(ms: number | null): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return "—";
+  const totalSec = Math.round(ms / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+  return `${seconds}s`;
 }
 
 function formatFormat(format: string): string {
@@ -256,11 +285,16 @@ export default async function AdminAnalyticsPage() {
                       <th className="px-6 py-3 font-semibold">Member</th>
                       <th className="px-4 py-3 font-semibold">Program</th>
                       <th className="px-4 py-3 font-semibold">Session</th>
-                      <th className="px-6 py-3 font-semibold">When</th>
+                      <th className="px-4 py-3 font-semibold">Date</th>
+                      <th className="px-4 py-3 font-semibold">Started</th>
+                      <th className="px-4 py-3 font-semibold">Completed</th>
+                      <th className="px-6 py-3 font-semibold">Duration</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.recentCompletions.map((row, idx) => (
+                    {data.recentCompletions.map((row, idx) => {
+                      const when = formatCompletedAt(row.completedAt);
+                      return (
                       <tr
                         key={`${row.userEmail}-${row.completedAt}-${idx}`}
                         className="border-b border-gray-100 last:border-0"
@@ -271,11 +305,21 @@ export default async function AdminAnalyticsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-gray-700">{row.programTitle}</td>
                         <td className="px-4 py-3.5 text-gray-700">{row.sessionName}</td>
-                        <td className="px-6 py-3.5 whitespace-nowrap text-gray-500">
-                          {formatWhen(row.completedAt)}
+                        <td className="px-4 py-3.5 whitespace-nowrap text-gray-700">
+                          {when?.date ?? "—"}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap tabular-nums text-gray-600">
+                          {formatClockTime(row.startedAt)}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap font-medium tabular-nums text-gray-900">
+                          {when?.time ?? "—"}
+                        </td>
+                        <td className="px-6 py-3.5 whitespace-nowrap font-medium tabular-nums text-gray-900">
+                          {formatDuration(row.durationMs)}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
