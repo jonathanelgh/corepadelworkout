@@ -1,5 +1,9 @@
 /**
  * Flip to `true` when member AI coach is ready to ship.
- * Until then Coach tab shows a coming-soon state and member coach actions refuse generation.
+ * Until then the Coach tab stays coming-soon, except for admins.
  */
 export const MEMBER_AI_COACH_ENABLED = false;
+
+export function isMemberAiCoachOpen(isAdmin: boolean): boolean {
+  return MEMBER_AI_COACH_ENABLED || isAdmin;
+}

@@ -3,6 +3,7 @@ import type { ProgramCard } from "@/app/programs/programs-library-client";
 import { PRIMARY_GOAL_LABELS, coercePainKeys, isOnboardingGoal, levelFromPadelSlug } from "@/lib/member/onboarding";
 import type { OnboardingEnvironment, OnboardingGoal, OnboardingLevel, PainKey } from "@/lib/member/onboarding";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
+import { getIsAdminUser } from "@/utils/supabase/is-admin";
 import { loadMemberSubscriptionStatus, type MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
 import { mapProgramRowsToCards, type ProgramRow } from "@/lib/programs/map-program-cards";
 import { loadUserActivePrograms, loadQuickWorkouts, type ActiveProgramSummary, type QuickWorkoutSummary } from "@/lib/programs/program-progress";
@@ -58,6 +59,7 @@ export type { ActiveProgramSummary, QuickWorkoutSummary };
 
 export type MemberHubData = {
   hasActivePro: boolean;
+  isAdmin: boolean;
   subscription: MemberSubscriptionStatus;
   activePrograms: ActiveProgramSummary[];
   quickWorkouts: QuickWorkoutSummary[];
@@ -80,6 +82,7 @@ export async function loadMemberHubData(
 ): Promise<MemberHubData> {
   const [
     hasActivePro,
+    isAdmin,
     subscription,
     homeProgramsRes,
     blogRes,
@@ -89,6 +92,7 @@ export async function loadMemberHubData(
     profileRes,
   ] = await Promise.all([
     getHasActivePro(supabase, userId),
+    getIsAdminUser(supabase, userId),
     loadMemberSubscriptionStatus(supabase, userId),
     supabase
       .from("programs")
@@ -258,6 +262,7 @@ export async function loadMemberHubData(
 
   return {
     hasActivePro,
+    isAdmin,
     subscription,
     activePrograms,
     quickWorkouts,

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Crown, Sparkles } from "lucide-react";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 import { MemberCoachClient } from "@/components/member/member-coach-client";
-import { MEMBER_AI_COACH_ENABLED } from "@/lib/member/member-ai-coach";
+import { isMemberAiCoachOpen } from "@/lib/member/member-ai-coach";
 
 function MemberCoachComingSoon() {
   return (
@@ -47,12 +47,14 @@ function MemberCoachComingSoon() {
 
 export function MemberCustomTab({
   hasActivePro,
+  isAdmin = false,
   mobileFullscreen = false,
 }: {
   hasActivePro: boolean;
+  isAdmin?: boolean;
   mobileFullscreen?: boolean;
 }) {
-  if (!MEMBER_AI_COACH_ENABLED) {
+  if (!isMemberAiCoachOpen(isAdmin)) {
     return <MemberCoachComingSoon />;
   }
 
@@ -91,10 +93,10 @@ export function MemberCustomTab({
         mobileFullscreen ? "max-md:flex max-md:h-full max-md:max-w-none max-md:flex-col max-md:space-y-0" : ""
       }`}
     >
-      <div className={mobileFullscreen ? "max-md:hidden" : ""}>
+      <div className="max-md:hidden">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Coach</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Chat about padel fitness, your training log, or get a custom workout built for you.
+          Answer a few questions. The coach builds a program around your goal, schedule, and where you train.
         </p>
       </div>
       <MemberCoachClient hasActivePro={hasActivePro} mobileFullscreen={mobileFullscreen} />

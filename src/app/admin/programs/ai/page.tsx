@@ -15,10 +15,21 @@ export default async function AdminAiCoachPage() {
     redirect("/login?next=/admin/programs/ai");
   }
 
-  const [programsCatalog, members] = await Promise.all([
+  const [programsCatalog, members, equipmentResult] = await Promise.all([
     fetchProgramsCatalog(supabase),
     listMembersForAiPicker(supabase),
+    supabase.from("equipment").select("title").order("title", { ascending: true }),
   ]);
 
-  return <AiCoachClient initialCatalog={programsCatalog} members={members} />;
+  const equipmentOptions = (equipmentResult.data ?? [])
+    .map((row) => (typeof row.title === "string" ? row.title.trim() : ""))
+    .filter((title) => title.length > 0);
+
+  return (
+    <AiCoachClient
+      initialCatalog={programsCatalog}
+      members={members}
+      equipmentOptions={equipmentOptions}
+    />
+  );
 }

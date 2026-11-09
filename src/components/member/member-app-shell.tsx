@@ -14,13 +14,13 @@ import {
   User,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { MEMBER_AI_COACH_ENABLED } from "@/lib/member/member-ai-coach";
 import { tabToHref, type MemberTab } from "@/lib/member/member-tabs";
 import type { MemberHubData } from "@/lib/member/load-member-hub-data";
 import { MemberHomeTab } from "@/components/member/member-home-tab";
 import { MemberCustomTab } from "@/components/member/member-custom-tab";
 import { MemberProfileTab } from "@/components/member/member-profile-tab";
 import { MemberProgramsLibraryClient } from "@/app/member/(shell)/programs/member-programs-client";
+import { CoachFormChromeProvider, useCoachFormChrome } from "@/components/member/coach-form-chrome";
 
 type Profile = {
   full_name: string | null;
@@ -46,7 +46,23 @@ function panelStyle(visible: boolean): React.CSSProperties {
   return { display: visible ? "block" : "none" };
 }
 
-export function MemberAppShell({
+export function MemberAppShell(props: {
+  userEmail: string | null;
+  profile: Profile;
+  children?: React.ReactNode;
+  hubData?: MemberHubData;
+  initialTab?: MemberTab;
+  billingSuccess?: boolean;
+  promoCode?: string | null;
+}) {
+  return (
+    <CoachFormChromeProvider>
+      <MemberAppShellView {...props} />
+    </CoachFormChromeProvider>
+  );
+}
+
+function MemberAppShellView({
   userEmail,
   profile,
   children,
@@ -72,9 +88,10 @@ export function MemberAppShell({
 
   const displayName = profile?.full_name?.trim() || userEmail?.split("@")[0] || "Member";
   const uploaded = profile?.profile_image_url?.trim();
-  const isCoachTab = Boolean(
-    isHub && tab === "custom" && hubData?.hasActivePro && MEMBER_AI_COACH_ENABLED
-  );
+  const isCoachTab = false;
+  const formChrome = useCoachFormChrome();
+  const mobileFormBar = tab === "custom" ? formChrome?.chrome : null;
+  const onCoachPage = isHub ? tab === "custom" : pathname.startsWith("/member/custom");
 
   function selectTab(next: MemberTab) {
     if (isHub) {
@@ -110,6 +127,43 @@ export function MemberAppShell({
     >
       <header className="sticky top-0 z-40 shrink-0 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
         <div className="relative mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-4 md:px-12">
+          {mobileFormBar?.mode === "overview" ? (
+            <div className="grid w-full grid-cols-[2.5rem_1fr_2.5rem] items-center md:hidden">
+              <button
+                type="button"
+                onClick={() => formChrome?.backRef.current?.()}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-zinc-800"
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <span className="truncate text-center text-sm font-semibold text-zinc-900">
+                {mobileFormBar.title}
+              </span>
+              <span />
+            </div>
+          ) : mobileFormBar ? (
+            <div className="flex w-full items-center gap-3 md:hidden">
+              <button
+                type="button"
+                onClick={() => formChrome?.backRef.current?.()}
+                disabled={!mobileFormBar.canGoBack}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-800 disabled:opacity-30"
+                aria-label="Previous question"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-200">
+                <div
+                  className="h-full rounded-full bg-[#ccff00]"
+                  style={{ width: `${mobileFormBar.progress}%` }}
+                />
+              </div>
+              <span className="shrink-0 text-xs font-medium tabular-nums text-zinc-500">
+                {mobileFormBar.label}
+              </span>
+            </div>
+          ) : null}
           {isCoachTab && (
             <div className="absolute inset-x-4 flex items-center justify-between md:hidden">
               <button
@@ -135,7 +189,9 @@ export function MemberAppShell({
           <button
             type="button"
             onClick={() => selectTab("home")}
-            className={`shrink-0 font-bold tracking-tight text-zinc-900 ${isCoachTab ? "hidden md:block" : ""}`}
+            className={`shrink-0 font-bold tracking-tight text-zinc-900 ${
+              isCoachTab || mobileFormBar ? "hidden md:block" : ""
+            }`}
           >
             CORE<span className="text-emerald-600">PADEL</span>
             <span className="ml-2 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
@@ -169,7 +225,7 @@ export function MemberAppShell({
             </Link>
           </nav>
 
-          <div className={`relative shrink-0 ${isCoachTab ? "max-md:hidden" : ""}`}>
+          <div className={`relative shrink-0 ${isCoachTab || mobileFormBar ? "max-md:hidden" : ""}`}>
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
@@ -250,7 +306,9 @@ export function MemberAppShell({
         className={`mx-auto flex w-full max-w-[1400px] flex-1 flex-col min-h-0 ${
           isCoachTab
             ? "max-md:overflow-hidden max-md:px-0 max-md:py-0 max-md:pb-0 md:px-12 md:py-8 md:pb-8"
-            : "px-6 py-8 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-12 md:pb-8"
+            : onCoachPage
+              ? "px-6 py-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-12 md:pb-8"
+              : "px-6 py-8 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-12 md:pb-8"
         }`}
       >
         {isHub && hubData ? (
@@ -283,7 +341,11 @@ export function MemberAppShell({
               aria-hidden={tab !== "custom"}
               className={isCoachTab ? "max-md:flex max-md:min-h-0 max-md:flex-1 max-md:flex-col" : undefined}
             >
-              <MemberCustomTab hasActivePro={hubData.hasActivePro} mobileFullscreen={isCoachTab} />
+              <MemberCustomTab
+                hasActivePro={hubData.hasActivePro}
+                isAdmin={hubData.isAdmin}
+                mobileFullscreen={isCoachTab}
+              />
             </div>
             <div style={panelStyle(tab === "profile")} aria-hidden={tab !== "profile"}>
               <MemberProfileTab
@@ -301,7 +363,7 @@ export function MemberAppShell({
 
       <nav
         className={`fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200/80 bg-white/95 backdrop-blur-md md:hidden ${
-          isCoachTab ? "max-md:hidden" : ""
+          onCoachPage ? "max-md:hidden" : ""
         }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Member mobile"

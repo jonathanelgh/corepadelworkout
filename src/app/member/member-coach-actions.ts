@@ -1,22 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { loadAiPrompt } from "@/lib/programs/ai-prompts";
 import {
-  chatWithAiCoach,
   type AiCoachToolName,
   type ChatHistoryMessage,
   type ProgramProposal,
   type WorkoutProposal,
 } from "@/lib/programs/ai-coach-gemini";
+import { chatWithAiCoachOpenAI } from "@/lib/programs/ai-coach-openai";
 import {
   catalogForAiPayload,
   fetchProgramsCatalog,
   type ProgramCatalogRow,
 } from "@/lib/programs/programs-catalog";
 import { formatExerciseCatalogForPrompt, loadProgramAiContext } from "@/lib/programs/exercise-catalog";
+import type { SwapExerciseOption } from "@/lib/programs/swap-exercises";
 import { filterCatalogByTrainingLevel } from "@/lib/programs/exercise-level-eligibility";
 import {
   buildMemberAiAthleteContext,
@@ -27,6 +29,7 @@ import {
   memberTrainingContextBlock,
 } from "@/lib/programs/load-member-coach-context";
 import { MEMBER_AI_COACH_ENABLED } from "@/lib/member/member-ai-coach";
+import { getIsAdminUser } from "@/utils/supabase/is-admin";
 import { coachShouldCreateNew, coachShouldRecommendCatalogOnly, coachWantsRehabProgram } from "@/lib/programs/coach-intent";
 import {
   buildConsultationState,
@@ -65,6 +68,13 @@ async function requireProMember() {
   return { error: null, supabase, user };
 }
 
+const COACH_COMING_SOON = "AI Coach is coming soon. Browse our programs in the meantime.";
+
+async function memberCoachClosed(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  if (MEMBER_AI_COACH_ENABLED) return false;
+  return !(await getIsAdminUser(supabase, userId));
+}
+
 function exercisesForLocation(
   exercises: Awaited<ReturnType<typeof loadProgramAiContext>>["exercises"],
   locationSlug: string | undefined,
@@ -91,21 +101,39 @@ function exercisesForLocation(
 
 export type MemberCoachInitialData = {
   programsCatalog: ProgramCatalogRow[];
+  equipmentOptions: string[];
+  swapExercises: SwapExerciseOption[];
 };
 
 export async function loadMemberCoachData(): Promise<
   { ok: true; data: MemberCoachInitialData } | { error: string }
 > {
-  if (!MEMBER_AI_COACH_ENABLED) {
-    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
+  const auth = await requireProMember();
+  if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
+  if (await memberCoachClosed(auth.supabase, auth.user.id)) {
+    return { error: COACH_COMING_SOON };
   }
 
-  const auth = await requireProMember();
-  if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
-
   try {
-    const programsCatalog = await fetchProgramsCatalog(auth.supabase);
-    return { ok: true, data: { programsCatalog } };
+    const [programsCatalog, equipmentResult, aiContext] = await Promise.all([
+      fetchProgramsCatalog(auth.supabase),
+      auth.supabase.from("equipment").select("title").order("title", { ascending: true }),
+      loadProgramAiContext(auth.supabase),
+    ]);
+    const equipmentOptions = (equipmentResult.data ?? [])
+      .map((row) => (typeof row.title === "string" ? row.title.trim() : ""))
+      .filter((title) => title.length > 0);
+    const swapExercises = aiContext.exercises
+      .filter((exercise) => exercise.status === "published")
+      .map((exercise) => ({
+        id: exercise.id,
+        title: exercise.title,
+        categories: exercise.categoryTypes,
+        imageUrl: exercise.imageUrl,
+        videoUrl: exercise.videoUrl,
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+    return { ok: true, data: { programsCatalog, equipmentOptions, swapExercises } };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not load coach data." };
   }
@@ -127,13 +155,14 @@ export async function sendMemberCoachMessage(input: {
   history: ChatHistoryMessage[];
   userMessage: string;
   programsCatalog: ProgramCatalogRow[];
+  /** Form submissions always build a program from the answers. */
+  creationKind?: "program" | null;
 }): Promise<SendMemberCoachMessageResult> {
-  if (!MEMBER_AI_COACH_ENABLED) {
-    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
-  }
-
   const auth = await requireProMember();
   if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
+  if (await memberCoachClosed(auth.supabase, auth.user.id)) {
+    return { error: COACH_COMING_SOON };
+  }
 
   const userMessage = input.userMessage.trim();
   if (!userMessage) return { error: "Message cannot be empty." };
@@ -169,14 +198,17 @@ export async function sendMemberCoachMessage(input: {
     }
     userTexts.push(userMessage);
 
-    const wantsProgram = coachWantsProgram(userTexts);
-    const wantsRehab = userTexts.some((t) => coachWantsRehabProgram(t));
-    const wantsRecommend =
-      coachShouldRecommendCatalogOnly(userMessage) || wantsProgram || wantsRehab;
-    const wantsWorkoutCreate =
-      !wantsRecommend &&
-      (userTexts.some((t) => coachShouldCreateNew(t)) ||
-        shouldRunConsultation(input.history, userMessage));
+    const formProgram = input.creationKind === "program";
+    const wantsProgram = formProgram || coachWantsProgram(userTexts);
+    const wantsRehab = formProgram ? false : userTexts.some((t) => coachWantsRehabProgram(t));
+    const wantsRecommend = formProgram
+      ? false
+      : coachShouldRecommendCatalogOnly(userMessage) || wantsProgram || wantsRehab;
+    const wantsWorkoutCreate = formProgram
+      ? false
+      : !wantsRecommend &&
+        (userTexts.some((t) => coachShouldCreateNew(t)) ||
+          shouldRunConsultation(input.history, userMessage));
 
     const consultation = buildConsultationState(
       input.history,
@@ -195,6 +227,9 @@ export async function sendMemberCoachMessage(input: {
       if (topic) {
         const prompt = buildConsultationPrompt(topic, locations, equipmentLibrary, wantsProgram);
         const text = buildConsultationResponseText(consultation, topic, prompt.question, locations);
+        if (formProgram) {
+          return { error: text || "Add the missing answer and try again." };
+        }
         return { type: "consultation", text, prompt };
       }
     }
@@ -217,7 +252,7 @@ export async function sendMemberCoachMessage(input: {
     const levelCap = enforcementOptions.trainingLevel ?? "beginner";
 
     const generationExercises = filterCatalogByTrainingLevel(
-      wantsWorkoutCreate && consultationComplete
+      consultationComplete && (wantsWorkoutCreate || formProgram)
         ? exercisesForLocation(publishedExercises, consultation.locationSlug, locations)
         : publishedExercises,
       levelCap
@@ -265,6 +300,7 @@ export async function sendMemberCoachMessage(input: {
       toolsEnabled:
         !inCreateFlow ||
         (wantsWorkoutCreate && consultationComplete) ||
+        (wantsProgram && consultationComplete) ||
         (wantsRecommend && (!wantsProgram || consultationComplete)),
       audience: "member" as const,
       allowedTools: MEMBER_TOOLS,
@@ -297,7 +333,7 @@ export async function sendMemberCoachMessage(input: {
           ]
         : fullHistory;
 
-    let result = await chatWithAiCoach({
+    let result = await chatWithAiCoachOpenAI({
       history: forcedTool != null ? generationHistory : fullHistory,
       ...coachParams,
       consultationBrief: generationBrief,
@@ -310,7 +346,7 @@ export async function sendMemberCoachMessage(input: {
       result.type === "functionCall" &&
       (result.name === "generate_workout" || result.name === "recommend_programs")
     ) {
-      result = await chatWithAiCoach({
+      result = await chatWithAiCoachOpenAI({
         history: fullHistory,
         ...coachParams,
         toolsEnabled: false,
@@ -319,7 +355,7 @@ export async function sendMemberCoachMessage(input: {
     }
 
     if (forcedTool != null && result.type === "text") {
-      result = await chatWithAiCoach({
+      result = await chatWithAiCoachOpenAI({
         history: [
           ...generationHistory,
           { role: "model", parts: [{ text: result.text }] },
@@ -397,12 +433,11 @@ export async function saveMemberCoachWorkout(
   proposal: WorkoutProposal,
   options?: { locationSlug?: string }
 ): Promise<SaveMemberCoachWorkoutResult> {
-  if (!MEMBER_AI_COACH_ENABLED) {
-    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
-  }
-
   const auth = await requireProMember();
   if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
+  if (await memberCoachClosed(auth.supabase, auth.user.id)) {
+    return { error: COACH_COMING_SOON };
+  }
 
   try {
     const ctx = await loadProgramAiContext(auth.supabase);
@@ -444,12 +479,11 @@ export async function saveMemberCoachProgram(
   proposal: ProgramProposal,
   options?: { locationSlug?: string }
 ): Promise<SaveMemberCoachProgramResult> {
-  if (!MEMBER_AI_COACH_ENABLED) {
-    return { error: "AI Coach is coming soon. Browse our programs in the meantime." };
-  }
-
   const auth = await requireProMember();
   if (auth.error || !auth.supabase || !auth.user) return { error: auth.error ?? "Unauthorized" };
+  if (await memberCoachClosed(auth.supabase, auth.user.id)) {
+    return { error: COACH_COMING_SOON };
+  }
 
   try {
     const ctx = await loadProgramAiContext(auth.supabase);

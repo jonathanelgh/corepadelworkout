@@ -24,6 +24,8 @@ export type ExerciseCatalogEntry = {
   bodyParts: string[];
   equipment: string[];
   bothSides: boolean;
+  imageUrl: string | null;
+  videoUrl: string | null;
 };
 
 export type ProgramAiContext = {
@@ -166,6 +168,8 @@ export async function loadProgramAiContext(supabase: SupabaseClient): Promise<Pr
       bodyParts: item.bodyPartIds.map((id) => bodyPartName.get(id)).filter(Boolean) as string[],
       equipment: item.equipmentIds.map((id) => equipmentName.get(id)).filter(Boolean) as string[],
       bothSides: item.bothSides,
+      imageUrl: item.image_url?.trim() || null,
+      videoUrl: item.video_url?.trim() || null,
     };
   });
 

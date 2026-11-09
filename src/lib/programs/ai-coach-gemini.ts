@@ -643,8 +643,7 @@ export async function chatWithAiCoach(params: {
               },
             }
           : {}),
-        temperature: params.forcedTool ? 0.4 : undefined,
-        max_tokens: turnToolsEnabled ? 4096 : 2048,
+        max_completion_tokens: turnToolsEnabled ? 4096 : 2048,
       }),
     });
 

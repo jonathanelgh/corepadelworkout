@@ -132,6 +132,11 @@ export async function sendAiCoachMessage(input: {
   trainingLevel?: string | null;
   /** LLM provider for generation / chat. Defaults to Gemini. */
   provider?: AiCoachProvider | null;
+  /**
+   * Form submissions set this so a filled-in brief is built as a program or a
+   * single workout without chat intent detection.
+   */
+  creationKind?: "program" | "workout" | null;
 }): Promise<SendAiCoachMessageResult> {
   const auth = await requireAdmin();
   if (auth.error || !auth.supabase) return { error: auth.error ?? "Unauthorized" };
@@ -217,7 +222,9 @@ export async function sendAiCoachMessage(input: {
     }
     userTexts.push(userMessage);
 
-    const isProgram = coachWantsProgram(userTexts);
+    const isProgram = input.creationKind
+      ? input.creationKind === "program"
+      : coachWantsProgram(userTexts);
     const consultation = buildConsultationState(
       input.history,
       userMessage,
@@ -229,10 +236,11 @@ export async function sendAiCoachMessage(input: {
       isProgram,
       equipmentLibrary
     );
-    const inCreateFlow =
-      !coachShouldRecommendCatalogOnly(userMessage) &&
-      (userTexts.some((t) => coachShouldCreateNew(t)) ||
-        shouldRunConsultation(input.history, userMessage));
+    const inCreateFlow = input.creationKind
+      ? true
+      : !coachShouldRecommendCatalogOnly(userMessage) &&
+        (userTexts.some((t) => coachShouldCreateNew(t)) ||
+          shouldRunConsultation(input.history, userMessage));
 
     if (inCreateFlow && !consultationComplete) {
       const topic = getCurrentConsultationTopic(consultation, isProgram);

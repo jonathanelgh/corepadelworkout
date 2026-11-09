@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Play, X } from "lucide-react";
 import { resolveVideoPlayer } from "@/lib/media/resolve-video-player";
@@ -8,7 +8,15 @@ import { ExerciseVideoFrame } from "@/components/programs/exercise-video-frame";
 
 const MODAL_Z = 10050;
 
-export function ExerciseVideoButton({ videoUrl, label }: { videoUrl: string; label: string }) {
+export function ExerciseVideoButton({
+  videoUrl,
+  label,
+  children,
+}: {
+  videoUrl: string;
+  label: string;
+  children?: ReactNode;
+}) {
   const trimmed = videoUrl?.trim();
   const player = useMemo(
     () => (trimmed ? resolveVideoPlayer(trimmed, { embedAutoplay: true }) : null),
@@ -38,10 +46,19 @@ export function ExerciseVideoButton({ videoUrl, label }: { videoUrl: string; lab
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+        className={
+          children
+            ? "relative block shrink-0 text-left"
+            : "mt-3 inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+        }
+        aria-label={children ? `Play ${label}` : undefined}
       >
-        <Play className="h-4 w-4 fill-current" />
-        Watch demo
+        {children ?? (
+          <>
+            <Play className="h-4 w-4 fill-current" />
+            Watch demo
+          </>
+        )}
       </button>
       {open &&
         typeof document !== "undefined" &&
