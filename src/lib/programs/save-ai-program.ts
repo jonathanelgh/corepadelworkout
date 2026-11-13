@@ -88,6 +88,8 @@ export async function saveAiProgram(
     sessionsPerWeek?: number;
     minutesPerSession?: number;
     trainingLevel?: import("@/lib/member/onboarding").OnboardingLevel | null;
+    /** When set, program is owned by this member (AI coach custom plan). */
+    createdByUserId?: string | null;
   }
 ): Promise<SaveAiProgramResult> {
   const status = options?.status ?? "draft";
@@ -186,11 +188,17 @@ export async function saveAiProgram(
       sessions_per_week: sessionsPerWeek,
       duration_weeks: durationWeeks,
       program_format: "training_plan",
+      ...(options?.createdByUserId ? { created_by_user_id: options.createdByUserId } : {}),
     })
     .select("id, slug, title")
     .single();
 
   if (programErr || !program) {
+    if (programErr?.message?.includes("created_by_user_id")) {
+      throw new Error(
+        "Saving member programs requires a database update. Run supabase db push or contact support."
+      );
+    }
     throw new Error(programErr?.message ?? "Could not create program.");
   }
 

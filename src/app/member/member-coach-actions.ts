@@ -502,6 +502,7 @@ export async function saveMemberCoachProgram(
       durationWeeks: fixed.duration_weeks,
       sessionsPerWeek: fixed.sessions_per_week,
       minutesPerSession: fixed.minutes_per_session,
+      createdByUserId: auth.user.id,
     });
 
     const { sessions } = await fetchProgramSessionsForProgram(auth.supabase, saved.programId);
