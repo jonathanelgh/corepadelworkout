@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Check,
@@ -623,6 +624,7 @@ export function AiCoachClient({
   members: MemberPickerOption[];
   equipmentOptions: string[];
 }) {
+  const router = useRouter();
   const [catalog] = useState(initialCatalog);
   const [targetUserId, setTargetUserId] = useState("");
   const [trainingLevel, setTrainingLevel] = useState("");
@@ -840,13 +842,14 @@ export function AiCoachClient({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
-          <Link
-            href="/admin/programs"
+          <button
+            type="button"
+            onClick={() => router.back()}
             className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
             Programs
-          </Link>
+          </button>
           <span className="text-gray-300">/</span>
           <h1 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
             <Sparkles className="h-5 w-5 text-[#9dcc00]" />
