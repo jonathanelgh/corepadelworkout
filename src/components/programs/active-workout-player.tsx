@@ -1212,6 +1212,7 @@ export function ActiveWorkoutPlayer({
           programTitle={programTitle}
           sessionName={sessionName}
           detailHref={detailHref}
+          playHref={`/programs/${programSlug}/play?session=${encodeURIComponent(sessionId)}`}
           nextSessionHref={usesProgramProgress(programFormat) ? nextSessionHref : null}
           nextSessionLabel={nextSessionLabel}
           programComplete={programComplete}

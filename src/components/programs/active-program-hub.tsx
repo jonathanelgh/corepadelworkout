@@ -205,7 +205,7 @@ export function ActiveProgramHub({
           {tab === "schedule" ? (
             <ProgramSchedulePanel programSlug={programSlug} progress={progress} embedded />
           ) : (
-            <ProgramTrainingLogPanel progress={progress} />
+            <ProgramTrainingLogPanel progress={progress} programSlug={programSlug} />
           )}
         </section>
 

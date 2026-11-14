@@ -7,6 +7,7 @@ export function WorkoutCompletionOverlay({
   programTitle,
   sessionName,
   detailHref,
+  playHref,
   nextSessionHref,
   nextSessionLabel,
   programComplete,
@@ -15,6 +16,7 @@ export function WorkoutCompletionOverlay({
   programTitle: string;
   sessionName?: string | null;
   detailHref: string;
+  playHref: string;
   nextSessionHref?: string | null;
   nextSessionLabel?: string | null;
   programComplete?: boolean;
@@ -67,12 +69,21 @@ export function WorkoutCompletionOverlay({
           )}
           <button
             type="button"
-            onClick={() => router.push(detailHref)}
+            onClick={() => {
+              window.location.assign(playHref);
+            }}
             className={`w-full rounded-xl py-3.5 text-sm font-semibold transition ${
               !programComplete && nextSessionHref && !isSingleWorkout
                 ? "border border-gray-200 text-gray-800 hover:bg-gray-50"
                 : "bg-[#ccff00] text-black hover:bg-[#b3e600]"
             }`}
+          >
+            Do again
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(detailHref)}
+            className="w-full rounded-xl border border-gray-200 py-3.5 text-sm font-semibold text-gray-800 transition hover:bg-gray-50"
           >
             {isSingleWorkout ? "Done" : programComplete ? "View program" : "Back to training plan"}
           </button>

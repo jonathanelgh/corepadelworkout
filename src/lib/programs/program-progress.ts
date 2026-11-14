@@ -382,16 +382,21 @@ export async function startProgramSession(
     .maybeSingle();
 
   if (existing) {
-    // Resume or restart: never auto-complete. Only clear completed_at if the day
-    // was never truly finished (null) — keep real completions intact.
-    const patch: { started_at: string; completed_at?: null } = { started_at: now };
-    if (!existing.completed_at) {
-      patch.completed_at = null;
-    }
-    const { error: updateErr } = await supabase
+    // A new attempt, including after a previous finish. Clear the old completion
+    // so progress can save and the workout starts from the first exercise.
+    let update = supabase
       .from("program_session_completions")
-      .update(patch)
+      .update({
+        started_at: now,
+        completed_at: null,
+        resume_step_index: 0,
+      })
       .eq("id", existing.id);
+    // Don't wipe a completion that landed after this attempt started.
+    if (existing.completed_at) {
+      update = update.eq("completed_at", existing.completed_at);
+    }
+    const { error: updateErr } = await update;
     if (updateErr) return { error: updateErr.message };
   } else {
     const { error: insertErr } = await supabase.from("program_session_completions").insert({

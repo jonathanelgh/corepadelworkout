@@ -82,7 +82,7 @@ function SessionRow({
           }`}
         >
           {!done && <Play className="h-3.5 w-3.5" />}
-          {done ? "View day" : inProgress ? "Continue" : "Start"}
+          {done ? "Do again" : inProgress ? "Continue" : "Start"}
         </span>
       </Link>
     </li>

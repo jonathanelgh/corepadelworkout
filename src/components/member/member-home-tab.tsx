@@ -176,9 +176,10 @@ export function MemberHomeTab({
                         {p.isComplete && (
                           <Link
                             href={p.trainingHref}
-                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 sm:w-auto"
+                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
                           >
-                            View training log
+                            <Play className="h-4 w-4" />
+                            Train again
                           </Link>
                         )}
                       </div>

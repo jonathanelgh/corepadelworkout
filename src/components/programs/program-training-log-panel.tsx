@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CalendarCheck, Clock } from "lucide-react";
 import {
   buildProgramTrainingLog,
@@ -7,11 +8,14 @@ import {
   formatTrainingTimestamp,
   type ProgramProgressView,
 } from "@/lib/programs/program-progress";
+import { programDayHref } from "@/lib/programs/program-routes";
 
 export function ProgramTrainingLogPanel({
   progress,
+  programSlug,
 }: {
   progress: ProgramProgressView;
+  programSlug: string;
 }) {
   const entries = buildProgramTrainingLog(progress);
 
@@ -46,10 +50,11 @@ export function ProgramTrainingLogPanel({
             const inProgress = Boolean(entry.startedAt && !entry.completedAt);
 
             return (
-              <li
-                key={entry.sessionId}
-                className="rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-4"
-              >
+              <li key={entry.sessionId}>
+                <Link
+                  href={programDayHref(programSlug, entry.sessionId)}
+                  className="block rounded-xl border border-zinc-200 bg-zinc-50/50 px-4 py-4 transition hover:border-zinc-300 hover:bg-white"
+                >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     {entry.weekName && (
@@ -95,6 +100,10 @@ export function ProgramTrainingLogPanel({
                     </div>
                   )}
                 </dl>
+                <p className="mt-3 text-sm font-semibold text-zinc-900">
+                  {inProgress ? "Continue" : "Do again"}
+                </p>
+                </Link>
               </li>
             );
           })}
