@@ -6,7 +6,7 @@ import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { getIsAdminUser } from "@/utils/supabase/is-admin";
 import { loadMemberSubscriptionStatus, type MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
 import { mapProgramRowsToCards, type ProgramRow } from "@/lib/programs/map-program-cards";
-import { loadUserActivePrograms, loadQuickWorkouts, type ActiveProgramSummary, type QuickWorkoutSummary } from "@/lib/programs/program-progress";
+import { loadMemberPrograms, loadQuickWorkouts, type ActiveProgramSummary, type QuickWorkoutSummary } from "@/lib/programs/program-progress";
 
 function programsFromEnrollments(
   rows: { programs: ProgramRow | ProgramRow[] | null }[] | null | undefined
@@ -20,24 +20,6 @@ function programsFromEnrollments(
   }
   return out;
 }
-
-export type MemberHubHomeProgram = {
-  slug: string;
-  title: string;
-  description: string;
-  image: string;
-  categoryName: string | null;
-  difficultyName: string | null;
-  durationLabel: string;
-  isFree: boolean;
-};
-
-export type MemberHubBlogPost = {
-  slug: string;
-  title: string;
-  excerpt: string | null;
-  published_at: string | null;
-};
 
 export type MemberHubProfile = {
   full_name: string | null;
@@ -63,10 +45,6 @@ export type MemberHubData = {
   subscription: MemberSubscriptionStatus;
   activePrograms: ActiveProgramSummary[];
   quickWorkouts: QuickWorkoutSummary[];
-  homePrograms: MemberHubHomeProgram[];
-  homeProgramsError: string | null;
-  blogPosts: MemberHubBlogPost[];
-  blogPostsError: string | null;
   allPrograms: ProgramCard[];
   myPrograms: ProgramCard[];
   categoryOptionsAll: string[];
@@ -84,8 +62,6 @@ export async function loadMemberHubData(
     hasActivePro,
     isAdmin,
     subscription,
-    homeProgramsRes,
-    blogRes,
     programsRes,
     categoriesRes,
     enrollRes,
@@ -94,35 +70,6 @@ export async function loadMemberHubData(
     getHasActivePro(supabase, userId),
     getIsAdminUser(supabase, userId),
     loadMemberSubscriptionStatus(supabase, userId),
-    supabase
-      .from("programs")
-      .select(
-        `
-        slug,
-        title,
-        description,
-        cover_image_url,
-        duration_weeks,
-        is_free,
-        program_format,
-        program_categories (
-          sort_order,
-          categories ( name )
-        ),
-        difficulty_levels ( name )
-      `
-      )
-      .eq("status", "published")
-      .eq("program_format", "training_plan")
-      .order("updated_at", { ascending: false })
-      .limit(6),
-    supabase
-      .from("blog_posts")
-      .select("slug, title, excerpt, published_at")
-      .eq("status", "published")
-      .lte("published_at", new Date().toISOString())
-      .order("published_at", { ascending: false })
-      .limit(3),
     supabase
       .from("programs")
       .select(
@@ -239,26 +186,8 @@ export async function loadMemberHubData(
   const painsStr =
     pains.length > 0 ? pains.map((p) => painLabels[p] ?? p).join(", ") : "—";
 
-  const activePrograms = await loadUserActivePrograms(supabase, userId, profile);
+  const activePrograms = await loadMemberPrograms(supabase, userId, profile);
   const quickWorkouts = await loadQuickWorkouts(supabase, 6);
-
-  const homeProgramRows = (homeProgramsRes.data ?? []) as (ProgramRow & { is_free?: boolean | null })[];
-  const homePrograms: MemberHubHomeProgram[] = homeProgramRows
-    .map((row) => {
-      const card = mapProgramRowsToCards([row])[0];
-      if (!card) return null;
-      return {
-        slug: card.slug,
-        title: card.title,
-        description: card.description,
-        image: card.image,
-        categoryName: card.categoryName,
-        difficultyName: card.difficultyName,
-        durationLabel: card.durationLabel,
-        isFree: Boolean(row.is_free),
-      };
-    })
-    .filter((p): p is MemberHubHomeProgram => p != null);
 
   return {
     hasActivePro,
@@ -266,10 +195,6 @@ export async function loadMemberHubData(
     subscription,
     activePrograms,
     quickWorkouts,
-    homePrograms,
-    homeProgramsError: homeProgramsRes.error?.message ?? null,
-    blogPosts: (blogRes.data ?? []) as MemberHubBlogPost[],
-    blogPostsError: blogRes.error?.message ?? null,
     allPrograms,
     myPrograms,
     categoryOptionsAll,

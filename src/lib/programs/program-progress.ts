@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getIsAdminUser } from "@/utils/supabase/is-admin";
-import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
+import { parseProgramFormat, usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import {
   fetchProgramSessionsForProgram,
@@ -8,7 +8,7 @@ import {
   type ProgramSessionRow,
   type ProgramWeekRow,
 } from "@/lib/programs/program-sessions";
-import { programDayHref, programTrainingHref } from "@/lib/programs/program-routes";
+import { programCatalogHref, programDayHref, programTrainingHref } from "@/lib/programs/program-routes";
 import { sessionDisplayLabel } from "@/lib/programs/program-sessions";
 
 export type SessionWithCompletion = ProgramSessionRow & {
@@ -626,6 +626,11 @@ export type ActiveProgramSummary = {
   trainingHref: string;
   isComplete: boolean;
   startedAt: string | null;
+  programFormat: ProgramFormat;
+  /** True when this member created the program with the AI coach. */
+  generated: boolean;
+  /** False for a generated program that has not been started yet. */
+  started: boolean;
 };
 
 export type QuickWorkoutSummary = {
@@ -722,10 +727,108 @@ export async function loadUserActivePrograms(
       trainingHref: programTrainingHref(prog.slug),
       isComplete: progress.isComplete,
       startedAt: (run.started_at as string | undefined) ?? progress.startedAt,
+      programFormat: parseProgramFormat(prog.program_format),
+      generated: false,
+      started: true,
     });
   }
 
   return summaries;
+}
+
+type GeneratedProgramRow = {
+  id: string;
+  slug: string;
+  title: string;
+  cover_image_url: string | null;
+  status: string;
+  program_format: string | null;
+  created_at: string | null;
+};
+
+/** Started programs, plus AI programs this member created even if they never started them. */
+export async function loadMemberPrograms(
+  supabase: SupabaseClient,
+  userId: string,
+  profile?: ProfileEnv | null
+): Promise<ActiveProgramSummary[]> {
+  const [started, generatedRes] = await Promise.all([
+    loadUserActivePrograms(supabase, userId, profile),
+    supabase
+      .from("programs")
+      .select("id, slug, title, cover_image_url, status, program_format, created_at")
+      .eq("created_by_user_id", userId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const generated = ((generatedRes.data ?? []) as GeneratedProgramRow[]).filter(
+    (row) => row.status === "published" || row.status === "draft"
+  );
+  const generatedIds = new Set(generated.map((row) => row.id));
+  const startedIds = new Set(started.map((row) => row.programId));
+  const markedStarted = started.map((row) =>
+    generatedIds.has(row.programId) ? { ...row, generated: true } : row
+  );
+
+  const unstarted = generated.filter((row) => !startedIds.has(row.id) && row.slug);
+  const playByProgram = await firstPlaySessionByProgram(
+    supabase,
+    unstarted.filter((row) => parseProgramFormat(row.program_format) === "single_workout").map((row) => row.id)
+  );
+
+  const generatedCards: ActiveProgramSummary[] = unstarted.map((row) => {
+    const format = parseProgramFormat(row.program_format);
+    const sessionId = playByProgram.get(row.id);
+    const href =
+      format === "single_workout" && sessionId
+        ? playHrefForSession(row.slug, sessionId)
+        : programCatalogHref(row.slug);
+    return {
+      programId: row.id,
+      slug: row.slug,
+      title: row.title,
+      coverImageUrl: row.cover_image_url?.trim() || null,
+      completedCount: 0,
+      totalSessions: 0,
+      nextSessionName: null,
+      nextSessionHref: href,
+      nextSessionInProgress: false,
+      trainingHref: href,
+      isComplete: false,
+      startedAt: null,
+      programFormat: format,
+      generated: true,
+      started: false,
+    };
+  });
+
+  return [...generatedCards, ...markedStarted];
+}
+
+async function firstPlaySessionByProgram(
+  supabase: SupabaseClient,
+  programIds: string[]
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (programIds.length === 0) return out;
+
+  const { data } = await supabase
+    .from("program_location_tracks")
+    .select("program_id, sort_order, program_sessions ( id, sort_order )")
+    .in("program_id", programIds)
+    .order("sort_order", { ascending: true });
+
+  type SessionNest = { id: string; sort_order: number };
+  for (const track of data ?? []) {
+    const programId = track.program_id as string;
+    if (out.has(programId)) continue;
+    const raw = track.program_sessions as SessionNest | SessionNest[] | null;
+    const sessions = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    sessions.sort((a, b) => a.sort_order - b.sort_order);
+    const first = sessions[0];
+    if (first?.id) out.set(programId, first.id);
+  }
+  return out;
 }
 
 export async function loadQuickWorkouts(

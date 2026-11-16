@@ -1,14 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Crown, Newspaper, Play } from "lucide-react";
+import { ArrowRight, Crown, Play } from "lucide-react";
 import type { MemberSubscriptionStatus } from "@/lib/member/load-subscription-status";
-import type {
-  ActiveProgramSummary,
-  MemberHubBlogPost,
-  MemberHubHomeProgram,
-  QuickWorkoutSummary,
-} from "@/lib/member/load-member-hub-data";
+import type { ActiveProgramSummary, QuickWorkoutSummary } from "@/lib/member/load-member-hub-data";
 import { MemberFeedbackCard } from "@/components/member/member-feedback-card";
 import { NavPendingCover } from "@/components/programs/nav-pending-cover";
 
@@ -22,32 +17,143 @@ function formatRenewalDate(iso: string | null): string | null {
 }
 
 export function MemberHomeTab({
+  firstName,
   hasActivePro,
   subscription,
   activePrograms,
   quickWorkouts,
-  programs,
-  programsError,
-  posts,
-  postsError,
-  onBrowseWorkouts,
 }: {
+  firstName: string | null;
   hasActivePro: boolean;
   subscription: MemberSubscriptionStatus;
   activePrograms: ActiveProgramSummary[];
   quickWorkouts: QuickWorkoutSummary[];
-  programs: MemberHubHomeProgram[];
-  programsError: string | null;
-  posts: MemberHubBlogPost[];
-  postsError: string | null;
-  onBrowseWorkouts: () => void;
 }) {
+  const greeting = firstName ? `Hi, ${firstName}` : "Hi";
+
   return (
     <div className="space-y-10">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-600">Your training hub — programs, updates, and membership.</p>
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">{greeting}</h1>
+
+      {activePrograms.length > 0 && (
+        <section className="min-w-0">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-zinc-900">My programs</h2>
+            <p className="text-sm text-zinc-500">
+              Programs you&apos;ve started, and ones your coach made for you.
+            </p>
+          </div>
+          <ul className="-mx-6 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-1 [scrollbar-width:none] md:mx-0 md:flex-col md:scroll-px-0 md:overflow-visible md:px-0 md:pb-0 md:snap-none [&::-webkit-scrollbar]:hidden">
+            {activePrograms.map((p) => {
+              const pct =
+                p.totalSessions > 0 ? Math.round((p.completedCount / p.totalSessions) * 100) : 0;
+              const img = p.coverImageUrl?.trim() || COVER_FALLBACK;
+              const startLabel =
+                p.programFormat === "single_workout" ? "Start workout" : "Start program";
+              return (
+                <li key={p.programId} className="flex w-[min(78vw,20rem)] shrink-0 snap-start md:w-auto">
+                  <div className="flex w-full flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm md:flex-row">
+                      <div className="relative aspect-16/10 w-full shrink-0 overflow-hidden bg-zinc-100 md:aspect-auto md:h-auto md:w-36">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt="" className="h-full w-full object-cover" />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                href={p.trainingHref}
+                                className="font-semibold text-zinc-900 hover:text-emerald-800"
+                              >
+                                {p.title}
+                              </Link>
+                              {p.generated && (
+                                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
+                                  Coach
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-sm text-zinc-600">
+                              {!p.started
+                                ? "Not started yet"
+                                : p.isComplete
+                                  ? "Program complete"
+                                  : p.nextSessionInProgress && p.nextSessionName
+                                    ? `In progress · ${p.nextSessionName}`
+                                    : p.nextSessionName
+                                      ? `Next up · ${p.nextSessionName}`
+                                      : "Continue your plan"}
+                            </p>
+                          </div>
+                          {p.started && (
+                            <span className="text-xs font-medium text-zinc-500">
+                              {p.completedCount}/{p.totalSessions} days
+                            </span>
+                          )}
+                        </div>
+                        {p.started && (
+                          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                            <div
+                              className="h-full rounded-full bg-[#ccff00]"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        )}
+                        {!p.started && (
+                          <Link
+                            href={p.trainingHref}
+                            className="relative mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 md:w-auto"
+                          >
+                            <NavPendingCover label="Opening program…" />
+                            <Play className="h-4 w-4" />
+                            {startLabel}
+                          </Link>
+                        )}
+                        {p.started && !p.isComplete && (
+                          <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
+                            <Link
+                              href={p.nextSessionHref ?? p.trainingHref}
+                              className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 md:w-auto"
+                            >
+                              <NavPendingCover
+                                label={
+                                  p.nextSessionInProgress ? "Opening workout…" : "Loading day…"
+                                }
+                              />
+                              <Play className="h-4 w-4" />
+                              {p.nextSessionInProgress
+                                ? "Continue day"
+                                : p.nextSessionHref
+                                  ? "Start next day"
+                                  : "Open program"}
+                            </Link>
+                            {p.nextSessionHref && (
+                              <Link
+                                href={p.trainingHref}
+                                className="inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900 md:w-auto"
+                              >
+                                View plan
+                              </Link>
+                            )}
+                          </div>
+                        )}
+                        {p.started && p.isComplete && (
+                          <Link
+                            href={p.trainingHref}
+                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 md:w-auto"
+                          >
+                            <Play className="h-4 w-4" />
+                            Train again
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {!hasActivePro && (
         <section className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-linear-to-br from-amber-50 via-white to-lime-50 p-6 shadow-sm sm:p-8">
@@ -95,103 +201,6 @@ export function MemberHomeTab({
         </div>
       )}
 
-      <MemberFeedbackCard />
-
-      {activePrograms.length > 0 && (
-        <section>
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-zinc-900">Your training</h2>
-            <p className="text-sm text-zinc-500">Programs you&apos;ve started — pick up where you left off</p>
-          </div>
-          <ul className="space-y-3">
-            {activePrograms.map((p) => {
-              const pct =
-                p.totalSessions > 0 ? Math.round((p.completedCount / p.totalSessions) * 100) : 0;
-              const img = p.coverImageUrl?.trim() || COVER_FALLBACK;
-              return (
-                <li key={p.programId}>
-                  <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-                    <div className="flex flex-col sm:flex-row">
-                      <div className="relative aspect-16/10 w-full shrink-0 overflow-hidden bg-zinc-100 sm:aspect-auto sm:h-auto sm:w-36">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt="" className="h-full w-full object-cover" />
-                      </div>
-                      <div className="flex min-w-0 flex-1 flex-col p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <Link
-                              href={p.trainingHref}
-                              className="font-semibold text-zinc-900 hover:text-emerald-800"
-                            >
-                              {p.title}
-                            </Link>
-                            <p className="mt-0.5 text-sm text-zinc-600">
-                              {p.isComplete
-                                ? "Program complete"
-                                : p.nextSessionInProgress && p.nextSessionName
-                                  ? `In progress · ${p.nextSessionName}`
-                                  : p.nextSessionName
-                                    ? `Next up · ${p.nextSessionName}`
-                                    : "Continue your plan"}
-                            </p>
-                          </div>
-                          <span className="text-xs font-medium text-zinc-500">
-                            {p.completedCount}/{p.totalSessions} days
-                          </span>
-                        </div>
-                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-                          <div
-                            className="h-full rounded-full bg-[#ccff00]"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        {!p.isComplete && (
-                          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Link
-                              href={p.nextSessionHref ?? p.trainingHref}
-                              className="relative inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
-                            >
-                              <NavPendingCover
-                                label={
-                                  p.nextSessionInProgress ? "Opening workout…" : "Loading day…"
-                                }
-                              />
-                              <Play className="h-4 w-4" />
-                              {p.nextSessionInProgress
-                                ? "Continue day"
-                                : p.nextSessionHref
-                                  ? "Start next day"
-                                  : "Open program"}
-                            </Link>
-                            {p.nextSessionHref && (
-                              <Link
-                                href={p.trainingHref}
-                                className="inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900 sm:w-auto"
-                              >
-                                View plan
-                              </Link>
-                            )}
-                          </div>
-                        )}
-                        {p.isComplete && (
-                          <Link
-                            href={p.trainingHref}
-                            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 sm:w-auto"
-                          >
-                            <Play className="h-4 w-4" />
-                            Train again
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
       {quickWorkouts.length > 0 && (
         <section>
           <div className="mb-4">
@@ -225,106 +234,7 @@ export function MemberHomeTab({
         </section>
       )}
 
-      <section>
-        <div className="mb-4 flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-900">Latest programs</h2>
-            <p className="text-sm text-zinc-500">Recently updated on the platform</p>
-          </div>
-          <button
-            type="button"
-            onClick={onBrowseWorkouts}
-            className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
-          >
-            Browse all
-          </button>
-        </div>
-        {programsError && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            Could not load programs.
-          </p>
-        )}
-        {!programsError && programs.length === 0 && (
-          <p className="text-sm text-zinc-500">No published programs yet.</p>
-        )}
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {programs.map((p) => (
-              <li key={p.slug}>
-                <Link
-                  href={`/programs/${p.slug}`}
-                  className="group flex h-full flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-300 hover:shadow-md"
-                >
-                  <div className="relative aspect-16/10 w-full overflow-hidden bg-zinc-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.image || COVER_FALLBACK}
-                      alt=""
-                      className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-                    />
-                  </div>
-                  <div className="flex flex-1 flex-col p-4">
-                    <h3 className="font-semibold text-zinc-900 group-hover:text-emerald-800">{p.title}</h3>
-                    {p.description && (
-                      <p className="mt-1 line-clamp-2 text-sm text-zinc-600">{p.description}</p>
-                    )}
-                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-3 text-xs text-zinc-500">
-                      {p.categoryName && (
-                        <span className="rounded-full bg-zinc-100 px-2 py-0.5">{p.categoryName}</span>
-                      )}
-                      {p.difficultyName && <span>{p.difficultyName}</span>}
-                      {p.durationLabel !== "—" && <span>{p.durationLabel}</span>}
-                      {p.isFree && (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
-                          Free
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <div className="mb-4 flex items-end justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Newspaper className="h-5 w-5 text-zinc-400" />
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-900">From the blog</h2>
-              <p className="text-sm text-zinc-500">Latest articles</p>
-            </div>
-          </div>
-          <Link href="/blog" className="text-sm font-medium text-emerald-700 hover:text-emerald-800">
-            All posts
-          </Link>
-        </div>
-        {postsError && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Blog could not be loaded. Run the latest database migration if{" "}
-            <code className="font-mono">blog_posts</code> is missing.
-          </p>
-        )}
-        {!postsError && posts.length === 0 && (
-          <p className="text-sm text-zinc-500">No posts published yet.</p>
-        )}
-        <ul className="space-y-3">
-          {posts.map((post) => (
-            <li key={post.slug}>
-              <Link
-                href={`/blog/${post.slug}`}
-                className="block rounded-xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
-              >
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                  {post.published_at ? post.published_at.slice(0, 10) : ""}
-                </p>
-                <h3 className="mt-1 font-semibold text-zinc-900">{post.title}</h3>
-                {post.excerpt && <p className="mt-1 line-clamp-2 text-sm text-zinc-600">{post.excerpt}</p>}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <MemberFeedbackCard />
     </div>
   );
 }

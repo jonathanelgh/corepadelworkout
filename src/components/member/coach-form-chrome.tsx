@@ -14,6 +14,8 @@ type CoachFormChromeContextValue = {
   chrome: CoachFormChromeState | null;
   setChrome: (next: CoachFormChromeState | null) => void;
   backRef: RefObject<(() => void) | null>;
+  /** Leave the form entirely, back to the screen that opened it. */
+  exitRef: RefObject<(() => void) | null>;
 };
 
 const CoachFormChromeContext = createContext<CoachFormChromeContextValue | null>(null);
@@ -21,6 +23,7 @@ const CoachFormChromeContext = createContext<CoachFormChromeContextValue | null>
 export function CoachFormChromeProvider({ children }: { children: ReactNode }) {
   const [chrome, setChromeState] = useState<CoachFormChromeState | null>(null);
   const backRef = useRef<(() => void) | null>(null);
+  const exitRef = useRef<(() => void) | null>(null);
 
   const setChrome = useCallback((next: CoachFormChromeState | null) => {
     setChromeState((prev) => {
@@ -40,7 +43,7 @@ export function CoachFormChromeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <CoachFormChromeContext.Provider value={{ chrome, setChrome, backRef }}>
+    <CoachFormChromeContext.Provider value={{ chrome, setChrome, backRef, exitRef }}>
       {children}
     </CoachFormChromeContext.Provider>
   );

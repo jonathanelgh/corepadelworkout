@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -46,6 +46,14 @@ function panelStyle(visible: boolean): React.CSSProperties {
   return { display: visible ? "block" : "none" };
 }
 
+function memberFirstName(fullName: string | null | undefined, email: string | null): string | null {
+  const fromName = fullName?.trim().split(/\s+/)[0];
+  if (fromName) return fromName;
+  const local = email?.split("@")[0]?.split(/[._-]/)[0]?.replace(/\d+/g, "");
+  if (!local) return null;
+  return local.charAt(0).toUpperCase() + local.slice(1).toLowerCase();
+}
+
 export function MemberAppShell(props: {
   userEmail: string | null;
   profile: Profile;
@@ -83,10 +91,12 @@ function MemberAppShellView({
   const router = useRouter();
   const isHub = Boolean(hubData);
   const [tab, setTab] = useState<MemberTab>(initialTab);
+  const previousTabRef = useRef<MemberTab>(initialTab === "custom" ? "home" : initialTab);
   const [menuOpen, setMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
   const displayName = profile?.full_name?.trim() || userEmail?.split("@")[0] || "Member";
+  const firstName = memberFirstName(profile?.full_name, userEmail);
   const uploaded = profile?.profile_image_url?.trim();
   const isCoachTab = false;
   const formChrome = useCoachFormChrome();
@@ -95,10 +105,24 @@ function MemberAppShellView({
 
   function selectTab(next: MemberTab) {
     if (isHub) {
-      setTab(next);
+      setTab((current) => {
+        if (current !== next && current !== "custom") previousTabRef.current = current;
+        return next;
+      });
       return;
     }
     router.push(tabToHref(next));
+  }
+
+  if (formChrome) {
+    formChrome.exitRef.current = () => {
+      if (!isHub) {
+        router.push("/member");
+        return;
+      }
+      const destination = previousTabRef.current === "custom" ? "home" : previousTabRef.current;
+      setTab(destination);
+    };
   }
 
   function isTabActive(item: MemberTab): boolean {
@@ -194,9 +218,6 @@ function MemberAppShellView({
             }`}
           >
             CORE<span className="text-emerald-600">PADEL</span>
-            <span className="ml-2 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-              Member
-            </span>
           </button>
 
           <nav className="hidden items-center gap-1 md:flex" aria-label="Member">
@@ -313,17 +334,13 @@ function MemberAppShellView({
       >
         {isHub && hubData ? (
           <>
-            <div style={panelStyle(tab === "home")} aria-hidden={tab !== "home"}>
+            <div className="min-w-0" style={panelStyle(tab === "home")} aria-hidden={tab !== "home"}>
               <MemberHomeTab
+                firstName={firstName}
                 hasActivePro={hubData.hasActivePro}
                 subscription={hubData.subscription}
                 activePrograms={hubData.activePrograms}
                 quickWorkouts={hubData.quickWorkouts}
-                programs={hubData.homePrograms}
-                programsError={hubData.homeProgramsError}
-                posts={hubData.blogPosts}
-                postsError={hubData.blogPostsError}
-                onBrowseWorkouts={() => setTab("workouts")}
               />
             </div>
             <div style={panelStyle(tab === "workouts")} aria-hidden={tab !== "workouts"}>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -45,6 +46,7 @@ import {
 import { useCoachFormChrome } from "@/components/member/coach-form-chrome";
 import { ExerciseVideoButton } from "@/app/programs/exercise-video-button";
 import { filterSwapExercises, type SwapExerciseOption } from "@/lib/programs/swap-exercises";
+import { programCatalogHref } from "@/lib/programs/program-routes";
 
 type LocationSlug = "gym" | "home" | "at-the-court";
 type StepId =
@@ -562,6 +564,7 @@ export function MemberCoachClient({
   hasActivePro: boolean;
   mobileFullscreen?: boolean;
 }) {
+  const router = useRouter();
   const [catalog, setCatalog] = useState<ProgramCatalogRow[]>([]);
   const [equipmentOptions, setEquipmentOptions] = useState<string[]>([]);
   const [swapExercises, setSwapExercises] = useState<SwapExerciseOption[]>([]);
@@ -634,7 +637,7 @@ export function MemberCoachClient({
       progress: ((stepIndex + 1) / steps.length) * 100,
       label: `${stepIndex + 1}/${steps.length}`,
       title: "",
-      canGoBack: stepIndex > 0,
+      canGoBack: true,
     });
   }, [phase, setFormChrome, stepIndex, steps.length, stepId, injuryArea]);
 
@@ -687,7 +690,10 @@ export function MemberCoachClient({
       return;
     }
     const prev = steps[stepIndex - 1];
-    if (!prev) return;
+    if (!prev) {
+      formChrome?.exitRef.current?.();
+      return;
+    }
     if (stepId === "injury") setHasInjury(false);
     setStepId(prev);
   }
@@ -739,7 +745,15 @@ export function MemberCoachClient({
     }
     setProposal(res.proposal);
     setOpenWeeks({});
-    setPhase("overview");
+    const saved = await saveMemberCoachProgram(res.proposal, {
+      locationSlug: res.proposal.location_slug || location || undefined,
+    });
+    if ("error" in saved) {
+      setError(saved.error);
+      setPhase("overview");
+      return;
+    }
+    router.push(programCatalogHref(saved.slug));
   }
 
   async function saveProgram() {
@@ -754,8 +768,9 @@ export function MemberCoachClient({
       setError(res.error);
       return;
     }
-    setSavedHref(res.playHref);
+    setSavedHref(programCatalogHref(res.slug));
     setSavedTitle(res.title);
+    router.push(programCatalogHref(res.slug));
   }
 
   const swapById = useMemo(
@@ -844,7 +859,7 @@ export function MemberCoachClient({
               href={savedHref}
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white"
             >
-              Start program
+              View program
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -999,9 +1014,8 @@ export function MemberCoachClient({
         <button
           type="button"
           onClick={goBack}
-          disabled={stepIndex === 0}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-800 disabled:opacity-40"
-          aria-label="Previous question"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-800"
+          aria-label={stepIndex === 0 ? "Close" : "Previous question"}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
