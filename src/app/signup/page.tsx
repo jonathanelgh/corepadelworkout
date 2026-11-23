@@ -51,16 +51,25 @@ function SignUpForm() {
   const [pending, setPending] = useState(false);
   const [verifySent, setVerifySent] = useState(false);
   const [offerMonths, setOfferMonths] = useState<number | null>(null);
+  const [offerError, setOfferError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!signupOfferCode || hasEarlyAccess) {
       setOfferMonths(null);
+      setOfferError(null);
       return;
     }
     let cancelled = false;
+    setOfferError(null);
     void previewSignupOffer(signupOfferCode).then((result) => {
       if (cancelled) return;
-      setOfferMonths(result.ok ? result.months : null);
+      if (result.ok) {
+        setOfferMonths(result.months);
+        setOfferError(null);
+      } else {
+        setOfferMonths(null);
+        setOfferError(result.error);
+      }
     });
     return () => {
       cancelled = true;
@@ -192,7 +201,13 @@ function SignUpForm() {
                 </div>
               )}
 
-              {hasSignupOffer && !verifySent && (
+              {hasSignupOffer && !verifySent && offerError && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {offerError}
+                </div>
+              )}
+
+              {hasSignupOffer && !verifySent && !offerError && (
                 <div className="mb-4 rounded-xl border border-[#ccff00]/50 bg-[#ccff00]/20 px-4 py-3 text-sm text-zinc-800">
                   Invite perk:{" "}
                   <strong className="font-semibold">
@@ -287,7 +302,7 @@ function SignUpForm() {
 
                     <button
                       type="submit"
-                      disabled={pending}
+                      disabled={pending || Boolean(offerError)}
                       className="w-full rounded-xl bg-zinc-900 py-3.5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-60"
                     >
                       {pending ? "Creating account…" : "Create account"}

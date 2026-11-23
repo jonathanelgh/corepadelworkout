@@ -77,21 +77,23 @@ export async function signUpWithPassword(input: {
     return { error: error.message };
   }
 
+  const createdUserId = data.session?.user?.id ?? data.user?.id ?? null;
+  if (createdUserId && signupOfferCode) {
+    const redeem = await redeemSignupOfferPro({
+      userId: createdUserId,
+      code: signupOfferCode,
+    });
+    if (!redeem.ok) {
+      return { error: redeem.error };
+    }
+  }
+
   if (data.session?.user) {
     if (earlyAccessToken && data.session.user.email) {
       const redeem = await redeemEarlyAccessPro({
         userId: data.session.user.id,
         email: data.session.user.email,
         token: earlyAccessToken,
-      });
-      if (!redeem.ok) {
-        return { error: redeem.error };
-      }
-    }
-    if (signupOfferCode) {
-      const redeem = await redeemSignupOfferPro({
-        userId: data.session.user.id,
-        code: signupOfferCode,
       });
       if (!redeem.ok) {
         return { error: redeem.error };
@@ -106,10 +108,10 @@ export async function signUpWithPassword(input: {
 
 export async function previewSignupOffer(
   codeRaw: string | null | undefined
-): Promise<{ ok: true; months: number; name: string } | { ok: false }> {
+): Promise<{ ok: true; months: number; name: string } | { ok: false; error: string }> {
   const code = normalizeSignupOfferCode(codeRaw);
-  if (!code) return { ok: false };
+  if (!code) return { ok: false, error: "This signup invite is invalid." };
   const valid = await validateSignupOfferCode(code);
-  if (!valid.ok) return { ok: false };
+  if (!valid.ok) return { ok: false, error: valid.error };
   return { ok: true, months: valid.months, name: valid.name };
 }

@@ -145,33 +145,34 @@ export async function redeemSignupOfferPro(input: {
     return { ok: true, months: validation.months };
   }
 
-  // Re-check cap under concurrency before insert.
-  const offer = await loadOfferByCode(validation.code);
-  if (offer?.max_redemptions != null) {
-    const used = await countRedemptions(offer.id);
-    if (used >= offer.max_redemptions) {
-      return { ok: false, error: "This signup offer has reached its redemption limit." };
-    }
-  }
-
-  const grant = await grantProSubscriptionToUser({
-    userId: input.userId,
-    months: validation.months,
-  });
-  if (!grant.ok) return grant;
-
+  // Claim the spot before granting Pro so a one-time code cannot be used twice.
   const { error: redeemErr } = await supabase.from("signup_offer_redemptions").insert({
     offer_id: validation.offerId,
     user_id: input.userId,
   });
 
   if (redeemErr) {
-    // Unique violation = already redeemed (race); treat as success.
     if (redeemErr.code === "23505") {
       await stopProConversionNurture(input.userId, "offer");
       return { ok: true, months: validation.months };
     }
+    if (/redemption limit/i.test(redeemErr.message)) {
+      return { ok: false, error: "This invite has already been used." };
+    }
     return { ok: false, error: redeemErr.message };
+  }
+
+  const grant = await grantProSubscriptionToUser({
+    userId: input.userId,
+    months: validation.months,
+  });
+  if (!grant.ok) {
+    await supabase
+      .from("signup_offer_redemptions")
+      .delete()
+      .eq("offer_id", validation.offerId)
+      .eq("user_id", input.userId);
+    return grant;
   }
 
   await stopProConversionNurture(input.userId, "offer");

@@ -48,6 +48,9 @@ scripts/gen_exercise_taxonomy_output.sql
 scripts/generate_exercise_taxonomy.sql
 scripts/mcp_merged*.sql
 
+# Printable one-time signup QR codes (contain live invite links)
+/exports/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
