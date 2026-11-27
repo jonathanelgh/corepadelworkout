@@ -108,7 +108,7 @@ export async function loadAffiliateDashboard(
         .limit(100),
       supabase
         .from("affiliate_payouts")
-        .select("id, amount_cents, currency, status, period_label, notes, paid_at, created_at")
+        .select("id, amount_cents, currency, status, period_label, notes, paid_at, created_at, report_id")
         .eq("affiliate_id", profile.id)
         .order("created_at", { ascending: false }),
     ]);
@@ -124,7 +124,13 @@ export async function loadAffiliateDashboard(
   const sameCurrency = sales.filter((row) => row.currency === currency);
   const salesCents = sameCurrency.reduce((sum, row) => sum + row.sale_amount_cents, 0);
   const commissionCents = sameCurrency.reduce((sum, row) => sum + row.commission_cents, 0);
-  const paidRows = (payouts.data ?? []) as AffiliatePayout[];
+  const payoutRows = (payouts.data ?? []) as Array<AffiliatePayout & { report_id: string | null }>;
+  const reportIds = [...new Set(payoutRows.map((row) => row.report_id).filter((id): id is string => Boolean(id)))];
+  const { data: reports } = reportIds.length
+    ? await supabase.from("affiliate_payout_reports").select("id, status").in("id", reportIds)
+    : { data: [] };
+  const lockedReports = new Set((reports ?? []).filter((row) => row.status === "locked").map((row) => row.id));
+  const paidRows = payoutRows.filter((row) => !row.report_id || lockedReports.has(row.report_id));
   const paidCents = paidRows
     .filter((row) => row.status === "paid" && row.currency === currency)
     .reduce((sum, row) => sum + row.amount_cents, 0);

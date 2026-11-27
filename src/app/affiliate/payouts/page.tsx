@@ -30,9 +30,19 @@ export default async function AffiliatePayoutsPage() {
                     {payout.notes ? `, ${payout.notes}` : ""}
                   </div>
                 </div>
-                <div className="text-right text-zinc-500">
-                  <div className="capitalize">{payout.status}</div>
-                  <div>{payout.paid_at ? formatWhen(payout.paid_at) : formatWhen(payout.created_at)}</div>
+                <div className="flex items-center gap-4 text-right text-zinc-500">
+                  <div>
+                    <div>{payout.status === "paid" ? "Paid" : "Waiting for payment"}</div>
+                    <div>{payout.paid_at ? formatWhen(payout.paid_at) : formatWhen(payout.created_at)}</div>
+                  </div>
+                  {payout.status === "paid" ? (
+                    <a
+                      href={`/affiliate/payouts/${payout.id}/receipt`}
+                      className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-950"
+                    >
+                      Download receipt
+                    </a>
+                  ) : null}
                 </div>
               </li>
             ))}
