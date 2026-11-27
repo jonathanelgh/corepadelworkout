@@ -62,7 +62,7 @@ const PRESCRIPTION_OPTIONS: { id: ExercisePrescriptionType; label: string; hint:
   {
     id: "sets_reps",
     label: "Sets & reps",
-    hint: "Go at your own pace — no timer.",
+    hint: "Go at your own pace. No timer.",
   },
   {
     id: "time",
@@ -1392,7 +1392,7 @@ export function CreateProgramForm({
       const msg = err instanceof Error ? err.message : "Something went wrong";
       setError(
         /unexpected response/i.test(msg)
-          ? "Save failed — the program may be too large for the old save path. Refresh and try again."
+          ? "Save failed. The program may be too large for the old save path. Refresh and try again."
           : msg
       );
     } finally {
@@ -2074,7 +2074,7 @@ export function CreateProgramForm({
                 <h2 className="text-lg font-semibold text-gray-900">Workout by location</h2>
                 <p className="text-sm text-gray-500 mt-1">
                   Add a block per place members can train (e.g. Gym vs Home). Each location has its own sessions
-                  and exercises—members pick where they work out and follow that track. Set{" "}
+                  and exercises. Members pick where they work out and follow that track. Set{" "}
                   <strong className="font-medium text-gray-700">Frequency</strong> on the Basic tab to group
                   sessions into weeks and duplicate whole weeks at once. Drag exercises by the grip handle to
                   reorder.
@@ -2555,7 +2555,7 @@ export function CreateProgramForm({
                                         </div>
                                         {entryBothSides && (
                                           <p className="mt-1 text-xs font-medium text-violet-700">
-                                            Both sides — enter total work time; the player splits it evenly (left → rest → right).
+                                            Both sides. Enter total work time; the player splits it evenly (left, rest, right).
                                           </p>
                                         )}
                                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2692,7 +2692,7 @@ export function CreateProgramForm({
                                               )
                                             }
                                             rows={2}
-                                            placeholder="Technique or setup only — never weekly load/reps increases"
+                                            placeholder="Technique or setup only. Never weekly load/reps increases"
                                             className="w-full resize-y rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
                                           />
                                         </div>
@@ -2711,7 +2711,7 @@ export function CreateProgramForm({
                                             {entry.sessionPhase === "main" ? " the main section" : " programs"}
                                             {entry.sessionPhase === "main" &&
                                             programMode === "time_only"
-                                              ? " — switch Section to Warm-up or Cool-down for a single Time block."
+                                              ? ". Switch Section to Warm-up or Cool-down for a single Time block."
                                               : "."}
                                           </p>
                                         ) : (
@@ -2772,7 +2772,7 @@ export function CreateProgramForm({
                                                     e.target.value
                                                   )
                                                 }
-                                                placeholder="—"
+                                                placeholder="-"
                                                 className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                                               />
                                             </div>
@@ -2798,7 +2798,7 @@ export function CreateProgramForm({
                                                     e.target.value
                                                   )
                                                 }
-                                                placeholder="—"
+                                                placeholder="-"
                                                 className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                                               />
                                             </div>
@@ -2858,7 +2858,7 @@ export function CreateProgramForm({
                                                       e.target.value
                                                     )
                                                   }
-                                                  placeholder="—"
+                                                  placeholder="-"
                                                   className="min-w-0 flex-1 px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                                                 />
                                                 <select
@@ -3061,7 +3061,7 @@ export function CreateProgramForm({
                                                 e.target.value
                                               )
                                             }
-                                            placeholder="—"
+                                            placeholder="-"
                                             className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
                                           />
                                         </div>

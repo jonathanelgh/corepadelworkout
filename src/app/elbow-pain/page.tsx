@@ -3,6 +3,7 @@
 import { ArrowRight, CheckCircle2, Star, Menu, X, Smartphone, Play, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 
 const heroStats = [
   { emoji: "🎯", value: "Outer elbow", text: "Pain that flares on grip & backhand" },
@@ -164,8 +165,8 @@ export default function ElbowPainPage() {
         }`}
       >
         <div className="max-w-[1400px] mx-auto w-full flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold tracking-wider uppercase">
-            Core Padel Workout
+          <Link href="/" className="inline-flex">
+            <BrandWordmark tone={isScrolled ? "onLight" : "onDark"} />
           </Link>
           <div className="hidden md:flex space-x-8 text-sm font-medium">
             <a href="#problem" className={`transition-colors ${isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]"}`}>
@@ -298,7 +299,7 @@ export default function ElbowPainPage() {
             </div>
             <p className="text-sm font-semibold uppercase tracking-widest text-[#ccff00] mb-4">Elbow pain from padel</p>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-medium leading-[1.08] tracking-tight">
-              Fix padel elbow pain — and play again without the flare-ups.
+              Fix padel elbow pain and play again without the flare-ups.
             </h1>
           </div>
 
@@ -343,15 +344,15 @@ export default function ElbowPainPage() {
               <h3 className="text-lg font-semibold text-white mb-3">Symptoms that sound familiar</h3>
               <ul className="space-y-3 text-zinc-400 text-sm leading-relaxed">
                 <li className="flex gap-2">
-                  <span className="text-[#ccff00] shrink-0">—</span>
+                  <span className="text-[#ccff00] shrink-0">•</span>
                   Aching or sharp pain on the outside of the elbow after play
                 </li>
                 <li className="flex gap-2">
-                  <span className="text-[#ccff00] shrink-0">—</span>
+                  <span className="text-[#ccff00] shrink-0">•</span>
                   Grip feels heavy: kettle, coffee cup, or racket feels like a trigger
                 </li>
                 <li className="flex gap-2">
-                  <span className="text-[#ccff00] shrink-0">—</span>
+                  <span className="text-[#ccff00] shrink-0">•</span>
                   Backhands, extension, or serves light up the same spot
                 </li>
               </ul>
@@ -360,15 +361,15 @@ export default function ElbowPainPage() {
               <h3 className="text-lg font-semibold text-white mb-3">What padel adds to the mix</h3>
               <ul className="space-y-3 text-zinc-400 text-sm leading-relaxed">
                 <li className="flex gap-2">
-                  <span className="text-[#ccff00] shrink-0">—</span>
+                  <span className="text-[#ccff00] shrink-0">•</span>
                   High repetition rallies compared with many other racket sports
                 </li>
                 <li className="flex gap-2">
-                  <span className="text-[#ccff00] shrink-0">—</span>
+                  <span className="text-[#ccff00] shrink-0">•</span>
                   Death grip under pressure, especially in defense
                 </li>
                 <li className="flex gap-2">
-                  <span className="text-[#ccff00] shrink-0">—</span>
+                  <span className="text-[#ccff00] shrink-0">•</span>
                   Jumping back to full court time after a short break
                 </li>
               </ul>

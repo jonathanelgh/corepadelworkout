@@ -25,7 +25,7 @@ function MemberCoachComingSoon() {
             Coming soon
           </h1>
           <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-zinc-600 sm:text-base">
-            Soon our AI coach can make customized programs for your needs — built around your
+            Soon our AI coach can make customized programs for your needs, built around your
             level, schedule, and how you play padel.
           </p>
           <div className="mx-auto mt-8 h-px w-16 bg-zinc-200" />

@@ -165,7 +165,7 @@ export function MemberHomeTab({
             <h2 className="text-xl font-bold text-zinc-900 sm:text-2xl">Unlock every program</h2>
             <p className="mt-2 text-sm text-zinc-700 sm:text-base">
               Upgrade to <strong>Pro</strong> for full access to all courses on the platform while your subscription
-              is active — plus priority updates as we ship new programs.
+              is active, plus priority updates as we ship new programs.
             </p>
             <Link
               href="/member/upgrade"
@@ -189,14 +189,21 @@ export function MemberHomeTab({
             <span className="font-semibold">
               {subscription.planName ? `${subscription.planName} is active` : "Pro is active"}
             </span>
-            {subscription.currentPeriodEnd && (
+            {subscription.status === "trialing" && subscription.currentPeriodEnd && (
+              <>
+                {" "}
+                · trial ends {formatRenewalDate(subscription.currentPeriodEnd)}. You&apos;ll be charged then unless you
+                cancel.
+              </>
+            )}
+            {subscription.status !== "trialing" && subscription.currentPeriodEnd && (
               <>
                 {" "}
                 · renews {formatRenewalDate(subscription.currentPeriodEnd)}
                 {subscription.cancelAtPeriodEnd ? " (cancels at period end)" : ""}
               </>
             )}
-            {!subscription.currentPeriodEnd && " — you have access to all published programs."}
+            {!subscription.currentPeriodEnd && ". You have access to all published programs."}
           </p>
         </div>
       )}
@@ -205,7 +212,7 @@ export function MemberHomeTab({
         <section>
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-zinc-900">Quick workouts</h2>
-            <p className="text-sm text-zinc-500">One-off routines — warm up before a match anytime</p>
+            <p className="text-sm text-zinc-500">One-off routines. Warm up before a match anytime</p>
           </div>
           <ul className="grid gap-3 sm:grid-cols-2">
             {quickWorkouts.map((w) => {

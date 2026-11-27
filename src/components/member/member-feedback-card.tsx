@@ -229,7 +229,7 @@ export function MemberFeedbackCard() {
           </div>
           <h2 className="text-lg font-semibold text-zinc-900">How is Core Padel working for you?</h2>
           <p className="mt-1 max-w-xl text-sm text-zinc-600">
-            Good, bad, or ideas for improvement — tap one and tell us. We read every message.
+            Good, bad, or ideas for improvement. Tap one and tell us. We read every message.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">

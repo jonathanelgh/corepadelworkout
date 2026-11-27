@@ -34,9 +34,9 @@ function formatCompletedAt(iso: string): { date: string; time: string } | null {
 }
 
 function formatClockTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return "—";
+  if (!Number.isFinite(t)) return "-";
   return new Date(iso).toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
@@ -45,7 +45,7 @@ function formatClockTime(iso: string | null): string {
 }
 
 function formatDuration(ms: number | null): string {
-  if (ms == null || !Number.isFinite(ms) || ms < 0) return "—";
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return "-";
   const totalSec = Math.round(ms / 1000);
   const hours = Math.floor(totalSec / 3600);
   const minutes = Math.floor((totalSec % 3600) / 60);
@@ -306,13 +306,13 @@ export default async function AdminAnalyticsPage() {
                         <td className="px-4 py-3.5 text-gray-700">{row.programTitle}</td>
                         <td className="px-4 py-3.5 text-gray-700">{row.sessionName}</td>
                         <td className="px-4 py-3.5 whitespace-nowrap text-gray-700">
-                          {when?.date ?? "—"}
+                          {when?.date ?? "-"}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap tabular-nums text-gray-600">
                           {formatClockTime(row.startedAt)}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap font-medium tabular-nums text-gray-900">
-                          {when?.time ?? "—"}
+                          {when?.time ?? "-"}
                         </td>
                         <td className="px-6 py-3.5 whitespace-nowrap font-medium tabular-nums text-gray-900">
                           {formatDuration(row.durationMs)}

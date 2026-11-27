@@ -14,8 +14,8 @@ import {
 } from "@/lib/member/onboarding";
 
 const LEVELS: { id: OnboardingLevel; title: string; subtitle: string }[] = [
-  { id: "beginner", title: "Beginner", subtitle: "Learning the basics · 0–1× a week" },
-  { id: "intermediate", title: "Intermediate", subtitle: "Sustained rallies · 2–3× a week" },
+  { id: "beginner", title: "Beginner", subtitle: "Learning the basics · 0-1x a week" },
+  { id: "intermediate", title: "Intermediate", subtitle: "Sustained rallies · 2-3x a week" },
   { id: "advanced", title: "Advanced / Pro", subtitle: "Tournament play · 4+ sessions a week" },
 ];
 
@@ -184,7 +184,7 @@ export function ProfileEditSheet({
             <div>
               <span className="text-sm font-medium text-zinc-700">Email</span>
               <p className="mt-1.5 rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                {profile.email ?? "—"}
+                {profile.email ?? "-"}
               </p>
             </div>
 

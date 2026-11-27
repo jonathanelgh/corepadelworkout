@@ -7,7 +7,7 @@ import type { PreLaunchSignupRow } from "@/lib/pre-launch/early-access";
 import { sendWaitlistLaunchCorrectionBulk, sendWaitlistLaunchEmail, sendWaitlistLaunchEmailBulk, sendWaitlistLaunchEmailTest } from "./actions";
 
 function formatWhen(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleString("en-GB", {
     day: "numeric",
     month: "short",
@@ -318,7 +318,7 @@ export function WaitlistClient({ initialRows }: { initialRows: PreLaunchSignupRo
                         {row.pro_redeemed_at ? (
                           <span className="text-emerald-700">{formatWhen(row.pro_redeemed_at)}</span>
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">

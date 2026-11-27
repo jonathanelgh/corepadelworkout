@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { userHasProgramAccess } from "@/lib/programs/check-program-access";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
 import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import { loadProgramProgress, playHrefForSession } from "@/lib/programs/program-progress";
@@ -78,11 +78,9 @@ export default async function ProgramTrainingPage({ params }: PageProps) {
     redirect(programCatalogHref(slug));
   }
 
-  const hasAccess =
-    (!loaded.isAdminDraftPreview && program.is_free) ||
-    (await userHasProgramAccess(supabase, user.id, program.id));
+  const hasAccess = await getHasActivePro(supabase, user.id);
   if (!hasAccess) {
-    redirect(`${programCatalogHref(slug)}?upgrade=1`);
+    redirect("/subscribe");
   }
 
   const progress = await loadProgramProgress(

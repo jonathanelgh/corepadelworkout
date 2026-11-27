@@ -131,13 +131,13 @@ export function BulkExerciseVideoImportModal({
         try {
           const compressed = await compressVideoForWeb(file, {
             onStatus: (msg) =>
-              setStatusLine(`Optimizing ${i + 1} of ${files.length}: ${file.name} — ${msg}`),
+              setStatusLine(`Optimizing ${i + 1} of ${files.length}: ${file.name}: ${msg}`),
           });
           fileToUpload = compressed.file;
         } catch (compressErr) {
           console.warn("[bulk-import] compress failed, uploading original", compressErr);
           setStatusLine(
-            `Compression skipped for ${file.name} — uploading original (${i + 1}/${files.length})`
+            `Compression skipped for ${file.name}. Uploading original (${i + 1}/${files.length})`
           );
         }
 
@@ -301,7 +301,7 @@ export function BulkExerciseVideoImportModal({
                 <UploadCloud className="mb-2 h-8 w-8 text-gray-400" />
                 <span className="text-sm font-medium text-gray-900">Click or drop videos</span>
                 <span className="mt-1 text-xs text-gray-500">
-                  MP4, WebM, MOV — up to 20 files. Videos are auto-compressed before upload.
+                  MP4, WebM, MOV. Up to 20 files. Videos are auto-compressed before upload.
                 </span>
               </label>
 

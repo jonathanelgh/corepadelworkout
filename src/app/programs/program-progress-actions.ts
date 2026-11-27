@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
-import { userHasProgramAccess } from "@/lib/programs/check-program-access";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
 import {
@@ -44,9 +44,9 @@ export async function startProgramTraining(
   const { program, isAdminDraftPreview } = loaded;
   const programFormat = parseProgramFormat(program.program_format);
 
-  const hasAccess = await userHasProgramAccess(supabase, user.id, program.id);
+  const hasAccess = await getHasActivePro(supabase, user.id);
   if (!hasAccess) {
-    return { error: "This program requires Pro. Upgrade from member settings." };
+    return { error: "Core Padel requires Pro. Start your 7-day trial to continue." };
   }
 
   // Free published programs get an enrollment row. Draft previews skip enroll (RLS requires published).

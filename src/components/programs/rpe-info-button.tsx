@@ -66,25 +66,25 @@ export function RpeInfoButton({ className = "" }: RpeInfoButtonProps) {
               </button>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-white/75">
-              RPE means <span className="text-white">Rate of Perceived Exertion</span> — how hard
-              the set feels on a 1–10 scale. Use it to pick a weight (not an exact kg/lb number).
+              RPE means <span className="text-white">Rate of Perceived Exertion</span>: how hard
+              the set feels on a 1-10 scale. Use it to pick a weight (not an exact kg/lb number).
             </p>
             <ul className="mt-3 space-y-2 text-sm leading-relaxed text-white/75">
               <li>
-                <span className="font-medium text-[#ccff00]">RPE 6–7</span> — Challenging but
+                <span className="font-medium text-[#ccff00]">RPE 6-7</span>: Challenging but
                 controlled; several reps left.
               </li>
               <li>
-                <span className="font-medium text-[#ccff00]">RPE 8–9</span> — Last 1–2 reps are
+                <span className="font-medium text-[#ccff00]">RPE 8-9</span>: Last 1-2 reps are
                 tough; form stays clean.
               </li>
               <li>
-                <span className="font-medium text-[#ccff00]">RPE 10</span> — Max effort; no more
+                <span className="font-medium text-[#ccff00]">RPE 10</span>: Max effort; no more
                 clean reps.
               </li>
             </ul>
             <p className="mt-3 text-sm leading-relaxed text-white/75">
-              Match the RPE shown for the exercise — lower reps usually mean a higher RPE (heavier
+              Match the RPE shown for the exercise. Lower reps usually mean a higher RPE (heavier
               feel).
             </p>
             <button

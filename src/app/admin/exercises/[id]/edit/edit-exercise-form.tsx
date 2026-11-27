@@ -276,8 +276,8 @@ export function EditExerciseForm({
                         defaultValue={initial.status}
                         className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-black"
                       >
-                        <option value="draft">Draft — hidden from member workouts</option>
-                        <option value="published">Published — visible in programs</option>
+                        <option value="draft">Draft, hidden from member workouts</option>
+                        <option value="published">Published, visible in programs</option>
                       </select>
                       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                     </div>

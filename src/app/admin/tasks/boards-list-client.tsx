@@ -52,7 +52,7 @@ export function BoardsListClient({
         <div className="min-h-0 flex-1 overflow-auto p-6 lg:p-8">
           <div className="mx-auto max-w-5xl space-y-6">
             <p className="text-sm text-gray-500">
-              Kanban boards for your team — create columns, tasks, assign members, and drag cards between lists.
+              Kanban boards for your team. Create columns, tasks, assign members, and drag cards between lists.
             </p>
 
             {(loadError || error) && (

@@ -34,7 +34,7 @@ export function ProgramEnrollBar({ programSlug, priceLabel, hasAccess = false }:
       }
       setJustEnrolled(true);
       if (result.alreadyEnrolled) {
-        setMessage("You're already enrolled — open the training view anytime.");
+        setMessage("You're already enrolled. Open the training view anytime.");
       } else {
         setMessage("You're in! Continue to your workouts below.");
       }
@@ -73,7 +73,7 @@ export function ProgramEnrollBar({ programSlug, priceLabel, hasAccess = false }:
           >
             {pending ? "Starting…" : "Start Program Now"}{" "}
             <span className="ml-2 font-normal opacity-50 md:hidden">
-              · {priceLabel !== "—" ? priceLabel : "—"}
+              · {priceLabel !== "-" ? priceLabel : "-"}
             </span>
           </button>
         )}

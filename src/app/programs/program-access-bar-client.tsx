@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useTransition } from "react";
-import { SubscribeButton } from "@/components/billing/subscribe-button";
 import { CancelProgramButton } from "@/components/programs/cancel-program-button";
 import { startProgramTraining } from "./program-progress-actions";
 import { usesProgramProgress, type ProgramFormat } from "@/lib/programs/program-format";
@@ -26,7 +25,6 @@ type Props = {
 export function ProgramAccessBarClient({
   programSlug,
   programFormat,
-  isFree,
   hasAccess,
   isSignedIn,
   minsLabel,
@@ -103,7 +101,7 @@ export function ProgramAccessBarClient({
       )}
       <div className="flex items-center justify-between border-t border-gray-100 bg-white p-4 md:p-6">
         <div className="hidden text-sm text-gray-500 md:block">
-          {isFree && <div className="mb-1 font-medium text-emerald-700">Free</div>}
+          {!hasAccess && <div className="mb-1 font-medium text-zinc-800">Pro</div>}
           {!isSingleWorkout && weekProgressLabel && (
             <div className="mb-1 font-medium text-gray-800">{weekProgressLabel}</div>
           )}
@@ -126,34 +124,17 @@ export function ProgramAccessBarClient({
               <CancelProgramButton programSlug={programSlug} />
             )}
           </div>
-        ) : isFree && !isSignedIn ? (
+        ) : (
           <Link
-            href={`/login?next=${encodeURIComponent(`/programs/${programSlug}`)}`}
+            href={
+              isSignedIn
+                ? "/subscribe"
+                : `/signup?next=${encodeURIComponent("/subscribe")}`
+            }
             className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ccff00] px-8 py-4 text-lg font-semibold text-black transition-colors hover:bg-[#b3e600] md:w-auto"
           >
-            Sign in to start
+            Start 7-day trial
           </Link>
-        ) : isFree ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onStart()}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ccff00] px-8 py-4 text-lg font-semibold text-black transition-colors hover:bg-[#b3e600] disabled:opacity-60 md:w-auto"
-          >
-            {pending ? "Starting…" : isSingleWorkout ? "Start workout" : "Start free program"}
-          </button>
-        ) : (
-          <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:items-end">
-            <SubscribeButton className="flex w-full items-center justify-center gap-2 rounded-full bg-[#ccff00] px-8 py-4 text-lg font-semibold text-black transition-colors hover:bg-[#b3e600] disabled:opacity-60 md:w-auto">
-              Unlock with Pro
-            </SubscribeButton>
-            <p className="text-center text-xs text-gray-500 md:text-right">
-              Or{" "}
-              <Link href="/member/upgrade" className="font-medium text-gray-700 underline">
-                view membership
-              </Link>
-            </p>
-          </div>
         )}
       </div>
     </div>

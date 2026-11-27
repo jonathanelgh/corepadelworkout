@@ -101,7 +101,7 @@ export function MemberProgramsLibraryClient({
                 <div>
                   <p className="font-semibold">Pro includes every program</p>
                   <p className="mt-1 text-emerald-800/90">
-                    You don&apos;t have separate &quot;purchased&quot; rows — your subscription unlocks the full
+                    You don&apos;t have separate &quot;purchased&quot; rows. Your subscription unlocks the full
                     library. Use the <strong>All programs</strong> tab to start any course.
                   </p>
                   <button

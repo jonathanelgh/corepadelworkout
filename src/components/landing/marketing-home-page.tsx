@@ -1,145 +1,149 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, Star, Menu, X, ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { PRO_MONTHLY_PRICE_LABEL } from "@/lib/billing/format-subscription-price";
+import { Check, Menu, Volume2, VolumeX, X } from "lucide-react";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { SiteFooter } from "@/components/landing/site-footer";
-
-const heroStats = [
-  { emoji: "💪", value: "872", text: "Elbows fixed" },
-  { emoji: "🛡️", value: "1,200+", text: "Injury-free matches" },
-];
-
-const testimonials = [
-  {
-    text: "Joining Core Padel Workout has been one of the best decisions I've made for my fitness and social life. The sessions are well-structured, the coaches genuinely care about improvement, and the community is welcoming.",
-    name: "Sara K.",
-    role: "Club Member",
-    rating: "5/5",
-    img: "https://i.pravatar.cc/100?img=4"
-  },
-  {
-    text: "What I love most about Core Padel Workout is the atmosphere. From the first day, I felt comfortable and motivated. The coaches explain techniques clearly, and the training sessions are pretty challenging and focusing.",
-    name: "Alex M.",
-    role: "Club Member",
-    rating: "4.9/5",
-    img: "https://i.pravatar.cc/100?img=11"
-  },
-  {
-    text: "As a beginner, I was nervous about joining, but Core Padel Workout exceeded all expectations. The staff and players were friendly, patient, and supportive. The structured sessions helped me learn the basics quickly.",
-    name: "Emily R.",
-    role: "New Player",
-    rating: "5/5",
-    img: "https://i.pravatar.cc/100?img=5"
-  },
-  {
-    text: "The Smash Power program completely changed my game. I used to struggle with finishing points, but the biomechanics breakdown helped me understand exactly what I was doing wrong. Highly recommend!",
-    name: "David T.",
-    role: "Advanced Player",
-    rating: "5/5",
-    img: "https://i.pravatar.cc/100?img=8"
-  },
-  {
-    text: "I suffered from tennis elbow for months until I started the rehab program here. The exercises were easy to follow at home, and I'm finally back on the court playing pain-free.",
-    name: "Maria L.",
-    role: "Intermediate Player",
-    rating: "4.8/5",
-    img: "https://i.pravatar.cc/100?img=9"
-  },
-  {
-    text: "The app is fantastic! Having the workouts right on my phone makes it so easy to stick to the routine. The video demonstrations are clear and the progress tracking keeps me motivated.",
-    name: "James H.",
-    role: "Club Member",
-    rating: "5/5",
-    img: "https://i.pravatar.cc/100?img=12"
-  }
-];
-
-const faqs = [
-  {
-    question: "Is it beginner-friendly?",
-    answer: "Absolutely! Our Year-Round Programs are designed for all level club players.\n\nHome workouts:\nEach workout is led by two coaches: one demonstrates beginner-friendly exercises, while the other shows more advanced variations. Plus, we offer a range of challenges tailored to different experience levels, so everyone can find the right fit and progress at their own pace.\n\nFitness workouts:\nEvery exercise includes a short video demo, with modified versions available for more challenging movements."
-  },
-  {
-    question: "Do I need equipment?",
-    answer: "Many of our programs require no equipment and can be done at home or on the court. For gym-based programs, standard fitness equipment is recommended. Each program clearly lists any required gear before you start."
-  },
-  {
-    question: "Do I need to download anything from the App Store?",
-    answer: "No! Core Padel Workout is a web-based platform. You can access all your programs directly through your browser on any device—phone, tablet, or computer."
-  },
-  {
-    question: "Can I watch the workouts on my TV?",
-    answer: "Yes! You can easily cast or AirPlay the workout videos from your phone or computer to your smart TV for a bigger screen experience."
-  },
-  {
-    question: "Can I try it for free?",
-    answer: "Yes, you can start with our Free 15-Min Pre-Match Warmup to get a taste of our training style before committing to a full program."
-  },
-  {
-    question: "Can I cancel my membership anytime?",
-    answer: "Absolutely. If you choose our Monthly Package, you can cancel your subscription at any time with no hidden fees or lock-in contracts."
-  }
-];
 
 export type FeaturedProgram = {
   slug: string;
   title: string;
   description: string;
   image: string;
+  meta: string[];
 };
 
-const fallbackFeaturedPrograms: FeaturedProgram[] = [
+export type WorkoutPreview = {
+  title: string;
+  posterUrl: string;
+  videoUrl: string;
+};
+
+const TRIAL_HREF = "/signup";
+const TRIAL_TERMS =
+  "€0 today, then €19.99/month unless you cancel before the trial ends.";
+
+const steps = [
   {
-    slug: "smash-power",
-    title: "Smash Power",
-    description: "Get a better smash through physics & strength",
-    image: "/Padel_player_makes_202603231105.jpeg",
+    title: "Pick a training goal",
+    body: "Build strength, work on your conditioning, or fit in short sessions during a busy week.",
   },
   {
-    slug: "elbow-rehab",
-    title: "Elbow Rehab",
-    description: "Fix tennis elbow & prevent injuries",
-    image: "/Padel_player_elbow_202603231059.jpeg",
+    title: "Follow the workout",
+    body: "Watch the exercise demos and follow the session at home, at the gym, or on court, depending on the program.",
   },
   {
-    slug: "on-court-agility",
-    title: "On-Court Agility",
-    description: "Footwork & reaction speed drills",
-    image: "/padel_player_footwork.webp",
+    title: "Track your sessions",
+    body: "See what you’ve completed and pick up where you left off.",
   },
 ];
 
+function TrialButton({
+  placement,
+  id,
+  className,
+}: {
+  placement: "header" | "hero" | "coach" | "pricing" | "closing" | "sticky";
+  id?: string;
+  className?: string;
+}) {
+  return (
+    <Link
+      id={id}
+      href={TRIAL_HREF}
+      data-cta="trial"
+      data-placement={placement}
+      className={
+        className ??
+        "inline-flex items-center justify-center rounded-full bg-[#ccff00] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[#b3e600]"
+      }
+    >
+      Start your 7-day free trial
+    </Link>
+  );
+}
+
+function TrialTerms({ className = "" }: { className?: string }) {
+  return <p className={`text-sm leading-relaxed text-gray-500 ${className}`}>{TRIAL_TERMS}</p>;
+}
+
+function WorkoutFrame({ preview }: { preview: WorkoutPreview }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(false);
+
+  function syncSound() {
+    const video = videoRef.current;
+    if (!video) return;
+    setMuted(video.muted || video.volume === 0);
+  }
+
+  function toggleSound() {
+    const video = videoRef.current;
+    if (!video) return;
+    const turnOn = video.muted || video.volume === 0;
+    video.muted = !turnOn;
+    if (turnOn) video.volume = 1;
+    setMuted(!turnOn);
+  }
+
+  return (
+    <figure className="overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
+      <div className="relative">
+        <video
+          ref={videoRef}
+          className="aspect-video w-full bg-black object-cover"
+          poster={preview.posterUrl}
+          controls
+          playsInline
+          preload="metadata"
+          onVolumeChange={syncSound}
+          onLoadedMetadata={syncSound}
+        >
+          <source src={preview.videoUrl} type="video/mp4" />
+        </video>
+        <button
+          type="button"
+          onClick={toggleSound}
+          className="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/80"
+          aria-label={muted ? "Turn sound on" : "Turn sound off"}
+        >
+          {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+          {muted ? "Sound off" : "Sound on"}
+        </button>
+      </div>
+      <figcaption className="flex items-center justify-between gap-3 px-4 py-3 text-left">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#ccff00]">Session</p>
+          <p className="mt-1 text-sm font-medium text-white">{preview.title}</p>
+        </div>
+        <p className="shrink-0 text-xs text-white/60">Video demo</p>
+      </figcaption>
+    </figure>
+  );
+}
+
 export function MarketingHomePage({
   featuredPrograms,
-  proPriceLabel,
+  workoutPreview,
+  signedIn = false,
 }: {
   featuredPrograms: FeaturedProgram[];
-  proPriceLabel: string | null;
+  workoutPreview: WorkoutPreview | null;
+  signedIn?: boolean;
 }) {
-  const programs = featuredPrograms.length > 0 ? featuredPrograms : fallbackFeaturedPrograms;
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [showMobileStickyCta, setShowMobileStickyCta] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      // Use window.scrollY with a fallback for older browsers
       const scrollPosition = window.scrollY || document.documentElement.scrollTop;
-      setIsScrolled(scrollPosition > 10); // Lowered threshold for mobile responsiveness
+      setIsScrolled(scrollPosition > 10);
     };
-    
-    // Add passive listener for better scroll performance on mobile
     window.addEventListener("scroll", handleScroll, { passive: true });
-    
-    // Initial check in case page is loaded already scrolled
     handleScroll();
-    
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
@@ -161,18 +165,14 @@ export function MarketingHomePage({
       },
       { threshold: 0.2 }
     );
-
     observer.observe(heroCta);
 
     const onMqlChange = (e: MediaQueryListEvent) => {
       isMobile = e.matches;
       update();
     };
-
-    // Safari compat
     if (typeof mql.addEventListener === "function") mql.addEventListener("change", onMqlChange);
     else mql.addListener(onMqlChange);
-
     update();
 
     return () => {
@@ -182,489 +182,424 @@ export function MarketingHomePage({
     };
   }, []);
 
+  const navLinkClass = isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]";
+
   return (
     <div className="min-h-screen bg-white font-sans text-black selection:bg-[#ccff00] selection:text-black">
-      {/* Navbar */}
-      <nav className={`fixed top-0 left-0 right-0 z-[90] flex items-center justify-between px-6 md:px-12 py-4 w-full transition-all duration-300 ${
-        isScrolled 
-          ? "bg-white/90 backdrop-blur-xl [-webkit-backdrop-filter:blur(24px)] text-black shadow-sm" 
-          : "bg-transparent text-white"
-      }`}>
-        <div className="max-w-[1400px] mx-auto w-full flex items-center justify-between">
-          <div className="text-xl font-bold tracking-wider uppercase">Core Padel Workout</div>
-          <div className="hidden md:flex space-x-8 text-sm font-medium">
-            <a href="#top" className={`transition-colors ${isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]"}`}>Home</a>
-            <a href="#about" className={`transition-colors ${isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]"}`}>About</a>
-            <a href="#programs" className={`transition-colors ${isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]"}`}>Programs</a>
-            <a href="#pricing" className={`transition-colors ${isScrolled ? "hover:text-gray-600" : "hover:text-[#ccff00]"}`}>Pricing</a>
+      <nav
+        className={`fixed top-0 right-0 left-0 z-[90] w-full px-6 py-4 transition-all duration-300 md:px-12 ${
+          isScrolled
+            ? "bg-white/90 text-black shadow-sm backdrop-blur-xl [-webkit-backdrop-filter:blur(24px)]"
+            : "bg-transparent text-white"
+        }`}
+      >
+        <div className="mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4">
+          <Link href="/" className="inline-flex" aria-label="CorePadel">
+            <BrandWordmark tone={isScrolled ? "onLight" : "onDark"} />
+          </Link>
+          <div className="hidden items-center gap-8 text-sm font-medium md:flex">
+            <a href="#how-it-works" className={`transition-colors ${navLinkClass}`}>
+              How it works
+            </a>
+            <a href="#programs" className={`transition-colors ${navLinkClass}`}>
+              Programs
+            </a>
+            <a href="#pricing" className={`transition-colors ${navLinkClass}`}>
+              Pricing
+            </a>
           </div>
           <div className="hidden items-center gap-3 md:flex">
             <Link
-              href="/login"
-              className={`px-4 py-2.5 rounded-full text-sm font-semibold transition-colors ${
-                isScrolled
-                  ? "bg-white text-black hover:bg-gray-100 border border-gray-200"
-                  : "bg-black/35 text-white hover:bg-black/50 border border-white/30"
-              }`}
+              href={signedIn ? "/member" : "/login"}
+              className={`text-sm font-medium transition-colors ${navLinkClass}`}
             >
-              Login
+              {signedIn ? "Go to app" : "Log in"}
             </Link>
-            <Link
-              href="/signup"
-              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-colors ${
-                isScrolled ? "bg-black text-white hover:bg-gray-800" : "bg-white text-black hover:bg-gray-100"
-              }`}
-            >
-              Get Started Now
-            </Link>
+            <TrialButton placement="header" />
           </div>
-          
-          {/* Mobile Menu Button */}
-          <button 
-            className="md:hidden p-2 -mr-2 relative z-[100]"
+          <button
+            className="relative z-[100] -mr-2 p-2 md:hidden"
             onClick={() => setIsMobileMenuOpen(true)}
             aria-label="Open menu"
-            style={{ cursor: 'pointer', touchAction: 'manipulation' }}
+            type="button"
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="h-6 w-6" />
           </button>
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
-      <div 
+      <div
         className={`fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
-          isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`} 
-        onClick={() => setIsMobileMenuOpen(false)} 
+          isMobileMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={() => setIsMobileMenuOpen(false)}
       />
-
-      {/* Mobile Menu Drawer */}
-      <div className={`fixed top-0 right-0 bottom-0 w-[80%] max-w-sm bg-white z-[110] shadow-2xl transition-transform duration-300 ease-in-out md:hidden flex flex-col ${
-        isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
-      }`}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <div className="text-xl font-bold tracking-wider uppercase text-black">Menu</div>
-          <button 
-            className="p-2 -mr-2 text-gray-500 hover:text-black transition-colors"
+      <div
+        className={`fixed top-0 right-0 bottom-0 z-[110] flex w-[80%] max-w-sm flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
+          isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-gray-100 p-6">
+          <BrandWordmark />
+          <button
+            className="-mr-2 p-2 text-gray-500 transition-colors hover:text-black"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Close menu"
-            style={{ cursor: 'pointer', touchAction: 'manipulation' }}
+            type="button"
           >
-            <X className="w-6 h-6" />
+            <X className="h-6 w-6" />
           </button>
         </div>
-        <div className="flex flex-col p-6 space-y-6 text-lg font-medium text-black">
-          <a href="#top" className="hover:text-gray-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Home</a>
-          <a href="#about" className="hover:text-gray-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>About</a>
-          <a href="#programs" className="hover:text-gray-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Programs</a>
-          <a href="#pricing" className="hover:text-gray-600 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Pricing</a>
-        </div>
-        <div className="mt-auto p-6 border-t border-gray-100">
-          <Link
-            href="/login"
-            className="mb-3 block w-full border border-gray-200 bg-white px-6 py-4 rounded-full font-semibold text-black hover:bg-gray-50 transition-colors text-center"
-          >
-            Login
-          </Link>
-          <Link
-            href="/signup"
-            className="block w-full bg-black text-white px-6 py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors text-center"
-          >
-            Get Started Now
+        <div className="flex flex-col space-y-6 p-6 text-lg font-medium text-black">
+          <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)}>
+            How it works
+          </a>
+          <a href="#programs" onClick={() => setIsMobileMenuOpen(false)}>
+            Programs
+          </a>
+          <a href="#pricing" onClick={() => setIsMobileMenuOpen(false)}>
+            Pricing
+          </a>
+          <Link href={signedIn ? "/member" : "/login"} onClick={() => setIsMobileMenuOpen(false)}>
+            {signedIn ? "Go to app" : "Log in"}
           </Link>
         </div>
       </div>
 
-      {/* Hero Section */}
-      <section id="top" className="relative min-h-[100vh] md:min-h-[90vh] flex flex-col justify-end pb-24 px-6 md:px-12 text-white">
+      <section className="relative flex h-[100vh] flex-col overflow-hidden px-6 pt-20 pb-0 text-white md:px-12 lg:block lg:h-auto lg:pt-28 lg:pb-20">
         <div className="absolute inset-0 z-0">
-          <picture className="absolute inset-0 w-full h-full">
+          <picture className="absolute inset-0 h-full w-full">
             <source media="(max-width: 767px)" srcSet="/hero-bg-mobile.webp" />
-            <img 
-              src="/hero-bg.webp" 
-              alt="Padel Court" 
-              className="w-full h-full object-cover"
-            />
+            <img src="/hero-bg.webp" alt="" className="h-full w-full object-cover" />
           </picture>
-          <div className="absolute inset-0 bg-black/40"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+          <div className="absolute inset-0 bg-black/65" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/35" />
         </div>
-        
-        <div className="relative z-10 max-w-[1400px] mx-auto w-full flex flex-col md:flex-row justify-between items-end gap-12">
-          <div className="max-w-3xl">
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-medium leading-[1.1] tracking-tight">
-              The Ultimate Strength & Conditioning Hub for Padel Players.
+
+        <div className="relative z-10 mx-auto mt-auto flex w-full max-w-[1400px] flex-col gap-8 lg:mt-0 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,460px)] lg:items-center lg:gap-16">
+          <div className="mx-auto w-full max-w-xl text-center lg:mx-0 lg:text-left">
+            <h1 className="text-4xl leading-[1.08] font-medium tracking-tight sm:text-5xl lg:text-6xl">
+              Move quicker. Stay strong through the last set.
             </h1>
-          </div>
-          
-          <div className="max-w-sm flex flex-col gap-8 pb-4">
-            <p className="text-gray-300 text-base leading-relaxed">
-              Professional training programs for Padel. Move faster, hit harder, and stay injury-free with workouts you can do at the gym, at home, or on the court.
+            <p className="mt-5 text-base leading-relaxed text-gray-200 sm:text-lg">
+              Strength and conditioning for padel players. Follow video-guided workouts to build the
+              strength and fitness you need for quick changes of direction, overhead shots, and long
+              rallies.
             </p>
-            <div className="flex flex-wrap gap-4">
-              <Link
+            <div className="mt-8">
+              <TrialButton
                 id="home-hero-cta"
-                href="/signup"
-                className="bg-[#ccff00] text-black px-8 py-3.5 rounded-full font-semibold hover:bg-[#b3e600] transition-colors"
-              >
-                Get Started Now
-              </Link>
+                placement="hero"
+                className="inline-flex w-full items-center justify-center rounded-full bg-[#ccff00] px-8 py-3.5 text-base font-semibold text-black transition-colors hover:bg-[#b3e600] sm:w-auto"
+              />
             </div>
+          </div>
+
+          <div className="relative mx-auto aspect-[519/768] w-full max-w-[320px] overflow-hidden lg:aspect-auto lg:max-w-none lg:overflow-visible">
+            <picture>
+              <source media="(min-width: 1024px)" srcSet="/hero-session.webp" />
+              <img
+                src="/hero-session-portrait.webp"
+                alt="CorePadel on a phone, showing Padel Power Base and the next workout"
+                className="absolute inset-x-0 top-0 h-auto w-full object-contain object-top drop-shadow-2xl lg:static"
+              />
+            </picture>
           </div>
         </div>
       </section>
 
-      {/* Programs Section */}
-      <section id="programs" className="py-12 md:py-24 px-6 md:px-12 bg-white text-black text-center">
-        <div className="max-w-[1400px] mx-auto">
-          <div className="inline-block border border-gray-200 rounded-full px-5 py-1.5 text-sm font-medium mb-8 text-gray-600">
-            Our Programs
-          </div>
-          <h2 className="text-4xl md:text-5xl font-medium mb-16 tracking-tight">The Core Padel Program Library</h2>
-          
-          <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto text-left">
-            {programs.map((program) => (
-              <Link
-                key={program.slug}
-                href={`/programs/${program.slug}`}
-                className="relative h-[500px] rounded-3xl overflow-hidden group cursor-pointer block"
-              >
-                <img
-                  src={program.image}
-                  alt={program.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute top-6 left-6 bg-white rounded-full p-2">
-                  <ArrowRight className="w-5 h-5 text-black -rotate-45" />
-                </div>
-                <div className="absolute bottom-8 left-8 text-white">
-                  <h3 className="text-2xl font-medium mb-1">{program.title}</h3>
-                  <p className="text-gray-300 text-sm">{program.description}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          <div className="mt-12 flex justify-center">
-            <Link href="/programs" className="flex items-center gap-2 text-black font-semibold hover:text-gray-600 transition-colors group">
-              View all programs
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* App Showcase Section */}
-      <section className="py-12 md:py-24 px-6 md:px-12 bg-[#f9f9f9] overflow-hidden">
-        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center gap-12 md:gap-20">
-          <div className="flex-1 text-center md:text-left">
-            <div className="inline-block border border-gray-200 bg-white rounded-full px-5 py-1.5 text-sm font-medium mb-8 text-gray-600">
-              Train Anywhere
-            </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium leading-[1.1] tracking-tight mb-6">
-              Your Personal Padel Coach, On Any Device.
+      <section id="how-it-works" className="scroll-mt-24 bg-white px-6 py-16 md:px-12 md:py-24">
+        <div className="mx-auto grid w-full max-w-[1400px] items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <h2 className="text-3xl font-medium tracking-tight sm:text-4xl md:text-5xl">
+              Know what to train between matches.
             </h2>
-            <p className="text-gray-500 text-lg md:text-xl leading-relaxed mb-10 max-w-xl mx-auto md:mx-0">
-              Access all programs, track your training days, and get AI-powered workouts from your browser — phone, tablet, or desktop. No app store required.
+            <p className="mt-4 max-w-xl text-lg leading-relaxed text-gray-500">
+              Pick a program that fits your game and follow each session from your phone, tablet, or
+              computer.
             </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start mb-10">
-              <Link
-                href="/signup"
-                className="flex items-center justify-center gap-3 bg-black text-white px-8 py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors"
-              >
-                Create free account
-              </Link>
-              <Link
-                href="/programs"
-                className="flex items-center justify-center gap-3 bg-white border border-gray-200 text-black px-8 py-4 rounded-full font-semibold hover:bg-gray-50 transition-colors"
-              >
-                Browse programs
-              </Link>
-            </div>
-            
-            <div className="flex items-center justify-center md:justify-start gap-4">
-              <div className="flex -space-x-3">
-                <img src="https://i.pravatar.cc/100?img=1" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
-                <img src="https://i.pravatar.cc/100?img=2" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
-                <img src="https://i.pravatar.cc/100?img=3" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
-                <img src="https://i.pravatar.cc/100?img=4" alt="User" className="w-10 h-10 rounded-full border-2 border-[#f9f9f9]" />
-              </div>
-              <div className="text-sm">
-                <div className="flex text-[#ccff00]">
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 fill-current" />
-                </div>
-                <div className="text-gray-500 font-medium mt-0.5">5.0 from 2,000+ reviews</div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex-1 w-full max-w-md mx-auto relative">
-            <div className="absolute inset-0 bg-[#ccff00]/20 blur-[100px] rounded-full"></div>
-            <img 
-              src="/Core Padel Workout 2-left.png" 
-              alt="Core Padel Workout App" 
-              className="relative z-10 w-full h-auto drop-shadow-2xl"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section id="about" className="py-12 md:py-24 px-6 md:px-12 bg-white text-black overflow-hidden">
-        <div className="max-w-[1400px] mx-auto">
-          <div className="mb-16">
-            <div className="inline-block border border-gray-200 rounded-full px-5 py-1.5 text-sm font-medium mb-8 text-gray-600">
-              About Us
-            </div>
-            <div className="flex flex-col md:flex-row gap-12 justify-between items-start">
-              <h2 className="text-4xl md:text-5xl font-medium max-w-2xl leading-tight tracking-tight">
-                Built For Players Who Love The Game — And The Community Behind It.
-              </h2>
-              <p className="text-gray-500 max-w-md text-lg leading-relaxed">
-                Core Padel Workout was created to make racket sports more accessible, energetic, and social. What started as a small group of friends meeting on weekends has grown into a vibrant community.
-              </p>
-            </div>
-          </div>
-
-          {/* Image */}
-          <div className="w-full h-[400px] md:h-[600px] rounded-3xl overflow-hidden mb-12">
-            <img src="/Padel_coach_standing.webp" alt="Core Padel Workout Coach" className="w-full h-full object-cover object-center" />
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-6 max-w-3xl mx-auto text-center">
-            {heroStats.map((stat, i) => (
-              <div key={i} className="bg-[#f9f9f9] p-6 rounded-3xl flex flex-col items-center justify-center">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-2xl shadow-sm mb-4">
-                  {stat.emoji}
-                </div>
-                <div className="text-4xl font-medium mb-2">{stat.value}</div>
-                <div className="text-gray-500 text-sm font-medium uppercase tracking-wider">{stat.text}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-12 md:py-24 bg-white text-black text-center overflow-hidden">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12 mb-16">
-          <div className="inline-block border border-gray-200 rounded-full px-5 py-1.5 text-sm font-medium mb-8 text-gray-600">
-            Testimonials
-          </div>
-          <h2 className="text-4xl md:text-5xl font-medium tracking-tight">Players Love Core Padel Workout</h2>
-        </div>
-        
-        {/* Infinite Scroll Container */}
-        <div className="relative flex overflow-x-hidden group">
-          <div className="flex gap-6 animate-infinite-scroll w-max px-6">
-            {/* Double the testimonials array to create seamless loop */}
-            {[...testimonials, ...testimonials].map((testimonial, i) => (
-              <div key={i} className="bg-[#f9f9f9] p-8 md:p-10 rounded-3xl flex flex-col justify-between w-[320px] md:w-[400px] shrink-0 text-left">
-                <p className="text-gray-600 leading-relaxed mb-12 text-sm md:text-base">
-                  "{testimonial.text}"
-                </p>
-                <div className="flex items-center justify-between mt-auto">
-                  <div className="flex items-center gap-4">
-                    <img src={testimonial.img} alt={testimonial.name} className="w-12 h-12 rounded-full" />
-                    <div>
-                      <h4 className="font-medium text-sm md:text-base">{testimonial.name}</h4>
-                      <p className="text-xs md:text-sm text-gray-500">{testimonial.role}</p>
-                    </div>
+            <ol className="mt-10 space-y-6">
+              {steps.map((step, index) => (
+                <li key={step.title} className="flex gap-4">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ccff00] text-sm font-semibold text-black">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <h3 className="text-lg font-medium">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-600">{step.body}</p>
                   </div>
-                  <div className="flex items-center gap-1 text-sm font-medium">
-                    {testimonial.rating} <Star className="w-4 h-4 fill-[#ffc107] text-[#ffc107]" />
-                  </div>
-                </div>
-              </div>
-            ))}
+                </li>
+              ))}
+            </ol>
           </div>
-          
-          {/* Gradient Overlays for smooth fade effect on edges */}
-          <div className="absolute top-0 bottom-0 left-0 w-12 md:w-32 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
-          <div className="absolute top-0 bottom-0 right-0 w-12 md:w-32 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
+          {workoutPreview ? <WorkoutFrame preview={workoutPreview} /> : null}
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-12 md:py-24 px-6 md:px-12 bg-white text-black text-center flex flex-col items-center">
-        <div className="max-w-[1400px] mx-auto w-full">
-          <div className="inline-block border border-gray-200 rounded-full px-5 py-1.5 text-sm font-medium mb-8 text-gray-600">
-            Pricing
-          </div>
-          <h2 className="text-4xl md:text-5xl font-medium mb-16 tracking-tight">Choose Your Membership</h2>
-          
-          <div className="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto text-left">
-            <div className="flex-1 bg-[#f4f4f4] rounded-[2rem] p-10 flex flex-col">
-              <div className="flex justify-between items-start mb-6">
-                <h3 className="text-xl font-medium text-gray-600">Free programs</h3>
-                <Star className="w-6 h-6 text-gray-400" />
-              </div>
-              <div className="mb-2">
-                <span className="text-5xl font-medium">€0</span>
-              </div>
-              <p className="text-gray-500 mb-8 pb-8 border-b border-gray-200">Start training with no commitment</p>
-              
-              <div className="mb-6">
-                <p className="text-sm font-medium mb-4">What&apos;s included:</p>
-                <ul className="space-y-4">
-                  <li className="flex items-center gap-3 text-gray-600">
-                    <CheckCircle2 className="w-5 h-5 text-black shrink-0" />
-                    <span>Free warm-ups and selected programs</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-gray-600">
-                    <CheckCircle2 className="w-5 h-5 text-black shrink-0" />
-                    <span>High-quality video instructions</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-gray-600">
-                    <CheckCircle2 className="w-5 h-5 text-black shrink-0" />
-                    <span>Progress tracking on training plans</span>
-                  </li>
-                </ul>
-              </div>
-              <Link href="/court-warm-up" className="w-full mt-auto bg-black text-white py-4 rounded-full font-semibold hover:bg-gray-800 transition-colors text-center block">
-                Try free warmup
-              </Link>
-            </div>
-
-            {/* Pro */}
-            <div className="flex-1 bg-[#0a0a0a] text-white rounded-[2rem] p-10 flex flex-col relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-[#ccff00] text-black text-xs font-bold px-4 py-1 rounded-bl-xl uppercase tracking-wider">
-                Best Value
-              </div>
-              <div className="flex justify-between items-start mb-6">
-                <h3 className="text-xl font-medium text-gray-400">Pro membership</h3>
-                <Star className="w-6 h-6 fill-[#ccff00] text-[#ccff00]" />
-              </div>
-              <div className="mb-2">
-                <span className="text-5xl font-medium">{proPriceLabel ?? PRO_MONTHLY_PRICE_LABEL}</span>
-              </div>
-              <p className="text-gray-400 mb-8 pb-8 border-b border-gray-800">Unlimited access to everything</p>
-              
-              <div className="mb-6">
-                <p className="text-sm font-medium mb-4">What's included:</p>
-                <ul className="space-y-4">
-                  <li className="flex items-center gap-3 text-gray-300">
-                    <CheckCircle2 className="w-5 h-5 text-[#ccff00] shrink-0" />
-                    <span>Unlimited access to ALL programs</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-gray-300">
-                    <CheckCircle2 className="w-5 h-5 text-[#ccff00] shrink-0" />
-                    <span>AI Coach for personalized routines</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-gray-300">
-                    <CheckCircle2 className="w-5 h-5 text-[#ccff00] shrink-0" />
-                    <span>New programs added monthly</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-gray-300">
-                    <CheckCircle2 className="w-5 h-5 text-[#ccff00] shrink-0" />
-                    <span>Cancel anytime</span>
-                  </li>
-                </ul>
-              </div>
-              <Link
-                href="/signup"
-                className="w-full mt-auto bg-[#ccff00] text-black py-4 rounded-full font-semibold hover:bg-[#b3e600] transition-colors text-center block"
-              >
-                Get started with Pro
-              </Link>
+      <section className="bg-white px-6 py-16 md:px-12 md:py-24">
+        <div className="mx-auto grid w-full max-w-[1400px] items-start gap-12 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+              CorePadel AI Coach
+            </p>
+            <h2 className="mt-3 text-3xl font-medium tracking-tight sm:text-4xl md:text-5xl">
+              A padel training plan built around you.
+            </h2>
+            <p className="mt-4 max-w-xl text-lg leading-relaxed text-gray-500">
+              Tell us what you want to improve and where you train. The CorePadel AI Coach builds a
+              program around your goal using exercises created by our padel training experts.
+            </p>
+            <ol className="mt-10 space-y-6">
+              <li className="flex gap-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ccff00] text-sm font-semibold text-black">
+                  1
+                </span>
+                <div>
+                  <h3 className="text-lg font-medium">Choose your goal</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                    Build strength for overhead shots, get quicker around the court, or improve your
+                    endurance for longer rallies.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ccff00] text-sm font-semibold text-black">
+                  2
+                </span>
+                <div>
+                  <h3 className="text-lg font-medium">Choose where you train</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                    At home, in the gym, or on the padel court. Your program is built around the
+                    setting you choose.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ccff00] text-sm font-semibold text-black">
+                  3
+                </span>
+                <div>
+                  <h3 className="text-lg font-medium">Get your personal program</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                    The AI Coach uses guidance from our experts to put together your sessions. Follow
+                    the exercise videos and track your progress as you train.
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <div className="mt-10 hidden lg:block">
+              <TrialButton
+                placement="coach"
+                className="inline-flex items-center justify-center rounded-full bg-[#ccff00] px-8 py-3.5 text-base font-semibold text-black transition-colors hover:bg-[#b3e600]"
+              />
+              <TrialTerms className="mt-3 max-w-md" />
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* FAQ Section */}
-      <section className="py-20 md:py-32 px-6 md:px-12 bg-white">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-medium mb-6 tracking-tight">Frequently Asked Questions</h2>
-            <p className="text-gray-500 text-lg">Everything you need to know about Core Padel Workout.</p>
-          </div>
-          
-          <div className="space-y-4">
-            {faqs.map((faq, index) => (
-              <div 
-                key={index} 
-                className={`border border-gray-200 rounded-2xl overflow-hidden transition-all duration-300 ${
-                  openFaqIndex === index ? "bg-gray-50 shadow-sm" : "bg-white hover:border-gray-300"
-                }`}
-              >
-                <button
-                  className="w-full px-6 py-5 flex items-center justify-between text-left focus:outline-none"
-                  onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-                >
-                  <span className="font-medium text-lg pr-8">{faq.question}</span>
-                  <ChevronDown 
-                    className={`w-5 h-5 text-gray-400 transition-transform duration-300 shrink-0 ${
-                      openFaqIndex === index ? "rotate-180" : ""
-                    }`} 
-                  />
-                </button>
-                
-                <div 
-                  className={`px-6 overflow-hidden transition-all duration-300 ease-in-out ${
-                    openFaqIndex === index ? "max-h-[500px] pb-6 opacity-100" : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <div className="text-gray-600 whitespace-pre-line leading-relaxed">
-                    {faq.answer}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="relative py-16 md:py-32 px-6 md:px-12 text-white text-center flex flex-col items-center justify-center">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?q=80&w=2940&auto=format&fit=crop" 
-            alt="Padel Court Close Up" 
-            className="w-full h-full object-cover"
+          <img
+            src="/ai-coach-plan.webp"
+            alt="Build your plan by choosing a training goal and where you train. An example week includes lower-body strength, lateral movement, and acceleration and braking."
+            className="h-auto w-full rounded-3xl"
           />
-          <div className="absolute inset-0 bg-black/60"></div>
+
+          <div className="lg:hidden">
+            <TrialButton
+              placement="coach"
+              className="inline-flex w-full items-center justify-center rounded-full bg-[#ccff00] px-8 py-3.5 text-base font-semibold text-black transition-colors hover:bg-[#b3e600]"
+            />
+            <TrialTerms className="mt-3" />
+          </div>
         </div>
-        <div className="relative z-10 max-w-2xl mx-auto">
-          <h2 className="text-4xl md:text-6xl font-medium mb-6 tracking-tight">Ready To Play With Us?</h2>
-          <p className="text-gray-300 text-lg mb-10 max-w-xl mx-auto leading-relaxed">
-            Step onto the court, sharpen your skills, and compete with players who share your passion for padel.
+      </section>
+
+      <section id="programs" className="scroll-mt-24 bg-[#f7f7f5] px-6 py-16 md:px-12 md:py-24">
+        <div className="mx-auto w-full max-w-[1400px]">
+          <h2 className="text-3xl font-medium tracking-tight sm:text-4xl md:text-5xl">
+            Find a program that fits your game.
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-gray-500">
+            Choose what you want to work on and see how each program fits into your week.
           </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link href="/signup" className="bg-[#ccff00] text-black px-8 py-3.5 rounded-full font-semibold hover:bg-[#b3e600] transition-colors">
-              Get Started
+
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {featuredPrograms.map((program) => (
+              <article key={program.slug} className="flex flex-col overflow-hidden rounded-3xl bg-white shadow-sm">
+                <img src={program.image} alt="" className="h-52 w-full object-cover" />
+                <div className="flex flex-1 flex-col p-6">
+                  <h3 className="text-xl font-medium">{program.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-600">{program.description}</p>
+                  {program.meta.length > 0 && (
+                    <ul className="mt-4 flex flex-wrap gap-2">
+                      {program.meta.map((item) => (
+                        <li
+                          key={item}
+                          className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700"
+                        >
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <Link
+                    href={`/programs/${program.slug}`}
+                    className="mt-6 text-sm font-semibold text-black underline-offset-4 hover:underline"
+                  >
+                    View program
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <Link href="/programs" className="text-sm font-semibold text-black underline-offset-4 hover:underline">
+              Browse all programs
             </Link>
-            <Link href="#programs" className="bg-white text-black px-8 py-3.5 rounded-full font-semibold hover:bg-gray-100 transition-colors">
-              View Programs
+            <Link
+              href="/programs?category=Recovery"
+              className="text-sm font-medium text-gray-600 underline-offset-4 hover:text-black hover:underline"
+            >
+              Explore comeback programs
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="scroll-mt-24 bg-white px-6 py-16 md:px-12 md:py-24">
+        <div className="mx-auto w-full max-w-5xl lg:text-center">
+          <h2 className="text-3xl font-medium tracking-tight sm:text-4xl md:text-5xl">
+            Try CorePadel Pro free for 7 days.
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-gray-500 lg:mx-auto">
+            Get full access to the training library and try a program that fits your game.
+          </p>
+
+          <div className="mt-10 max-w-xl lg:mx-auto lg:text-left">
+            <article className="flex flex-col rounded-[2rem] bg-[#0a0a0a] p-8 text-white md:p-10">
+              <h3 className="text-xl font-medium">CorePadel Pro</h3>
+              <p className="mt-6 text-4xl font-medium">7 days free</p>
+              <p className="mt-1 text-gray-400">Then €19.99/month</p>
+              <ul className="mt-8 space-y-3 text-sm text-gray-200">
+                {[
+                  "Full access to the program library",
+                  "Video-guided workouts and session tracking",
+                  "AI Coach for personalized routines",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#ccff00]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <TrialButton
+                  placement="pricing"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-[#ccff00] px-8 py-3.5 text-base font-semibold text-black transition-colors hover:bg-[#b3e600]"
+                />
+                <p className="mt-3 text-sm leading-relaxed text-gray-400">{TRIAL_TERMS}</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white px-6 pb-16 md:px-12 md:pb-24">
+        <div className="mx-auto w-full max-w-3xl">
+          <h2 className="text-3xl font-medium tracking-tight sm:text-4xl">Questions</h2>
+          <div className="mt-8 divide-y divide-gray-200 border-y border-gray-200">
+            <details className="group py-4">
+              <summary className="cursor-pointer list-none text-lg font-medium [&::-webkit-details-marker]:hidden">
+                How does the 7-day free trial work?
+              </summary>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                You’ll enter your payment details when you sign up and get full Pro access for 7 days.
+                Your first €19.99 payment is charged when your trial ends, then monthly after that. Cancel
+                before the trial ends to avoid the first charge.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="cursor-pointer list-none text-lg font-medium [&::-webkit-details-marker]:hidden">
+                Can I cancel my subscription?
+              </summary>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                Yes. You can cancel anytime. Cancel before the end of your 7-day trial to avoid being
+                charged.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="cursor-pointer list-none text-lg font-medium [&::-webkit-details-marker]:hidden">
+                Can I try a workout before starting a trial?
+              </summary>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                No. You need a CorePadel Pro subscription to use the workouts. You can start with a
+                7-day trial and cancel before it ends to avoid being charged.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="cursor-pointer list-none text-lg font-medium [&::-webkit-details-marker]:hidden">
+                Do I need gym equipment?
+              </summary>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                Some workouts require no equipment. Others use standard gym equipment. Check the program
+                details to see what you’ll need.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="cursor-pointer list-none text-lg font-medium [&::-webkit-details-marker]:hidden">
+                Is CorePadel suitable for beginners?
+              </summary>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                Yes. Choose a beginner-friendly program and use the video demos to follow each exercise at
+                your own pace.
+              </p>
+            </details>
+            <details className="group py-4">
+              <summary className="cursor-pointer list-none text-lg font-medium [&::-webkit-details-marker]:hidden">
+                Do I need to download an app?
+              </summary>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                You can use CorePadel in your browser on a phone, tablet, or computer.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative px-6 py-16 text-white md:px-12 md:py-24">
+        <div className="absolute inset-0 z-0">
+          <img src="/hero-bg.webp" alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-black/70" />
+        </div>
+        <div className="relative z-10 mx-auto max-w-2xl text-center">
+          <h2 className="text-3xl font-medium tracking-tight sm:text-4xl md:text-5xl">
+            Start training for your next match.
+          </h2>
+          <p className="mt-4 text-lg leading-relaxed text-gray-200">
+            Pick your first program and follow it free for 7 days with CorePadel Pro.
+          </p>
+          <div className="mt-8">
+            <TrialButton
+              placement="closing"
+              className="inline-flex w-full items-center justify-center rounded-full bg-[#ccff00] px-8 py-3.5 text-base font-semibold text-black transition-colors hover:bg-[#b3e600] sm:w-auto"
+            />
+            <p className="mt-3 text-sm leading-relaxed text-gray-300">{TRIAL_TERMS}</p>
           </div>
         </div>
       </section>
 
       <SiteFooter />
 
-      {/* Mobile sticky CTA (shows when hero CTA is off-screen) */}
       <div
-        className={`fixed inset-x-0 bottom-0 z-[120] md:hidden transition-transform duration-300 ${
+        className={`fixed inset-x-0 bottom-0 z-[120] transition-transform duration-300 md:hidden ${
           showMobileStickyCta && !isMobileMenuOpen ? "translate-y-0" : "translate-y-full"
         }`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="w-full border-t border-black/10 bg-white/95 p-3 backdrop-blur">
-          <Link
-            href="/signup"
-            className="flex w-full items-center justify-center rounded-xl bg-[#ccff00] px-5 py-3.5 text-sm font-semibold text-black hover:bg-[#b3e600] transition-colors"
-          >
-            Get Started Now
-          </Link>
+        <div className="border-t border-black/10 bg-white/95 p-3 backdrop-blur">
+          <TrialButton
+            placement="sticky"
+            className="flex w-full items-center justify-center rounded-xl bg-[#ccff00] px-5 py-3.5 text-sm font-semibold text-black transition-colors hover:bg-[#b3e600]"
+          />
         </div>
       </div>
     </div>

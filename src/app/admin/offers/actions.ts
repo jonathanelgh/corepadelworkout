@@ -47,11 +47,11 @@ export async function createSignupOffer(input: {
   if (auth.error) return { error: auth.error };
 
   const code = normalizeSignupOfferCode(input.code);
-  if (!code) return { error: "Code must be 2–40 characters: A–Z, 0–9, or hyphen." };
+  if (!code) return { error: "Code must be 2-40 characters: A-Z, 0-9, or hyphen." };
 
   const name = input.name.trim();
   if (name.length < 2 || name.length > 80) {
-    return { error: "Name must be 2–80 characters." };
+    return { error: "Name must be 2-80 characters." };
   }
 
   if (!ADMIN_PRO_GRANT_MONTHS.includes(input.months as AdminProGrantMonths)) {

@@ -29,6 +29,7 @@ type Props = {
   hideIntro?: boolean;
   programHref?: (slug: string) => string;
   emptyState?: { title: string; body: string };
+  initialCategory?: string | null;
 };
 
 export function ProgramsCatalog({
@@ -41,9 +42,12 @@ export function ProgramsCatalog({
   programHref = (slug) => `/programs/${slug}`,
   hideIntro = false,
   emptyState,
+  initialCategory,
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState(() =>
+    initialCategory && categoryOptions.includes(initialCategory) ? initialCategory : "All"
+  );
 
   const filteredPrograms = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

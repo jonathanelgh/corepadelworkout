@@ -16,6 +16,7 @@ import {
   Bot,
   Mail,
   Gift,
+  QrCode,
   Settings, 
   LogOut, 
   ChevronLeft, 
@@ -25,6 +26,7 @@ import {
   Tags
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -56,6 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Tasks", href: "/admin/tasks", icon: KanbanSquare },
     { name: "Waitlist", href: "/admin/waitlist", icon: Mail },
     { name: "Offers", href: "/admin/offers", icon: Gift },
+    { name: "Pro passes", href: "/admin/passes", icon: QrCode },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 
@@ -64,8 +67,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Top Bar */}
       <header className="z-30 flex h-12 shrink-0 items-center justify-between border-b border-gray-800 bg-black px-4 md:px-6">
         <div className="flex items-center gap-4">
-          <Link href="/admin" className="font-bold text-lg tracking-tight text-white">
-            CORE<span className="text-[#ccff00]">PADEL</span>
+          <Link href="/admin" className="inline-flex items-center">
+            <BrandWordmark tone="onDark" />
             <span className="ml-2 text-[10px] font-medium bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded-md tracking-normal">Admin</span>
           </Link>
         </div>

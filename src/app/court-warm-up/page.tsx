@@ -10,6 +10,7 @@ import {
   type FreeWarmupProgramCard,
 } from "@/lib/programs/court-warmup-funnel";
 import { CourtWarmupSignUpForm } from "./signup-form";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ const FALLBACK_OUTCOMES = [
 export const metadata: Metadata = {
   title: "Free Padel Warm-ups",
   description:
-    "Create a free account and unlock all free padel warm-up programs — three court routines to get match-ready.",
+    "Create a free account and unlock all free padel warm-up programs: three court routines to get match-ready.",
   openGraph: {
     title: "Free Padel Warm-ups · Core Padel",
     description:
@@ -151,8 +152,8 @@ export default async function CourtWarmupLandingPage() {
     <div className="min-h-dvh bg-[#070807] text-white">
       <header className="absolute inset-x-0 top-0 z-20">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
-          <Link href="/" className="text-sm font-bold uppercase tracking-[0.22em]">
-            Core<span className="text-[#ccff00]">Padel</span>
+          <Link href="/" className="inline-flex">
+            <BrandWordmark tone="onDark" />
           </Link>
           <Link
             href={
@@ -192,7 +193,7 @@ export default async function CourtWarmupLandingPage() {
                   Free padel warm-ups
                 </h1>
                 <p className="mt-5 max-w-md text-base leading-relaxed text-white/75 sm:text-lg">
-                  Create a free account and unlock every free warm-up in the library — {freeCount}{" "}
+                  Create a free account and unlock every free warm-up in the library. {freeCount}{" "}
                   court routines to get match-ready, including dynamic, flow, and resistance-band
                   options.
                 </p>
@@ -231,7 +232,7 @@ export default async function CourtWarmupLandingPage() {
                       Your free warm-ups are ready
                     </h2>
                     <p className="mt-2 text-sm leading-relaxed text-white/65">
-                      You have free access to all {freeCount} warm-up programs — pick one below and
+                      You have free access to all {freeCount} warm-up programs. Pick one below and
                       start.
                     </p>
                     <a
@@ -250,7 +251,7 @@ export default async function CourtWarmupLandingPage() {
                       Unlock all free warm-ups
                     </h2>
                     <p className="mt-2 text-sm leading-relaxed text-white/65">
-                      Create a free account with email and password — then open every free warm-up
+                      Create a free account with email and password, then open every free warm-up
                       program ({freeCount} routines today).
                     </p>
                     <div className="mt-6">
@@ -273,7 +274,7 @@ export default async function CourtWarmupLandingPage() {
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-relaxed text-white/65">
               One free account unlocks the full free warm-up library. Choose the routine that fits
-              your day — dynamic, flow, or resistance bands.
+              your day: dynamic, flow, or resistance bands.
             </p>
 
             <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

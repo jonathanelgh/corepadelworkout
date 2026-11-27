@@ -671,7 +671,17 @@ export async function loadUserActivePrograms(
 
   if (error || !runs?.length) return [];
 
-  const summaries: ActiveProgramSummary[] = [];
+  const ready: {
+    run: (typeof runs)[number];
+    prog: {
+      id: string;
+      slug: string;
+      title: string;
+      cover_image_url: string | null;
+      status: string;
+      program_format: string | null;
+    };
+  }[] = [];
 
   for (const run of runs) {
     let progRaw = run.programs;
@@ -697,6 +707,11 @@ export async function loadUserActivePrograms(
     if (prog.status !== "published" && !(isAdmin && prog.status === "draft")) continue;
     if (prog.program_format === "single_workout") continue;
 
+    ready.push({ run, prog });
+  }
+
+  const loaded = await Promise.all(
+    ready.map(async ({ run, prog }) => {
     const progress = await loadProgramProgress(
       supabase,
       userId,
@@ -704,7 +719,7 @@ export async function loadUserActivePrograms(
       profile,
       "training_plan"
     );
-    if (!progress?.runId) continue;
+    if (!progress?.runId) return null;
 
     const next = progress.nextSession;
     const nextWithProgress = next
@@ -713,7 +728,7 @@ export async function loadUserActivePrograms(
     const nextSessionInProgress = Boolean(
       nextWithProgress?.startedAt && !nextWithProgress.completedAt
     );
-    summaries.push({
+    return {
       programId: prog.id,
       slug: prog.slug,
       title:
@@ -730,10 +745,11 @@ export async function loadUserActivePrograms(
       programFormat: parseProgramFormat(prog.program_format),
       generated: false,
       started: true,
-    });
-  }
+    };
+    })
+  );
 
-  return summaries;
+  return loaded.filter((row): row is ActiveProgramSummary => row != null);
 }
 
 type GeneratedProgramRow = {
@@ -837,7 +853,17 @@ export async function loadQuickWorkouts(
 ): Promise<QuickWorkoutSummary[]> {
   const { data, error } = await supabase
     .from("programs")
-    .select("id, slug, title, cover_image_url, minutes_per_session")
+    .select(`
+      id,
+      slug,
+      title,
+      cover_image_url,
+      minutes_per_session,
+      program_location_tracks (
+        sort_order,
+        program_sessions ( id, sort_order )
+      )
+    `)
     .eq("status", "published")
     .eq("program_format", "single_workout")
     .order("updated_at", { ascending: false })
@@ -847,9 +873,17 @@ export async function loadQuickWorkouts(
 
   const out: QuickWorkoutSummary[] = [];
   for (const p of data) {
-    const { sessions } = await fetchProgramSessionsForProgram(supabase, p.id);
+    const tracksRaw = p.program_location_tracks as
+      | { sort_order: number; program_sessions: { id: string; sort_order: number } | { id: string; sort_order: number }[] | null }
+      | { sort_order: number; program_sessions: { id: string; sort_order: number } | { id: string; sort_order: number }[] | null }[]
+      | null;
+    const tracks = Array.isArray(tracksRaw) ? tracksRaw : tracksRaw ? [tracksRaw] : [];
+    tracks.sort((a, b) => a.sort_order - b.sort_order);
+    const sessionsRaw = tracks[0]?.program_sessions;
+    const sessions = Array.isArray(sessionsRaw) ? sessionsRaw : sessionsRaw ? [sessionsRaw] : [];
+    sessions.sort((a, b) => a.sort_order - b.sort_order);
     const session = sessions[0];
-    if (!session) continue;
+    if (!session?.id || !p.slug) continue;
     out.push({
       programId: p.id,
       slug: p.slug,

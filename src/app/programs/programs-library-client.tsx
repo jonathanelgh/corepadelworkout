@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { ProgramsCatalog } from "@/components/programs/programs-catalog";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 
 export type ProgramCard = {
   slug: string;
@@ -22,9 +23,15 @@ type Props = {
   programs: ProgramCard[];
   categoryOptions: string[];
   loadError?: string | null;
+  initialCategory?: string | null;
 };
 
-export function ProgramsLibraryClient({ programs, categoryOptions, loadError }: Props) {
+export function ProgramsLibraryClient({
+  programs,
+  categoryOptions,
+  loadError,
+  initialCategory,
+}: Props) {
   return (
     <div className="min-h-screen bg-white pb-24 font-sans text-black selection:bg-[#ccff00] selection:text-black">
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/80 backdrop-blur-xl">
@@ -36,7 +43,9 @@ export function ProgramsLibraryClient({ programs, categoryOptions, loadError }: 
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <span className="hidden font-bold tracking-wider uppercase sm:block">Core Padel Workout</span>
+            <Link href="/" className="inline-flex">
+              <BrandWordmark />
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/" className="hidden text-sm font-medium transition-colors hover:text-[#ccff00] sm:block">
@@ -54,6 +63,7 @@ export function ProgramsLibraryClient({ programs, categoryOptions, loadError }: 
           programs={programs}
           categoryOptions={categoryOptions}
           loadError={loadError}
+          initialCategory={initialCategory}
         />
       </main>
     </div>

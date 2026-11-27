@@ -25,11 +25,11 @@ export async function sendLaunchLiveEmail(input: {
 
   const subject = input.correction
     ? input.test
-      ? "[TEST] Sorry — here is the correct Core Padel Workout signup link"
-      : "Sorry — here is the correct Core Padel Workout signup link"
+      ? "[TEST] Sorry. Here is the correct Core Padel Workout signup link"
+      : "Sorry. Here is the correct Core Padel Workout signup link"
     : input.test
-      ? "[TEST] Core Padel Workout is live — claim your 6 months of Pro"
-      : "Core Padel Workout is live — claim your 6 months of Pro";
+      ? "[TEST] Core Padel Workout is live. Claim your 6 months of Pro"
+      : "Core Padel Workout is live. Claim your 6 months of Pro";
 
   const resend = new Resend(apiKey);
   const { error } = await resend.emails.send({

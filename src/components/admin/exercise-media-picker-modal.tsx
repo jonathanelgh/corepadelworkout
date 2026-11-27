@@ -168,7 +168,7 @@ export function ExerciseMediaPickerModal({
         } catch (compressErr) {
           // Still allow the original so admins aren't blocked if wasm fails.
           console.warn("[exercise-media] compress failed, uploading original", compressErr);
-          setUploadStatus("Compression skipped — uploading original file.");
+          setUploadStatus("Compression skipped. Uploading original file.");
         }
       }
 

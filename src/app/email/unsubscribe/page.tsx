@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { stopProConversionNurtureByToken } from "@/lib/emails/pro-conversion-nurture";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +28,7 @@ export default async function EmailUnsubscribePage({ searchParams }: PageProps) 
   return (
     <main className="min-h-screen bg-zinc-100 px-4 py-16 text-zinc-900">
       <div className="mx-auto max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-lime-700">
-          Core Padel Workout
-        </p>
+        <BrandWordmark />
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">
           {ok ? "Unsubscribed" : "Unsubscribe"}
         </h1>

@@ -71,10 +71,10 @@ export function ProgramDayOverview({
                 {sessionLabel}
               </h1>
               {inProgress && (
-                <p className="mt-1 text-sm font-medium text-[#ccff00]">In progress — pick up where you left off</p>
+                <p className="mt-1 text-sm font-medium text-[#ccff00]">In progress. Pick up where you left off</p>
               )}
               {completed && !inProgress && (
-                <p className="mt-1 text-sm font-medium text-emerald-200">Completed — you can train this day again</p>
+                <p className="mt-1 text-sm font-medium text-emerald-200">Completed. You can train this day again</p>
               )}
             </div>
           </div>
@@ -84,7 +84,7 @@ export function ProgramDayOverview({
               <Clock className="h-4 w-4 shrink-0 text-zinc-400" />
               <div>
                 <p className="text-sm font-semibold tabular-nums text-zinc-900">
-                  {durationLabel ?? "—"}
+                  {durationLabel ?? "-"}
                 </p>
                 <p className="text-xs text-zinc-500">Duration</p>
               </div>
@@ -122,7 +122,7 @@ export function ProgramDayOverview({
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-sm text-zinc-600">No equipment needed — bodyweight only.</p>
+              <p className="mt-2 text-sm text-zinc-600">No equipment needed. Bodyweight only.</p>
             )}
           </div>
         </div>

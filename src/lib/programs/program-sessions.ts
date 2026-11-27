@@ -109,18 +109,15 @@ function buildWeeksFromSessions(sessions: ProgramSessionRow[]): ProgramWeekRow[]
     }));
 }
 
-async function fetchWeeksForTrack(
-  supabase: SupabaseClient,
-  trackId: string
-): Promise<WeekDbRow[]> {
-  const { data, error } = await supabase
-    .from("program_weeks")
-    .select("id, week_number, name, sort_order")
-    .eq("track_id", trackId)
-    .order("sort_order", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return (data ?? []) as WeekDbRow[];
+function weeksFromSessionRows(rows: SessionDbRow[]): WeekDbRow[] {
+  const byId = new Map<string, WeekDbRow>();
+  for (const row of rows) {
+    const weekRaw = row.program_weeks;
+    const week = Array.isArray(weekRaw) ? weekRaw[0] : weekRaw;
+    if (!week?.id || byId.has(week.id)) continue;
+    byId.set(week.id, week);
+  }
+  return [...byId.values()].sort((a, b) => a.sort_order - b.sort_order || a.week_number - b.week_number);
 }
 
 function buildWeeksFromTrackWeeks(
@@ -176,10 +173,9 @@ const TRACK_SESSIONS_SELECT = `
   )
 `;
 
-async function sessionsAndWeeksForTrack(
-  supabase: SupabaseClient,
+function sessionsAndWeeksForTrack(
   track: TrackRow
-): Promise<{ trackId: string; sessions: ProgramSessionRow[]; weeks: ProgramWeekRow[] }> {
+): { trackId: string; sessions: ProgramSessionRow[]; weeks: ProgramWeekRow[] } {
   const sessionsRaw = track.program_sessions;
   const sessionsArr = Array.isArray(sessionsRaw)
     ? sessionsRaw
@@ -198,7 +194,7 @@ async function sessionsAndWeeksForTrack(
     return mapSession(row, dayInWeek);
   });
 
-  const weeksData = await fetchWeeksForTrack(supabase, track.id);
+  const weeksData = weeksFromSessionRows(sorted);
 
   return {
     trackId: track.id,
@@ -221,7 +217,7 @@ export async function fetchProgramSessionsForTrack(
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Training track not found.");
 
-  return sessionsAndWeeksForTrack(supabase, data as TrackRow);
+  return sessionsAndWeeksForTrack(data as TrackRow);
 }
 
 export async function fetchProgramSessionsForProgram(
@@ -259,7 +255,7 @@ export async function fetchProgramSessionsForProgram(
     }
   }
 
-  return sessionsAndWeeksForTrack(supabase, picked);
+  return sessionsAndWeeksForTrack(picked);
 }
 
 export type SessionOwnership = {

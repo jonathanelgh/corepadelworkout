@@ -21,14 +21,14 @@ export function MemberProfileTab({
   const [editOpen, setEditOpen] = useState(false);
 
   const rows: [string, string][] = [
-    ["Email", profile.email ?? "—"],
-    ["Name", profile.full_name?.trim() || "—"],
+    ["Email", profile.email ?? "-"],
+    ["Name", profile.full_name?.trim() || "-"],
     ["Padel level", profile.levelName],
     ["Top priority", profile.goalLabel],
     ["Train usually", profile.envLabel],
     ["Padel pains / focus", profile.painsStr],
-    ["Birth date", profile.birth_date ?? "—"],
-    ["Gender", profile.gender ?? "—"],
+    ["Birth date", profile.birth_date ?? "-"],
+    ["Gender", profile.gender ?? "-"],
   ];
 
   return (

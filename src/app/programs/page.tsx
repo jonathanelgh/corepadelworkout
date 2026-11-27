@@ -4,7 +4,12 @@ import { ProgramsLibraryClient } from "./programs-library-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProgramsPage() {
+export default async function ProgramsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string }>;
+}) {
+  const { category } = await searchParams;
   const supabase = await createClient();
 
   const [programsRes, categoriesRes] = await Promise.all([
@@ -56,6 +61,7 @@ export default async function ProgramsPage() {
       programs={programs}
       categoryOptions={categoryOptions}
       loadError={loadError}
+      initialCategory={category?.trim() || null}
     />
   );
 }

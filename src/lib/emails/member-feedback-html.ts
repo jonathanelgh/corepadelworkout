@@ -66,7 +66,7 @@ export function buildMemberFeedbackEmail(params: {
 </html>`;
 
   const text = [
-    "Core Padel Workout — New member feedback",
+    "Core Padel Workout: New member feedback",
     "",
     `From: ${params.memberName} <${params.memberEmail}>`,
     `Category: ${params.categoryLabel}`,
@@ -74,7 +74,7 @@ export function buildMemberFeedbackEmail(params: {
     "",
     params.message,
     "",
-    "—",
+    "-",
     "You are receiving this because you are an admin on Core Padel Workout.",
   ].join("\n");
 

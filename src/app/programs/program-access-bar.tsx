@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { createClient } from "@/utils/supabase/server";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { parseProgramFormat, type ProgramFormat } from "@/lib/programs/program-format";
@@ -26,10 +27,11 @@ export async function ProgramAccessBar({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Drafts are never publicly free; require access (admins pass via RPC).
-  let hasAccess = isFree && !isAdminDraftPreview;
-  if (user && !hasAccess) {
-    hasAccess = await userHasProgramAccess(supabase, user.id, programId);
+  let hasAccess = false;
+  if (user) {
+    hasAccess = isAdminDraftPreview
+      ? await userHasProgramAccess(supabase, user.id, programId)
+      : await getHasActivePro(supabase, user.id);
   }
 
   let progress = null;
@@ -70,7 +72,7 @@ export async function ProgramAccessBar({
 export async function requireProgramWorkoutAccess(
   programId: string,
   programSlug: string,
-  isFree: boolean,
+  _isFree: boolean,
   opts?: { isAdminDraftPreview?: boolean }
 ) {
   const supabase = await createClient();
@@ -90,11 +92,9 @@ export async function requireProgramWorkoutAccess(
     return;
   }
 
-  if (isFree) return;
-
-  const hasAccess = await userHasProgramAccess(supabase, user.id, programId);
+  const hasAccess = await getHasActivePro(supabase, user.id);
   if (!hasAccess) {
-    redirect(`/programs/${programSlug}?upgrade=1`);
+    redirect("/subscribe");
   }
 }
 

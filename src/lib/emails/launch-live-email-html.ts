@@ -29,8 +29,8 @@ export function buildLaunchLiveEmail(signupUrl: string): { html: string; text: s
           <tr>
             <td style="padding:32px 28px 28px;border-bottom:1px solid #e4e4e7;">
               <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#65a30d;">Core Padel Workout</p>
-              <p style="margin:10px 0 0;font-size:26px;font-weight:600;line-height:1.25;color:#09090b;">We are live — your Pro access is waiting</p>
-              <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#52525b;">You joined the waitlist before launch. Today you can create your account and unlock <strong style="color:#09090b;">${months} months of Pro free</strong> — every program, the exercise library, and AI Coach.</p>
+              <p style="margin:10px 0 0;font-size:26px;font-weight:600;line-height:1.25;color:#09090b;">We are live. Your Pro access is waiting</p>
+              <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#52525b;">You joined the waitlist before launch. Today you can create your account and unlock <strong style="color:#09090b;">${months} months of Pro free</strong>: every program, the exercise library, and AI Coach.</p>
             </td>
           </tr>
           <tr>
@@ -47,7 +47,7 @@ export function buildLaunchLiveEmail(signupUrl: string): { html: string; text: s
                 <tr>
                   <td style="padding:18px 20px;">
                     <p style="margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#65a30d;">Your early-access perk</p>
-                    <p style="margin:0;font-size:14px;line-height:1.55;color:#3f3f46;">Sign up with <strong style="color:#09090b;">the same email address</strong> you used on the waitlist. Your personal link activates ${months} months of Pro automatically — no payment required.</p>
+                    <p style="margin:0;font-size:14px;line-height:1.55;color:#3f3f46;">Sign up with <strong style="color:#09090b;">the same email address</strong> you used on the waitlist. Your personal link activates ${months} months of Pro automatically. No payment required.</p>
                   </td>
                 </tr>
               </table>

@@ -237,7 +237,7 @@ export function EquipmentListClient({ items }: { items: EquipmentListItem[] }) {
                       {row.description?.trim() ? (
                         <p className="line-clamp-2 text-sm">{row.description.trim()}</p>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-gray-400">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 align-middle text-right">

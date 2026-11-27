@@ -777,7 +777,7 @@ export function AiCoachClient({
         res = (await response.json()) as typeof res;
       } catch {
         setError(
-          `Save failed (HTTP ${response.status}). The server returned a non-JSON response — check the terminal log.`
+          `Save failed (HTTP ${response.status}). The server returned a non-JSON response. Check the terminal log.`
         );
         return;
       }
@@ -865,7 +865,7 @@ export function AiCoachClient({
               className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black"
             >
               <option value="">
-                {targetUserId ? "Auto — from member onboarding" : "Auto — not set"}
+                {targetUserId ? "Auto, from member onboarding" : "Auto, not set"}
               </option>
               {TRAINING_LEVEL_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -910,8 +910,8 @@ export function AiCoachClient({
               <p className="text-xs font-semibold tracking-[0.16em] text-gray-500 uppercase">AI Coach</p>
               <h2 className="mt-1 text-2xl font-bold tracking-tight text-gray-900">Build a plan</h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600">
-                Fill this in once. The coach writes the program, then you get the full plan —
-                summary, weeks, and every workout — before anything is saved.
+                Fill this in once. The coach writes the program, then you get the full plan:
+                summary, weeks, and every workout, before anything is saved.
               </p>
             </div>
 
@@ -934,7 +934,7 @@ export function AiCoachClient({
                   <ChoiceCard
                     selected={form.kind === "workout"}
                     title="Single workout"
-                    hint="One session — activation, recovery, or a focused day."
+                    hint="One session: activation, recovery, or a focused day."
                     onClick={() =>
                       patch({
                         kind: "workout",

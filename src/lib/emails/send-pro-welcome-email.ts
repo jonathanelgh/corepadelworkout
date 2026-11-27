@@ -78,7 +78,7 @@ export async function sendProWelcomeEmail(input: {
   const { error } = await resend.emails.send({
     from,
     to: [input.to.trim()],
-    subject: "Thank you — welcome to Core Padel Pro",
+    subject: "Thank you. Welcome to Core Padel Pro",
     html,
     text,
   }, input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined);

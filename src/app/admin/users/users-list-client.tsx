@@ -168,7 +168,7 @@ export function UsersListClient({
               <option value="">All offer codes</option>
               {offerOptions.map((o) => (
                 <option key={o.code} value={o.code}>
-                  {o.code} — {o.name}
+                  {o.code}: {o.name}
                 </option>
               ))}
             </select>
@@ -253,11 +253,11 @@ export function UsersListClient({
                             {user.age}
                           </span>
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
-                        {user.padelLevelName ?? "—"}
+                        {user.padelLevelName ?? "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-600 tabular-nums">
                         {joined}
@@ -294,7 +294,7 @@ export function UsersListClient({
                             </span>
                           ))}
                           {!user.hasActivePro && user.offerCodes.length === 0 && (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-400">-</span>
                           )}
                         </div>
                       </td>
@@ -305,7 +305,7 @@ export function UsersListClient({
                             Admin
                           </span>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-gray-400">-</span>
                         )}
                       </td>
                     </tr>

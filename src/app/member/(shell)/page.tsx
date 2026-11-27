@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server";
+import { createClient, getRequestUser } from "@/utils/supabase/server";
 import { loadMemberHubData } from "@/lib/member/load-member-hub-data";
 import { getMemberShellContext } from "@/lib/member/member-shell-context";
 import { tabFromSearchParam } from "@/lib/member/member-tabs";
@@ -14,9 +14,7 @@ export default async function MemberHubPage({ searchParams }: { searchParams: Pa
   const { userEmail, profile } = await getMemberShellContext();
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
   if (!user) return null;
 
   const hubData = await loadMemberHubData(supabase, user.id, userEmail);

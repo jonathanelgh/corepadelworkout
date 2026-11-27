@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { notifyAdminTrialStarted } from "@/lib/emails/notify-admin-trial-started";
 import { sendProWelcomeEmailForCheckoutSession } from "@/lib/emails/send-pro-welcome-email";
 import { getStripeWebhookSecret } from "@/lib/stripe/config";
 import { getStripe } from "@/lib/stripe/server";
@@ -33,8 +34,9 @@ export async function POST(request: Request) {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode === "subscription") {
           await syncStripeSubscriptionFromCheckoutSession(session);
-          // Fire-and-forget style: never fail the webhook if email delivery fails.
+          // Never fail the webhook if email delivery fails.
           await sendProWelcomeEmailForCheckoutSession(session);
+          await notifyAdminTrialStarted(session);
         }
         break;
       }

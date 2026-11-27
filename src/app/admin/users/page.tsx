@@ -84,7 +84,7 @@ function accessLabel(
   if (enrollmentCount > 0) {
     return `${enrollmentCount} program${enrollmentCount === 1 ? "" : "s"}`;
   }
-  return "—";
+  return "-";
 }
 
 export default async function AdminUsersPage() {

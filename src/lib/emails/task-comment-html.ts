@@ -81,7 +81,7 @@ export function buildTaskCommentEmail(params: {
 </html>`;
 
   const text = [
-    "Core Padel Workout — New comment on your task",
+    "Core Padel Workout: New comment on your task",
     "",
     `${params.commenterName} commented on "${params.taskTitle}" on board "${params.boardTitle}".`,
     "",

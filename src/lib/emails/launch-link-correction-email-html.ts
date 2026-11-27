@@ -20,7 +20,7 @@ export function buildLaunchLinkCorrectionEmail(signupUrl: string): { html: strin
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light" />
-  <title>Correct signup link — Core Padel Workout</title>
+  <title>Correct signup link, Core Padel Workout</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;color:#18181b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f4f5;">
@@ -30,7 +30,7 @@ export function buildLaunchLinkCorrectionEmail(signupUrl: string): { html: strin
           <tr>
             <td style="padding:32px 28px 28px;border-bottom:1px solid #e4e4e7;">
               <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#65a30d;">Core Padel Workout</p>
-              <p style="margin:10px 0 0;font-size:26px;font-weight:600;line-height:1.25;color:#09090b;">Sorry — here is the correct signup link</p>
+              <p style="margin:10px 0 0;font-size:26px;font-weight:600;line-height:1.25;color:#09090b;">Sorry. Here is the correct signup link</p>
               <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#52525b;">We recently emailed you that Core Padel Workout is live. Unfortunately that message included a broken signup link by mistake. We apologize for the confusion.</p>
               <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#52525b;">Please use the button below to create your account and claim your <strong style="color:#09090b;">${months} months of Pro free</strong>.</p>
             </td>
@@ -49,11 +49,11 @@ export function buildLaunchLinkCorrectionEmail(signupUrl: string): { html: strin
                 <tr>
                   <td style="padding:18px 20px;">
                     <p style="margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#65a30d;">Your early-access perk</p>
-                    <p style="margin:0;font-size:14px;line-height:1.55;color:#3f3f46;">Sign up with <strong style="color:#09090b;">the same email address</strong> you used on the waitlist. Your personal link activates ${months} months of Pro automatically — no payment required.</p>
+                    <p style="margin:0;font-size:14px;line-height:1.55;color:#3f3f46;">Sign up with <strong style="color:#09090b;">the same email address</strong> you used on the waitlist. Your personal link activates ${months} months of Pro automatically. No payment required.</p>
                   </td>
                 </tr>
               </table>
-              <p style="margin:20px 0 0;font-size:13px;line-height:1.55;color:#71717a;">Thanks for your patience — we are excited to have you training with us.</p>
+              <p style="margin:20px 0 0;font-size:13px;line-height:1.55;color:#71717a;">Thanks for your patience. We are excited to have you training with us.</p>
             </td>
           </tr>
           <tr>
@@ -69,7 +69,7 @@ export function buildLaunchLinkCorrectionEmail(signupUrl: string): { html: strin
 </html>`;
 
   const text = [
-    "Sorry — here is the correct Core Padel Workout signup link",
+    "Sorry. Here is the correct Core Padel Workout signup link",
     "",
     "We recently emailed you that we are live, but that message included a broken signup link by mistake. We apologize for the confusion.",
     "",

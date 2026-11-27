@@ -355,7 +355,7 @@ export function MediaLibraryClient() {
                                   dateStyle: "short",
                                   timeStyle: "short",
                                 })
-                              : "—"}
+                              : "-"}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex flex-wrap items-center justify-end gap-1">

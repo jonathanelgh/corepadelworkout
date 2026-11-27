@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/utils/supabase/server";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
+import { createClient, getRequestUser } from "@/utils/supabase/server";
 
 export default async function MemberLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) {
     redirect(`/login?next=${encodeURIComponent("/member")}`);
@@ -19,6 +18,10 @@ export default async function MemberLayout({ children }: { children: React.React
 
   if (!profile?.onboarding_completed_at) {
     redirect("/onboarding");
+  }
+
+  if (!(await getHasActivePro(supabase, user.id))) {
+    redirect("/subscribe");
   }
 
   return children;

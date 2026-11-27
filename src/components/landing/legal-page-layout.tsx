@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { SiteFooter } from "@/components/landing/site-footer";
 
 export function LegalPageLayout({
@@ -14,11 +15,8 @@ export function LegalPageLayout({
     <div className="flex min-h-screen flex-col bg-white font-sans text-black selection:bg-[#ccff00] selection:text-black">
       <header className="border-b border-gray-100 bg-white">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
-          <Link
-            href="/"
-            className="text-sm font-bold tracking-wider uppercase transition hover:text-gray-600"
-          >
-            Core Padel Workout
+          <Link href="/" className="inline-flex">
+            <BrandWordmark />
           </Link>
           <Link href="/" className="text-sm font-medium text-gray-600 transition hover:text-black">
             Back to home

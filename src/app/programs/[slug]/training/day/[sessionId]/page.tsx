@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { ProgramDayOverview } from "@/components/programs/program-day-overview";
-import { userHasProgramAccess } from "@/lib/programs/check-program-access";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { parseProgramFormat, usesProgramProgress } from "@/lib/programs/program-format";
 import { loadProgramBySlugForViewer } from "@/lib/programs/load-program-for-viewer";
 import { playHrefForSession } from "@/lib/programs/program-progress";
@@ -71,12 +71,8 @@ export default async function ProgramDayPage({ params }: PageProps) {
     redirect(playHrefForSession(slug, sessionId));
   }
 
-  const needsAccessCheck = loaded.isAdminDraftPreview || !program.is_free;
-
   const [hasAccess, workout, runRes, completionRes] = await Promise.all([
-    needsAccessCheck
-      ? userHasProgramAccess(supabase, user.id, program.id)
-      : Promise.resolve(true),
+    getHasActivePro(supabase, user.id),
     loadSessionWorkout(supabase, program.id, sessionId),
     supabase
       .from("program_runs")
@@ -93,7 +89,7 @@ export default async function ProgramDayPage({ params }: PageProps) {
   ]);
 
   if (!hasAccess) {
-    redirect(`${programCatalogHref(slug)}?upgrade=1`);
+    redirect("/subscribe");
   }
 
   if (!runRes.data) {

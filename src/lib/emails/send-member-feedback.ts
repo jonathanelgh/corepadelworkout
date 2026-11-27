@@ -23,7 +23,7 @@ export async function sendMemberFeedbackEmail(params: {
   const { error } = await resend.emails.send({
     from,
     to: [params.to],
-    subject: `Feedback: ${params.categoryLabel} — ${params.memberName}`,
+    subject: `Feedback: ${params.categoryLabel}, ${params.memberName}`,
     html,
     text,
   });

@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
-export async function createClient() {
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -26,4 +27,13 @@ export async function createClient() {
       },
     }
   )
-}
+})
+
+/** One auth lookup per request, shared by the layout and the page. */
+export const getRequestUser = cache(async function getRequestUser() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user
+})

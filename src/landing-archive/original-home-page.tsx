@@ -72,7 +72,7 @@ const faqs = [
   },
   {
     question: "Do I need to download anything from the App Store?",
-    answer: "No! Core Padel Workout is a web-based platform. You can access all your programs directly through your browser on any device—phone, tablet, or computer."
+    answer: "No! Core Padel Workout is a web-based platform. You can access all your programs directly through your browser on any device: phone, tablet, or computer."
   },
   {
     question: "Can I watch the workouts on my TV?",
@@ -440,7 +440,7 @@ export default function Home() {
             </div>
             <div className="flex flex-col md:flex-row gap-12 justify-between items-start">
               <h2 className="text-4xl md:text-5xl font-medium max-w-2xl leading-tight tracking-tight">
-                Built For Players Who Love The Game — And The Community Behind It.
+                Built For Players Who Love The Game, And The Community Behind It.
               </h2>
               <p className="text-gray-500 max-w-md text-lg leading-relaxed">
                 Core Padel Workout was created to make racket sports more accessible, energetic, and social. What started as a small group of friends meeting on weekends has grown into a vibrant community.

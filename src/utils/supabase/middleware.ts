@@ -1,9 +1,28 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { attachPromoCookieFromRequest } from '@/lib/billing/promo-cookie'
+import { getHasActivePro } from '@/lib/member/has-active-pro'
 import { isCourtWarmupFunnelPath } from '@/lib/programs/court-warmup-funnel'
 
+type SigningKeys = { keys: { kid?: string }[] }
+let signingKeys: { keys: SigningKeys["keys"]; fetchedAt: number } | null = null
+
+async function getSigningKeys(): Promise<SigningKeys> {
+  if (signingKeys && Date.now() - signingKeys.fetchedAt < 10 * 60 * 1000) {
+    return { keys: signingKeys.keys }
+  }
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/.well-known/jwks.json`
+  )
+  if (!response.ok) return { keys: [] }
+  const body = (await response.json()) as SigningKeys
+  const keys = Array.isArray(body.keys) ? body.keys : []
+  signingKeys = { keys, fetchedAt: Date.now() }
+  return { keys }
+}
+
 export async function updateSession(request: NextRequest) {
+  const signing = await getSigningKeys()
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -33,9 +52,12 @@ export async function updateSession(request: NextRequest) {
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Verify the session locally when the project uses an asymmetric signing key.
+  // getUser() asks the Auth server on every click.
+  const { data: claimsData } = await supabase.auth.getClaims(undefined, {
+    jwks: signing.keys.length > 0 ? signing : undefined,
+  })
+  const userId = typeof claimsData?.claims.sub === "string" ? claimsData.claims.sub : null
 
   function withSessionCookies(res: NextResponse) {
     supabaseResponse.cookies.getAll().forEach(({ name, value }) => {
@@ -57,18 +79,18 @@ export async function updateSession(request: NextRequest) {
     return withSessionCookies(NextResponse.redirect(url))
   }
 
-  if (isAdminRoute && !user) {
+  if (isAdminRoute && !userId) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     url.searchParams.set("next", `${path}${request.nextUrl.search}`)
     return withSessionCookies(NextResponse.redirect(url))
   }
 
-  if (isAdminRoute && user) {
+  if (isAdminRoute && userId) {
     const { data: adminRow } = await supabase
       .from("admin_users")
       .select("user_id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle()
 
     if (!adminRow) {
@@ -78,22 +100,26 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  if (user && (isLoginRoute || isSignupRoute)) {
+  if (userId && (isLoginRoute || isSignupRoute)) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_completed_at")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle()
 
     const next = request.nextUrl.searchParams.get("next")
     const safeNext =
       next && next.startsWith("/") && !next.startsWith("//") ? next : null
 
-    const target = profile?.onboarding_completed_at
-      ? safeNext ?? "/member"
-      : safeNext && isCourtWarmupFunnelPath(safeNext)
-        ? safeNext
-        : "/onboarding"
+    const onboarded = Boolean(profile?.onboarding_completed_at)
+    const hasPro = onboarded ? await getHasActivePro(supabase, userId) : false
+    const target = !onboarded
+      ? "/onboarding"
+      : !hasPro
+        ? "/subscribe"
+        : safeNext && isCourtWarmupFunnelPath(safeNext)
+          ? safeNext
+          : safeNext ?? "/member"
 
     return withSessionCookies(NextResponse.redirect(new URL(target, request.url)))
   }

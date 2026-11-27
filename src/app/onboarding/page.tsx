@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { createClient } from "@/utils/supabase/server";
 import { OnboardingFlow } from "./onboarding-flow";
 
@@ -21,6 +22,9 @@ export default async function OnboardingPage() {
     .maybeSingle();
 
   if (profile?.onboarding_completed_at) {
+    if (!(await getHasActivePro(supabase, user.id))) {
+      redirect("/subscribe");
+    }
     redirect("/member");
   }
 

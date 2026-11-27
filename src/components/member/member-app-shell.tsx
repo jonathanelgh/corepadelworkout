@@ -21,6 +21,7 @@ import { MemberCustomTab } from "@/components/member/member-custom-tab";
 import { MemberProfileTab } from "@/components/member/member-profile-tab";
 import { MemberProgramsLibraryClient } from "@/app/member/(shell)/programs/member-programs-client";
 import { CoachFormChromeProvider, useCoachFormChrome } from "@/components/member/coach-form-chrome";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 
 type Profile = {
   full_name: string | null;
@@ -150,7 +151,7 @@ function MemberAppShellView({
       }`}
     >
       <header className="sticky top-0 z-40 shrink-0 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
-        <div className="relative mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-4 md:px-12">
+        <div className="relative mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 px-6 md:px-12">
           {mobileFormBar?.mode === "overview" ? (
             <div className="grid w-full grid-cols-[2.5rem_1fr_2.5rem] items-center md:hidden">
               <button
@@ -213,11 +214,9 @@ function MemberAppShellView({
           <button
             type="button"
             onClick={() => selectTab("home")}
-            className={`shrink-0 font-bold tracking-tight text-zinc-900 ${
-              isCoachTab || mobileFormBar ? "hidden md:block" : ""
-            }`}
+            className={`shrink-0 ${isCoachTab || mobileFormBar ? "hidden md:block" : ""}`}
           >
-            CORE<span className="text-emerald-600">PADEL</span>
+            <BrandWordmark />
           </button>
 
           <nav className="hidden items-center gap-1 md:flex" aria-label="Member">

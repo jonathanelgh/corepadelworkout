@@ -164,7 +164,7 @@ export function AiProgramGeneratorModal({
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
-                    {m.email ? ` — ${m.email}` : ""}
+                    {m.email ? ` (${m.email})` : ""}
                   </option>
                 ))}
               </select>
@@ -186,7 +186,7 @@ export function AiProgramGeneratorModal({
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black disabled:opacity-60"
             >
               <option value="">
-                {targetUserId ? "Auto — from member onboarding" : "Auto — not set"}
+                {targetUserId ? "Auto, from member onboarding" : "Auto, not set"}
               </option>
               {TRAINING_LEVEL_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>

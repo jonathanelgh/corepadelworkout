@@ -21,6 +21,14 @@ function periodBounds(sub: Stripe.Subscription): {
   const item = sub.items.data[0] as
     | { current_period_start?: number; current_period_end?: number }
     | undefined;
+  if (sub.status === "trialing" && typeof sub.trial_end === "number") {
+    const trialStart =
+      typeof sub.trial_start === "number" ? sub.trial_start : Math.floor(Date.now() / 1000);
+    return {
+      start: new Date(trialStart * 1000).toISOString(),
+      end: new Date(sub.trial_end * 1000).toISOString(),
+    };
+  }
   const start = item?.current_period_start ?? legacy.current_period_start;
   const end = item?.current_period_end ?? legacy.current_period_end;
   if (start == null || end == null) {

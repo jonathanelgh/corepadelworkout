@@ -26,7 +26,7 @@ function formatProgramSchedule(p: ProgramRow): string {
   if (p.duration_weeks != null) parts.push(`${p.duration_weeks} wk`);
   if (p.sessions_per_week != null) parts.push(`${p.sessions_per_week}/wk`);
   if (p.minutes_per_session != null) parts.push(`${p.minutes_per_session} min`);
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return parts.length > 0 ? parts.join(" · ") : "-";
 }
 
 function firstRel<T extends { name?: string }>(
@@ -45,7 +45,7 @@ function categoryLabelsFromLinks(
     | null
     | undefined
 ): string {
-  if (links == null) return "—";
+  if (links == null) return "-";
   const arr = Array.isArray(links) ? links : [links];
   const pairs = arr
     .map((l) => {
@@ -58,7 +58,7 @@ function categoryLabelsFromLinks(
     .filter((x): x is { order: number; name: string } => x != null);
   pairs.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   const labels = [...new Set(pairs.map((p) => p.name))];
-  return labels.length > 0 ? labels.join(", ") : "—";
+  return labels.length > 0 ? labels.join(", ") : "-";
 }
 
 export default async function AdminPrograms({ searchParams }: { searchParams?: PageSearch }) {
@@ -224,7 +224,7 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
                       const imageSrc =
                         program.cover_image_url ?? "/Padel_coach_standing.webp";
                       const priceLabel =
-                        program.price != null ? `€${Number(program.price).toFixed(2)}` : "—";
+                        program.price != null ? `€${Number(program.price).toFixed(2)}` : "-";
                       const statusLabel = program.status === "published" ? "Published" : "Draft";
                       return (
                         <tr key={program.id} className="hover:bg-gray-50/50 transition-colors group">
@@ -243,8 +243,8 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
                           </td>
                           <td className="px-6 py-4 text-gray-600">
                             <span className="inline-flex max-w-xs flex-wrap items-center gap-1">
-                              {program.categoryLabels === "—" ? (
-                                <span className="text-gray-400">—</span>
+                              {program.categoryLabels === "-" ? (
+                                <span className="text-gray-400">-</span>
                               ) : (
                                 program.categoryLabels.split(", ").map((label) => (
                                   <span
@@ -258,13 +258,13 @@ export default async function AdminPrograms({ searchParams }: { searchParams?: P
                             </span>
                           </td>
                           <td className="px-6 py-4 text-gray-600">
-                            {program.difficulty_levels?.name ?? "—"}
+                            {program.difficulty_levels?.name ?? "-"}
                           </td>
                           <td className="px-6 py-4 text-gray-600 text-xs tabular-nums whitespace-nowrap">
                             {formatProgramSchedule(program)}
                           </td>
                           <td className="px-6 py-4 font-medium text-gray-900">{priceLabel}</td>
-                          <td className="px-6 py-4 text-gray-600">—</td>
+                          <td className="px-6 py-4 text-gray-600">-</td>
                           <td className="px-6 py-4">
                             <span
                               className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${

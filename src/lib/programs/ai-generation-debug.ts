@@ -274,7 +274,7 @@ function buildSessionRuleChecks(
         `${sessionKey}-main-start`,
         `${prefix}Main starts with explosive / power work`,
         "pass",
-        `Main opens with "${final.firstMainTitle ?? "—"}" (explosive/power while fresh — preferred after warm-up).`
+        `Main opens with "${final.firstMainTitle ?? "-"}" (explosive/power while fresh, preferred after warm-up).`
       )
     );
   } else {
@@ -283,7 +283,7 @@ function buildSessionRuleChecks(
         `${sessionKey}-main-start`,
         `${prefix}Main starts with explosive / power work`,
         "pass",
-        `Main starts with "${final.firstMainTitle ?? "—"}". Prefer jumps/throws/sprints/agility first after warm-up when the session includes power/speed.`
+        `Main starts with "${final.firstMainTitle ?? "-"}". Prefer jumps/throws/sprints/agility first after warm-up when the session includes power/speed.`
       )
     );
   }
@@ -381,7 +381,7 @@ export function buildAiGenerationDebugLog(
         "footwork-week",
         "Weekly footwork 2/1/2",
         matches ? (rawMatches ? "pass" : "fixed") : "fail",
-        `AI: ${rawFw.join("/") || "—"}. Final: ${fw.join("/")}. Target ≥2/≥1/≥2.`
+        `AI: ${rawFw.join("/") || "-"}. Final: ${fw.join("/")}. Target ≥2/≥1/≥2.`
       )
     );
   }

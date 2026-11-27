@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { createClient } from "@/utils/supabase/server";
 import {
   LEVEL_TO_PADEL_SLUG,
@@ -29,10 +30,10 @@ export type OnboardingPayload = {
 
 export async function completeOnboarding(
   payload: OnboardingPayload,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; next: string } | { ok: false; message: string }> {
   const name = payload.displayName.trim();
   if (name.length < 1 || name.length > 80) {
-    return { ok: false, message: "Please enter your name (1–80 characters)." };
+    return { ok: false, message: "Please enter your name (1-80 characters)." };
   }
 
   const birth = parseDateOfBirthParts(payload.birthDay, payload.birthMonth, payload.birthYear);
@@ -111,5 +112,6 @@ export async function completeOnboarding(
 
   revalidatePath("/member", "layout");
   revalidatePath("/onboarding");
-  return { ok: true };
+  const next = (await getHasActivePro(supabase, user.id)) ? "/member" : "/subscribe";
+  return { ok: true, next };
 }

@@ -6,9 +6,9 @@ import { ManageSubscriptionButton } from "@/components/billing/manage-subscripti
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
 
@@ -35,7 +35,7 @@ export function SubscriptionSettings({
 
       {billingSuccess && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Thanks — your subscription is being activated. It may take a moment to appear here.
+          Thanks. Your subscription is being activated. It may take a moment to appear here.
         </div>
       )}
 
@@ -49,13 +49,15 @@ export function SubscriptionSettings({
           <div className="min-w-0 flex-1">
             {hasActivePro ? (
               <>
-                <p className="font-semibold text-zinc-900">{planName ?? "Pro"} — active</p>
+                <p className="font-semibold text-zinc-900">{planName ?? "Pro"}, active</p>
                 <p className="mt-1 text-sm text-zinc-600">
                   {isAdminPro
                     ? "Full Pro access included with your admin account."
-                    : cancelAtPeriodEnd
-                      ? `Access until ${formatDate(currentPeriodEnd)} (canceled, won’t renew)`
-                      : `Renews on ${formatDate(currentPeriodEnd)}`}
+                    : status === "trialing"
+                      ? `Trial ends ${formatDate(currentPeriodEnd)}. You'll be charged then unless you cancel.`
+                      : cancelAtPeriodEnd
+                        ? `Access until ${formatDate(currentPeriodEnd)} (canceled, won’t renew)`
+                        : `Renews on ${formatDate(currentPeriodEnd)}`}
                 </p>
                 {status && status !== "active" && (
                   <p className="mt-1 text-xs text-amber-700">Status: {status}</p>
@@ -65,7 +67,7 @@ export function SubscriptionSettings({
               <>
                 <p className="font-semibold text-zinc-900">No active Pro subscription</p>
                 <p className="mt-1 text-sm text-zinc-600">
-                  Free programs stay available. Upgrade for the full library and member tools.
+                  Pro is required for Core Padel. Start a 7-day trial and you will only be charged if you keep it.
                 </p>
               </>
             )}

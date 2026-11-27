@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/utils/supabase/server";
+import { createClient, getRequestUser } from "@/utils/supabase/server";
 
 export type MemberShellProfile = {
   full_name: string | null;
@@ -12,9 +12,7 @@ export async function getMemberShellContext(): Promise<{
   profile: MemberShellProfile | null;
 }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) {
     redirect(`/login?next=${encodeURIComponent("/member")}`);

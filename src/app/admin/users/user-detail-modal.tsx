@@ -54,7 +54,7 @@ function DetailField({ label, value }: { label: string; value: string | null | u
   return (
     <div>
       <dt className="text-xs font-medium text-gray-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-gray-900">{value?.trim() ? value : "—"}</dd>
+      <dd className="mt-0.5 text-sm text-gray-900">{value?.trim() ? value : "-"}</dd>
     </div>
   );
 }
@@ -172,7 +172,7 @@ function UserDetailContent({
           <p className="mt-1 text-sm font-medium text-gray-900">
             {detail.stats.lastActivityAt
               ? formatTrainingTimestamp(detail.stats.lastActivityAt)
-              : "—"}
+              : "-"}
           </p>
         </div>
       </div>
@@ -341,7 +341,7 @@ function UserDetailContent({
                       </Link>
                       <p className="mt-0.5 text-xs text-gray-500">
                         Started{" "}
-                        {prog.startedAt ? formatTrainingTimestamp(prog.startedAt) : "—"}
+                        {prog.startedAt ? formatTrainingTimestamp(prog.startedAt) : "-"}
                       </p>
                     </div>
                     {prog.isComplete ? (

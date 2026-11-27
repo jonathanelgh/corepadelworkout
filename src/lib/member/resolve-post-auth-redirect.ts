@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { isCourtWarmupFunnelPath } from "@/lib/programs/court-warmup-funnel";
 
 function isSafePath(path: string | null | undefined): path is string {
@@ -25,15 +26,18 @@ export async function resolvePostAuthRedirect(
   userId: string,
   explicitNext?: string | null
 ): Promise<string> {
-  // Free warm-up funnel: send them straight into the program (skip onboarding gate).
-  if (isSafePath(explicitNext) && isCourtWarmupFunnelPath(explicitNext)) {
-    return explicitNext;
-  }
-
   const completed = await hasCompletedOnboarding(supabase, userId);
-
   if (!completed) {
     return "/onboarding";
+  }
+
+  if (!(await getHasActivePro(supabase, userId))) {
+    return "/subscribe";
+  }
+
+  // Warm-up funnel: send them into the program once onboarding and Pro are done.
+  if (isSafePath(explicitNext) && isCourtWarmupFunnelPath(explicitNext)) {
+    return explicitNext;
   }
 
   if (isSafePath(explicitNext)) {

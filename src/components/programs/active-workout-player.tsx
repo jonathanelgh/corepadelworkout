@@ -1012,7 +1012,7 @@ export function ActiveWorkoutPlayer({
               )}
               <p className="mt-6 text-sm text-white/50 font-medium">
                 {resumeEntry
-                  ? "Pick up where you left off — tap Continue when you are ready."
+                  ? "Pick up where you left off. Tap Continue when you are ready."
                   : "Watch the demo, then tap Start now when you are ready."}
               </p>
             </div>

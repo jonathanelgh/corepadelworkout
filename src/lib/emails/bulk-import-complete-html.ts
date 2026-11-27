@@ -33,7 +33,7 @@ export function buildBulkImportCompleteEmail(params: {
 </body>
 </html>`;
 
-  const text = `Core Padel Workout — bulk import complete
+  const text = `Core Padel Workout: bulk import complete
 
 Processed ${total} video(s): ${completed} created${failed > 0 ? `, ${failed} failed` : ""}.
 

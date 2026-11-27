@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Dumbbell, Sparkles, Target } from "lucide-react";
 import { EARLY_ACCESS_OFFER, EARLY_ACCESS_PRO_MONTHS, EARLY_ACCESS_TOKEN_PARAM } from "@/lib/pre-launch/early-access";
@@ -18,7 +19,7 @@ const perks = [
   {
     icon: Target,
     title: "Train anywhere",
-    text: "Follow workouts at home, in the gym, or on court — no app store required.",
+    text: "Follow workouts at home, in the gym, or on court. No app store required.",
   },
   {
     icon: Sparkles,
@@ -119,8 +120,8 @@ function SignUpForm() {
 
       <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 py-6 sm:px-6 lg:px-8">
         <header className="flex items-center justify-between">
-          <Link href="/" className="text-lg font-bold tracking-wider uppercase text-zinc-900">
-            CORE<span className="text-emerald-600">PADEL</span>
+          <Link href="/" className="inline-flex">
+            <BrandWordmark />
           </Link>
           <Link
             href="/login"
@@ -183,13 +184,13 @@ function SignUpForm() {
                       ? `Use the same waitlist email to unlock ${EARLY_ACCESS_PRO_MONTHS} months of Pro free.`
                       : hasSignupOffer
                         ? "Create your account to unlock free Pro access with this invite."
-                      : "Free programs are available right away. Upgrade anytime for the full library and AI Coach."}
+                      : "Pro includes every program. New accounts start with a 7-day trial. You are only charged if you keep it."}
                 </p>
               </div>
 
               {promoCode && !verifySent && (
                 <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                  Promo <strong className="font-semibold">{promoCode}</strong> saved — it will be applied when you
+                  Promo <strong className="font-semibold">{promoCode}</strong> saved. It will be applied when you
                   subscribe to Pro.
                 </div>
               )}
@@ -290,7 +291,7 @@ function SignUpForm() {
                     </div>
 
                     <ul className="space-y-2 rounded-xl bg-zinc-50 px-4 py-3 text-xs text-zinc-600">
-                      {["Access free training programs", "Personalize your plan in under 2 minutes", "Works on phone, tablet, and desktop"].map(
+                      {["7-day Pro trial, cancel before you are charged", "Personalize your plan in under 2 minutes", "Works on phone, tablet, and desktop"].map(
                         (item) => (
                           <li key={item} className="flex items-center gap-2">
                             <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />

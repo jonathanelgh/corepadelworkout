@@ -7,7 +7,7 @@ import { buildSignupOfferUrl, type SignupOfferRow } from "@/lib/billing/signup-o
 import { createSignupOffer, setSignupOfferActive } from "./actions";
 
 function formatWhen(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleString("en-GB", {
     day: "numeric",
     month: "short",

@@ -243,7 +243,7 @@ export async function loadAdminAnalyticsData(
     },
     {
       title: "Avg completions / runner",
-      value: uniqueRunners.size > 0 ? avgPerRunner.toLocaleString("en-GB") : "—",
+      value: uniqueRunners.size > 0 ? avgPerRunner.toLocaleString("en-GB") : "-",
       hint: `${formatCount(enrollments.length)} active enrollment${enrollments.length === 1 ? "" : "s"}`,
     },
   ];
@@ -378,8 +378,8 @@ export async function loadAdminAnalyticsData(
       const p = profileById.get(userId);
       return {
         userId,
-        name: p?.full_name?.trim() || "—",
-        email: p?.email?.trim() || "—",
+        name: p?.full_name?.trim() || "-",
+        email: p?.email?.trim() || "-",
         completed: stats.completed,
         started: stats.started,
         lastActiveAt: stats.lastActiveAt,
@@ -415,8 +415,8 @@ export async function loadAdminAnalyticsData(
         }
       }
       return {
-        userName: p?.full_name?.trim() || "—",
-        userEmail: p?.email?.trim() || "—",
+        userName: p?.full_name?.trim() || "-",
+        userEmail: p?.email?.trim() || "-",
         programTitle: prog?.title?.trim() || "Program",
         sessionName: session?.name?.trim() || "Session",
         startedAt,

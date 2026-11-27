@@ -55,17 +55,17 @@ function bodyParagraphs(body: string | null, description: string | null): string
 }
 
 function formatStatWeeks(n: number | null): string {
-  if (n == null) return "—";
+  if (n == null) return "-";
   return `${n} Week${n === 1 ? "" : "s"}`;
 }
 
 function formatStatFrequency(n: number | null): string {
-  if (n == null) return "—";
+  if (n == null) return "-";
   return `${n}x / Week`;
 }
 
 function formatStatMins(n: number | null): string {
-  if (n == null) return "—";
+  if (n == null) return "-";
   return `${n} Min${n === 1 ? "" : "s"}`;
 }
 
@@ -168,7 +168,7 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
       heroImage={heroImage}
       promoVideoUrl={program.promo_video_url}
       songUrl={program.song_url}
-      statWeeks={programFormat === "single_workout" ? "—" : formatStatWeeks(program.duration_weeks)}
+      statWeeks={programFormat === "single_workout" ? "-" : formatStatWeeks(program.duration_weeks)}
       statFrequency={
         programFormat === "single_workout" ? "One-off" : formatStatFrequency(program.sessions_per_week)
       }
@@ -177,7 +177,7 @@ export default async function ProgramDetail({ params, searchParams }: PageProps)
       backLabel="Back to programs"
       draftPreviewBanner={
         isAdminDraftPreview
-          ? "Draft preview — only admins can see and test this program."
+          ? "Draft preview. Only admins can see and test this program."
           : null
       }
       footer={

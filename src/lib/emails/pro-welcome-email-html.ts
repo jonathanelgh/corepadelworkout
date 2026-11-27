@@ -35,7 +35,7 @@ export function buildProWelcomeEmail(input: {
           <tr>
             <td style="padding:32px 28px 28px;border-bottom:1px solid #e4e4e7;">
               <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#65a30d;">Core Padel Workout</p>
-              <p style="margin:10px 0 0;font-size:26px;font-weight:600;line-height:1.25;color:#09090b;">${greeting} — welcome to Pro</p>
+              <p style="margin:10px 0 0;font-size:26px;font-weight:600;line-height:1.25;color:#09090b;">${greeting}, welcome to Pro</p>
               <p style="margin:12px 0 0;font-size:15px;line-height:1.55;color:#52525b;">We are glad to have you with us. Your Pro membership is now active, and you have access to <strong style="color:#09090b;">all programs and features</strong> in Core Padel.</p>
             </td>
           </tr>
@@ -45,7 +45,7 @@ export function buildProWelcomeEmail(input: {
                 <tr>
                   <td style="padding:18px 20px;">
                     <p style="margin:0 0 10px;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#65a30d;">You now have access to</p>
-                    <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;">• Every training program — gym, home, and on court</p>
+                    <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;">• Every training program: gym, home, and on court</p>
                     <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;">• The full exercise library with video demos</p>
                     <p style="margin:0;font-size:14px;line-height:1.55;color:#3f3f46;">• AI Coach and all Pro member features</p>
                   </td>
@@ -79,12 +79,12 @@ export function buildProWelcomeEmail(input: {
 </html>`;
 
   const text = [
-    `${greetingText} — welcome to Pro`,
+    `${greetingText}, welcome to Pro`,
     "",
     "We are glad to have you with us. Your Pro membership is now active, and you have access to all programs and features in Core Padel.",
     "",
     "You now have access to:",
-    "- Every training program — gym, home, and on court",
+    "- Every training program: gym, home, and on court",
     "- The full exercise library with video demos",
     "- AI Coach and all Pro member features",
     "",

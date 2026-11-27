@@ -117,7 +117,7 @@ export function ActiveProgramHub({
               <p className="text-xs text-zinc-500">Complete</p>
             </div>
             <div className="px-4 py-4 text-center">
-              <p className="text-lg font-semibold tabular-nums">{mins ?? "—"}</p>
+              <p className="text-lg font-semibold tabular-nums">{mins ?? "-"}</p>
               <p className="text-xs text-zinc-500">Per session</p>
             </div>
           </div>

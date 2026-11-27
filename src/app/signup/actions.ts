@@ -30,7 +30,7 @@ export async function signUpWithPassword(input: {
   const password = input.password;
 
   if (fullName.length < 1 || fullName.length > 80) {
-    return { error: "Please enter your name (1–80 characters)." };
+    return { error: "Please enter your name (1-80 characters)." };
   }
 
   if (!email) {

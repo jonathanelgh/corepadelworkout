@@ -264,7 +264,7 @@ export function ExercisesListClient({
                     <tr key={ex.id} className="transition-colors hover:bg-gray-50/50">
                       <td className="px-6 py-4">
                         {!ex.video_url?.trim() && !ex.image_url?.trim() ? (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-gray-400">-</span>
                         ) : (
                           <ExerciseVideoThumbnail
                             title={ex.title}
@@ -297,7 +297,7 @@ export function ExercisesListClient({
                             {ex.exerciseLevelLabel}
                           </span>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-gray-400">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
@@ -313,7 +313,7 @@ export function ExercisesListClient({
                             ))}
                           </div>
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
                       <td className="max-w-[220px] px-6 py-4 text-gray-600">
@@ -330,7 +330,7 @@ export function ExercisesListClient({
                             ))}
                           </div>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-gray-400">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-gray-500">{created}</td>

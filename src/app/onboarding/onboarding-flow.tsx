@@ -40,13 +40,13 @@ const LEVELS: {
   {
     id: "beginner",
     title: "Beginner",
-    subtitle: "Learning the basics · playing 0–1× a week",
+    subtitle: "Learning the basics · playing 0-1x a week",
     icon: Activity,
   },
   {
     id: "intermediate",
     title: "Intermediate",
-    subtitle: "Can sustain rallies · playing 2–3× a week",
+    subtitle: "Can sustain rallies · playing 2-3x a week",
     icon: Wind,
   },
   {
@@ -104,7 +104,7 @@ const GOALS: {
   {
     id: "match_play",
     title: "Match play",
-    subtitle: "Perform better when it counts — tactics, focus, results",
+    subtitle: "Perform better when it counts: tactics, focus, results",
     icon: Medal,
   },
   {
@@ -263,7 +263,7 @@ export function OnboardingFlow({
       setError(res.message);
       return;
     }
-    router.push("/member");
+    router.push(res.next);
     router.refresh();
   }
 
@@ -325,7 +325,7 @@ export function OnboardingFlow({
               </div>
 
               <p className="mt-6 text-base text-zinc-600">
-                Takes about a minute — let&apos;s build your setup ✍️
+                Takes about a minute. Let&apos;s build your setup ✍️
               </p>
             </>
           )}
@@ -333,10 +333,10 @@ export function OnboardingFlow({
           {step === 1 && (
             <>
               <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
-                First up — what should we call you? 🙂
+                First up, what should we call you? 🙂
               </h2>
               <p className="mt-2 text-base text-zinc-600">
-                We&apos;ll use it in the app — like: &ldquo;Ready for your smash session, {name.trim() || "…"}?&rdquo; 🎾
+                We&apos;ll use it in the app, like: &ldquo;Ready for your smash session, {name.trim() || "…"}?&rdquo; 🎾
               </p>
               <label className="mt-8 block">
                 <span className="sr-only">Your name</span>
@@ -411,7 +411,7 @@ export function OnboardingFlow({
           {step === 3 && (
             <>
               <h2 className={displayClassName("text-2xl font-semibold text-zinc-900 sm:text-3xl")}>
-                Quick level check — where are you at? 📈
+                Quick level check. Where are you at? 📈
               </h2>
               <p className="mt-2 text-base text-zinc-600">
                 This helps us set the right intensity (no ego, just smart training). 🧠
@@ -488,7 +488,7 @@ export function OnboardingFlow({
                 What do you want most right now? 🎯
               </h2>
               <p className="mt-2 text-base text-zinc-600">
-                Pick your #1 focus — we&apos;ll prioritize the best program path for you. 🚀
+                Pick your #1 focus. We&apos;ll prioritize the best program path for you. 🚀
               </p>
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
                 {GOALS.map(({ id, title, subtitle, icon: Icon }) => {
@@ -529,10 +529,10 @@ export function OnboardingFlow({
                 Where do you usually train? 🏟️
               </h2>
               <p className="mt-2 text-base text-zinc-600">
-                Pick one or more. This is just your preference — you can always train somewhere else too. 🔁
+                Pick one or more. This is just your preference. You can always train somewhere else too. 🔁
               </p>
               <p className="mt-1 text-base text-zinc-600">
-                All programs include options for gym, home, and club — we&apos;ll stitch the best fit inside the program. 🧩
+                All programs include options for gym, home, and club. We&apos;ll stitch the best fit inside the program. 🧩
               </p>
               <ul className="mt-8 space-y-3">
                 {ENVIRONMENTS.map(({ id, title, subtitle, icon: Icon }) => {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 
 const LEGAL_EMAIL = "hello@corepadel.app";
 
@@ -10,10 +11,11 @@ export function SiteFooter() {
       <div className="mx-auto max-w-[1400px] px-6 py-14 md:px-12 md:py-16">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
-            <p className="text-lg font-bold tracking-wider uppercase">Core Padel Workout</p>
+            <Link href="/" className="inline-flex">
+              <BrandWordmark tone="onDark" />
+            </Link>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-gray-400">
-              Strength, conditioning, and rehab programs built for padel players. Train at the gym,
-              at home, or on the court.
+              Video-guided strength and conditioning for padel players.
             </p>
           </div>
 
@@ -21,7 +23,7 @@ export function SiteFooter() {
             <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Explore</p>
             <ul className="mt-4 space-y-2.5 text-sm">
               <li>
-                <Link href="/#programs" className="text-gray-300 transition hover:text-[#ccff00]">
+                <Link href="/programs" className="text-gray-300 transition hover:text-[#ccff00]">
                   Programs
                 </Link>
               </li>
@@ -31,18 +33,8 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/programs" className="text-gray-300 transition hover:text-[#ccff00]">
-                  Program library
-                </Link>
-              </li>
-              <li>
-                <Link href="/court-warm-up" className="text-gray-300 transition hover:text-[#ccff00]">
-                  Free warmup
-                </Link>
-              </li>
-              <li>
-                <Link href="/blog" className="text-gray-300 transition hover:text-[#ccff00]">
-                  Blog
+                <Link href="/login" className="text-gray-300 transition hover:text-[#ccff00]">
+                  Log in
                 </Link>
               </li>
             </ul>
@@ -74,15 +66,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-8 text-sm text-gray-500 md:flex-row md:items-center md:justify-between">
-          <p>&copy; {year} Core Padel Workout. All rights reserved.</p>
-          <div className="flex flex-wrap gap-4">
-            <Link href="/login" className="transition hover:text-gray-300">
-              Login
-            </Link>
-            <Link href="/signup" className="transition hover:text-gray-300">
-              Sign up
-            </Link>
-          </div>
+          <p>&copy; {year} CorePadel. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { createClient } from "@/utils/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +21,8 @@ export default async function BlogIndexPage() {
     <div className="min-h-dvh bg-zinc-50 text-zinc-900">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="text-sm font-semibold text-zinc-900">
-            CORE<span className="text-emerald-600">PADEL</span>
+          <Link href="/" className="inline-flex">
+            <BrandWordmark />
           </Link>
           <div className="flex gap-4 text-sm font-medium">
             <Link href="/programs" className="text-zinc-600 hover:text-zinc-900">

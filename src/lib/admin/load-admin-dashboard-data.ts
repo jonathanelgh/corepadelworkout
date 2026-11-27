@@ -99,7 +99,7 @@ function memberStatus(
 
 function formatRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return "—";
+  if (!Number.isFinite(then)) return "-";
   const diffSec = Math.round((then - Date.now()) / 1000);
   const abs = Math.abs(diffSec);
   const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -237,7 +237,7 @@ export async function loadAdminDashboardData(
     },
     {
       title: "Est. monthly revenue",
-      value: mrr > 0 ? formatCurrency(mrr) : "—",
+      value: mrr > 0 ? formatCurrency(mrr) : "-",
       hint:
         mrr > 0
           ? `${payingUserIds.size} paying subscriber${payingUserIds.size === 1 ? "" : "s"} (Stripe only)`
@@ -255,8 +255,8 @@ export async function loadAdminDashboardData(
 
   const recentSignups: AdminRecentSignup[] = profiles.slice(0, 8).map((p) => {
     const id = p.id as string;
-    const name = (p.full_name as string | null)?.trim() || "—";
-    const email = (p.email as string | null)?.trim() || "—";
+    const name = (p.full_name as string | null)?.trim() || "-";
+    const email = (p.email as string | null)?.trim() || "-";
     return {
       id,
       name,

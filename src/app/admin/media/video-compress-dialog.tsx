@@ -354,7 +354,7 @@ export function VideoCompressDialog({
                 className="w-full"
               />
               <p className="mt-0.5 text-xs text-gray-500">
-                {crf} — lower is sharper but larger files
+                {crf}. Lower is sharper but larger files
               </p>
             </div>
             <div>

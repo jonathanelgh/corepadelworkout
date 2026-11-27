@@ -59,7 +59,7 @@ export default async function MemberUpgradePage({
           </Link>
           <h1 className="mt-4 text-2xl font-bold text-zinc-900">Pro membership</h1>
           <p className="mt-2 text-sm text-zinc-600">
-            One subscription for paid programs, the exercise library, and AI Coach.
+            Start with 7 days free. Your card is charged after the trial unless you cancel.
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export default async function MemberUpgradePage({
 
         {sp.canceled === "1" && (
           <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            Checkout canceled — you can subscribe whenever you&apos;re ready.
+            Checkout canceled. You can subscribe whenever you&apos;re ready.
           </div>
         )}
 
@@ -93,7 +93,7 @@ export default async function MemberUpgradePage({
             </ManageSubscriptionButton>
           ) : (
             <SubscribeButton className="mt-8 w-full rounded-xl bg-zinc-900 py-3 text-sm font-semibold text-white hover:bg-zinc-800">
-              Subscribe with Stripe
+              Start 7-day trial
             </SubscribeButton>
           )}
 

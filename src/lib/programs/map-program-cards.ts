@@ -33,7 +33,7 @@ function categoryNamesFromLinks(links: ProgramCategoryLinkRow[] | ProgramCategor
 }
 
 function formatDurationWeeks(n: number | null): string {
-  if (n == null) return "—";
+  if (n == null) return "-";
   return `${n} Week${n === 1 ? "" : "s"}`;
 }
 

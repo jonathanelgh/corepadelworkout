@@ -11,6 +11,7 @@ import {
   playHrefForSession,
 } from "@/lib/programs/program-progress";
 import { programDayHref } from "@/lib/programs/program-routes";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { userHasProgramAccess } from "@/lib/programs/check-program-access";
 import { fetchMemberExerciseLoads } from "@/lib/programs/member-exercise-loads";
 
@@ -74,16 +75,15 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
     redirect(`/login?next=${encodeURIComponent(`/programs/${slug}/play`)}`);
   }
 
-  const needsAccessCheck = loaded.isAdminDraftPreview || !row.is_free;
   const resolvedSessionId = sessionId?.trim() || null;
+  const hasAccess = loaded.isAdminDraftPreview
+    ? await userHasProgramAccess(supabase, user.id, row.id)
+    : await getHasActivePro(supabase, user.id);
 
   if (!resolvedSessionId) {
-    const hasAccess = needsAccessCheck
-      ? await userHasProgramAccess(supabase, user.id, row.id)
-      : true;
     if (!hasAccess) {
       if (loaded.isAdminDraftPreview) notFound();
-      redirect(`/programs/${slug}?upgrade=1`);
+      redirect("/subscribe");
     }
     const { data: run } = await supabase
       .from("program_runs")
@@ -124,16 +124,11 @@ export default async function ProgramPlayPage({ params, searchParams }: PageProp
     redirect(`/programs/${slug}`);
   }
 
-  const [hasAccess, workout] = await Promise.all([
-    needsAccessCheck
-      ? userHasProgramAccess(supabase, user.id, row.id)
-      : Promise.resolve(true),
-    loadSessionWorkout(supabase, row.id, resolvedSessionId),
-  ]);
+  const workout = await loadSessionWorkout(supabase, row.id, resolvedSessionId);
 
   if (!hasAccess) {
     if (loaded.isAdminDraftPreview) notFound();
-    redirect(`/programs/${slug}?upgrade=1`);
+    redirect("/subscribe");
   }
 
   if (!workout) {

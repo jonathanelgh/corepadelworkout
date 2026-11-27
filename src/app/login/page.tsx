@@ -2,6 +2,7 @@
 
 import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
@@ -100,8 +101,8 @@ function LoginForm() {
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-6 py-10 md:px-12">
         <header className="flex items-center justify-between">
-          <Link href="/" className="font-bold tracking-wider uppercase text-white">
-            CORE<span className="text-[#ccff00]">PADEL</span>
+          <Link href="/" className="inline-flex">
+            <BrandWordmark tone="onDark" />
           </Link>
           <Link
             href="/signup"

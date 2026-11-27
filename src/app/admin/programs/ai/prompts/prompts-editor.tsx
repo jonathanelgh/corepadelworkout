@@ -98,9 +98,8 @@ export function AiPromptsEditor({ initialPrompts }: { initialPrompts: AiPromptRe
       </div>
 
       <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-950">
-        <strong className="font-semibold">Hard rules come from code</strong>
-        {" — "}
-        tool routing, session structure, rest, levels, both_sides, and progression are always injected at
+        <strong className="font-semibold">Hard rules come from code.</strong>{" "}
+        Tool routing, session structure, rest, levels, both_sides, and progression are always injected at
         generation time and override anything in these templates. Edit here for tone and consultation style
         only. Use <span className="font-medium">Reset default</span> to clear stale DB copies.
       </div>

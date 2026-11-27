@@ -85,7 +85,7 @@ export function buildTaskAssignedEmail(params: {
 </html>`;
 
   const text = [
-    "Core Padel Workout — You were assigned a task",
+    "Core Padel Workout: You were assigned a task",
     "",
     `${params.assignedByName} assigned you to "${params.taskTitle}" on board "${params.boardTitle}".`,
     params.dueDate ? `Due: ${params.dueDate}` : "",

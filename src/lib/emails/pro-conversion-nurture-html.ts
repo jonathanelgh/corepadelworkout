@@ -22,7 +22,7 @@ export type ProConversionEmailInput = {
 };
 
 const SUBJECTS: Record<ProConversionStep, string> = {
-  1: "Your Core Padel account is ready — unlock full training",
+  1: "Your Core Padel account is ready. Unlock full training",
   2: "Train with a plan built for padel",
   3: "Everything in one place for your padel training",
   4: "Still thinking it over?",
@@ -31,8 +31,8 @@ const SUBJECTS: Record<ProConversionStep, string> = {
 const PREVIEWS: Record<ProConversionStep, string> = {
   1: "All programs, video library, and AI Coach with Pro",
   2: "Structure beats random gym work when you want better movement on court",
-  3: "Programs, exercise videos, and AI Coach — cancel anytime",
-  4: "Your account stays free — Pro is here when you are ready",
+  3: "Programs, exercise videos, and AI Coach. Cancel anytime",
+  4: "Your account stays free. Pro is here when you are ready",
 };
 
 const CTAS: Record<ProConversionStep, string> = {
@@ -158,7 +158,7 @@ export function buildProConversionEmail(input: ProConversionEmailInput): {
     title = "Unlock full training with Pro";
     bodyHtml = `
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">${greet.html}</p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">Welcome to Core Padel. You are in — next step is choosing how you train.</p>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">Welcome to Core Padel. You are in. Next step is choosing how you train.</p>
       <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#52525b;">With <strong style="color:#09090b;">Pro</strong> you get:</p>
       <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;">• Every program (gym, home, and on court)</p>
       <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;">• Full exercise library with video demos</p>
@@ -169,7 +169,7 @@ export function buildProConversionEmail(input: ProConversionEmailInput): {
     textLines = [
       greet.text,
       "",
-      "Welcome to Core Padel. You are in — next step is choosing how you train.",
+      "Welcome to Core Padel. You are in. Next step is choosing how you train.",
       "",
       "With Pro you get:",
       "- Every program (gym, home, and on court)",
@@ -183,19 +183,19 @@ export function buildProConversionEmail(input: ProConversionEmailInput): {
     title = "A plan built for padel";
     bodyHtml = `
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">${greet.html}</p>
-      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">Most players do not need more random exercises. They need a plan that matches padel — power, stability, and staying healthy through the season.</p>
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">Most players do not need more random exercises. They need a plan that matches padel: power, stability, and staying healthy through the season.</p>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">Pro unlocks structured programs you can follow day by day, with video guidance so every set is done right.</p>
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#52525b;">If you already peeked at a program and hit a lock, that is the upgrade — one click and you can continue from where you left off.</p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#52525b;">If you already peeked at a program and hit a lock, that is the upgrade. One click and you can continue from where you left off.</p>
     `;
     secondaryHtml = secondaryLink("See programs", input.programsUrl);
     textLines = [
       greet.text,
       "",
-      "Most players do not need more random exercises. They need a plan that matches padel — power, stability, and staying healthy through the season.",
+      "Most players do not need more random exercises. They need a plan that matches padel: power, stability, and staying healthy through the season.",
       "",
       "Pro unlocks structured programs you can follow day by day, with video guidance so every set is done right.",
       "",
-      "If you already peeked at a program and hit a lock, that is the upgrade — one click and you can continue from where you left off.",
+      "If you already peeked at a program and hit a lock, that is the upgrade. One click and you can continue from where you left off.",
     ];
     secondaryText = `See programs: ${input.programsUrl}`;
   } else if (input.step === 3) {
@@ -203,9 +203,9 @@ export function buildProConversionEmail(input: ProConversionEmailInput): {
     bodyHtml = `
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">${greet.html}</p>
       <p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#52525b;">Pro is the full Core Padel toolkit:</p>
-      <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;"><strong style="color:#09090b;">1. Programs</strong> — follow a path instead of guessing what to do today</p>
-      <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;"><strong style="color:#09090b;">2. Exercise library</strong> — video demos you can trust</p>
-      <p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#3f3f46;"><strong style="color:#09090b;">3. AI Coach</strong> — help when you want a program shaped to you</p>
+      <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;"><strong style="color:#09090b;">1. Programs</strong>: follow a path instead of guessing what to do today</p>
+      <p style="margin:0 0 8px;font-size:14px;line-height:1.55;color:#3f3f46;"><strong style="color:#09090b;">2. Exercise library</strong>: video demos you can trust</p>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#3f3f46;"><strong style="color:#09090b;">3. AI Coach</strong>: help when you want a program shaped to you</p>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">Built for players who want to move better, hit harder, and stay injury-free.</p>
       <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#52525b;">Pro is <strong style="color:#09090b;">${escapeHtmlText(priceLabel)}/month</strong>. Cancel anytime from your account.</p>
     `;
@@ -214,9 +214,9 @@ export function buildProConversionEmail(input: ProConversionEmailInput): {
       greet.text,
       "",
       "Pro is the full Core Padel toolkit:",
-      "1. Programs — follow a path instead of guessing what to do today",
-      "2. Exercise library — video demos you can trust",
-      "3. AI Coach — help when you want a program shaped to you",
+      "1. Programs: follow a path instead of guessing what to do today",
+      "2. Exercise library: video demos you can trust",
+      "3. AI Coach: help when you want a program shaped to you",
       "",
       "Built for players who want to move better, hit harder, and stay injury-free.",
       "",
@@ -229,7 +229,7 @@ export function buildProConversionEmail(input: ProConversionEmailInput): {
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">${greet.html}</p>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">No pressure. Your free account stays yours.</p>
       <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#52525b;">Whenever you want the full library of programs and features, Pro is one step away. Same training system our members use to stay consistent through the week.</p>
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#52525b;">We will leave it here for now — you can upgrade anytime from your dashboard.</p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#52525b;">We will leave it here for now. You can upgrade anytime from your dashboard.</p>
     `;
     secondaryHtml = secondaryLink("Go to your dashboard", input.memberUrl);
     textLines = [
@@ -239,7 +239,7 @@ export function buildProConversionEmail(input: ProConversionEmailInput): {
       "",
       "Whenever you want the full library of programs and features, Pro is one step away. Same training system our members use to stay consistent through the week.",
       "",
-      "We will leave it here for now — you can upgrade anytime from your dashboard.",
+      "We will leave it here for now. You can upgrade anytime from your dashboard.",
     ];
     secondaryText = `Go to your dashboard: ${input.memberUrl}`;
   }

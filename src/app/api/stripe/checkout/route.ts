@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStoredPromoCode } from "@/lib/billing/promo-cookie-server";
+import { PRO_TRIAL_DAYS, userEligibleForProTrial } from "@/lib/billing/pro-trial";
+import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { createClient } from "@/utils/supabase/server";
 import { getSiteUrl, getStripeProPriceId, PRO_PLAN_SLUG } from "@/lib/stripe/config";
 import { getOrCreateStripeCustomer } from "@/lib/stripe/customer";
@@ -17,10 +19,15 @@ export async function POST() {
       return NextResponse.json({ error: "Sign in required." }, { status: 401 });
     }
 
+    if (await getHasActivePro(supabase, user.id)) {
+      return NextResponse.json({ error: "You already have Pro access." }, { status: 400 });
+    }
+
     const customerId = await getOrCreateStripeCustomer(supabase, user.id, user.email);
     const stripe = getStripe();
     const priceId = getStripeProPriceId();
     const siteUrl = getSiteUrl();
+    const trialDays = (await userEligibleForProTrial(user.id)) ? PRO_TRIAL_DAYS : null;
 
     const storedPromoCode = await getStoredPromoCode();
     const promotionCodeId = storedPromoCode
@@ -37,14 +44,16 @@ export async function POST() {
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: !promotionCodeId,
       ...(promotionCodeId ? { discounts: [{ promotion_code: promotionCodeId }] } : {}),
-      success_url: `${siteUrl}/member?tab=profile&billing=success`,
-      cancel_url: `${siteUrl}/member/upgrade?canceled=1`,
+      success_url: `${siteUrl}/subscribe/complete?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/subscribe?canceled=1`,
+      payment_method_collection: "always",
       metadata: {
         user_id: user.id,
         plan_slug: PRO_PLAN_SLUG,
         ...(storedPromoCode ? { promo_code: storedPromoCode } : {}),
       },
       subscription_data: {
+        ...(trialDays ? { trial_period_days: trialDays } : {}),
         metadata: {
           user_id: user.id,
           plan_slug: PRO_PLAN_SLUG,

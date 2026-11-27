@@ -96,7 +96,7 @@ function firstRelName(rel: { name: string } | { name: string }[] | null): string
 function profileLabels(profile: ProfileRow) {
   const goal: OnboardingGoal | null =
     profile.primary_goal && isOnboardingGoal(profile.primary_goal) ? profile.primary_goal : null;
-  const goalLabel = goal ? PRIMARY_GOAL_LABELS[goal] : "—";
+  const goalLabel = goal ? PRIMARY_GOAL_LABELS[goal] : "-";
 
   const envOptions = new Set<OnboardingEnvironment>(["gym", "home", "club"]);
   const envName: Record<string, string> = { gym: "Gym", home: "Home", club: "Club" };
@@ -105,7 +105,7 @@ function profileLabels(profile: ProfileRow) {
       ? profile.training_environments.map((v) => envName[v] ?? v).join(", ")
       : profile.training_environment
         ? (envName[profile.training_environment] ?? profile.training_environment)
-        : "—";
+        : "-";
 
   const pains: PainKey[] =
     profile.padel_pains?.filter((p): p is PainKey => isPainKey(p)) ?? [];
@@ -114,10 +114,10 @@ function profileLabels(profile: ProfileRow) {
     jumpers_knee: "Jumper's knee",
     lower_back: "Lower back",
     plantar_fasciitis: "Heel / plantar",
-    none: "None — general strength",
+    none: "None, general strength",
   };
   const painsStr =
-    pains.length > 0 ? pains.map((p) => painLabels[p] ?? p).join(", ") : "—";
+    pains.length > 0 ? pains.map((p) => painLabels[p] ?? p).join(", ") : "-";
 
   return { goalLabel, envLabel, painsStr };
 }

@@ -90,7 +90,7 @@ export default async function ExerciseTaxonomyPage({ searchParams }: { searchPar
         categoryPanel={
           <TaxonomyTableSection
             heading="Category types"
-            hint="Maps to exercise_category_types — multi-select on each exercise."
+            hint="Maps to exercise_category_types. Multi-select on each exercise."
             rows={categoryTypes}
             updateAction={updateCategoryType}
             deleteAction={deleteCategoryType}
@@ -130,7 +130,7 @@ export default async function ExerciseTaxonomyPage({ searchParams }: { searchPar
         levelPanel={
           <TaxonomyTableSection
             heading="Exercise levels"
-            hint="Maps to exercise_levels — optional single select on each exercise (difficulty / experience)."
+            hint="Maps to exercise_levels. Optional single select on each exercise (difficulty / experience)."
             rows={exerciseLevels}
             updateAction={updateExerciseLevel}
             deleteAction={deleteExerciseLevel}

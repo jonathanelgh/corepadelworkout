@@ -76,7 +76,7 @@ export function buildTaskMovedEmail(params: {
 </html>`;
 
   const text = [
-    "Core Padel Workout — Task moved",
+    "Core Padel Workout: Task moved",
     "",
     `${params.movedByName} moved "${params.taskTitle}" on board "${params.boardTitle}".`,
     `${params.fromColumnName} → ${params.toColumnName}`,
