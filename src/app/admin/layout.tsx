@@ -17,6 +17,7 @@ import {
   Mail,
   Gift,
   QrCode,
+  Handshake,
   Settings, 
   LogOut, 
   ChevronLeft, 
@@ -59,6 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Waitlist", href: "/admin/waitlist", icon: Mail },
     { name: "Offers", href: "/admin/offers", icon: Gift },
     { name: "Pro passes", href: "/admin/passes", icon: QrCode },
+    { name: "Affiliates", href: "/admin/affiliates", icon: Handshake },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { userHasAffiliateAccount } from "@/lib/affiliates/tracking";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { createClient } from "@/utils/supabase/server";
 import { OnboardingFlow } from "./onboarding-flow";
@@ -13,6 +14,10 @@ export default async function OnboardingPage() {
 
   if (!user) {
     redirect("/signup");
+  }
+
+  if (await userHasAffiliateAccount(supabase, user.id)) {
+    redirect("/affiliate");
   }
 
   const { data: profile } = await supabase

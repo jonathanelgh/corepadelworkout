@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 
 /** After form POST, use 303 so the browser follows with GET (307 would re-POST to /login → 405). */
@@ -73,6 +74,13 @@ export async function POST(request: Request) {
   }
 
   const userId = signInData.user?.id;
+  if (userId) {
+    try {
+      await attachAffiliateToUser(userId);
+    } catch (error) {
+      console.error("[affiliate] login attach failed:", error);
+    }
+  }
   if (!userId) {
     return NextResponse.redirect(
       loginRedirectUrl(request, { error: "Sign in failed. Try again.", next }),

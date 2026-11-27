@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 import { createClient } from "@/utils/supabase/server";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 
@@ -33,6 +34,12 @@ export async function signInWithPassword(input: {
   const userId = data.user?.id;
   if (!userId) {
     return { error: "Sign in failed. Try again." };
+  }
+
+  try {
+    await attachAffiliateToUser(userId);
+  } catch (error) {
+    console.error("[affiliate] login attach failed:", error);
   }
 
   const redirectTo = await resolvePostAuthRedirect(supabase, userId, input.next);

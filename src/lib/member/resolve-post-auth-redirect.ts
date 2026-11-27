@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { userHasAffiliateAccount } from "@/lib/affiliates/tracking";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { isCourtWarmupFunnelPath } from "@/lib/programs/court-warmup-funnel";
 
@@ -26,6 +27,10 @@ export async function resolvePostAuthRedirect(
   userId: string,
   explicitNext?: string | null
 ): Promise<string> {
+  if (await userHasAffiliateAccount(supabase, userId)) {
+    return "/affiliate";
+  }
+
   const completed = await hasCompletedOnboarding(supabase, userId);
   if (!completed) {
     return "/onboarding";

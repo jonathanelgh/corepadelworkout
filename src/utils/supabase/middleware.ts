@@ -1,10 +1,18 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { attachPromoCookieFromRequest } from '@/lib/billing/promo-cookie'
+import { redirectForAffiliateParam } from '@/lib/affiliates/middleware-redirect'
 import { getHasActivePro } from '@/lib/member/has-active-pro'
 import { isCourtWarmupFunnelPath } from '@/lib/programs/court-warmup-funnel'
 
-type SigningKeys = { keys: { kid?: string }[] }
+type SigningKey = {
+  kty: "RSA" | "EC" | "oct"
+  key_ops: string[]
+  alg?: string
+  kid?: string
+  [key: string]: unknown
+}
+type SigningKeys = { keys: SigningKey[] }
 let signingKeys: { keys: SigningKeys["keys"]; fetchedAt: number } | null = null
 
 async function getSigningKeys(): Promise<SigningKeys> {
@@ -68,6 +76,7 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname
   const isAdminRoute = path.startsWith("/admin")
+  const isAffiliateRoute = path === "/affiliate" || path.startsWith("/affiliate/")
   const isLoginRoute = path === "/login"
   const isSignupRoute = path === "/signup"
   const code = request.nextUrl.searchParams.get("code")
@@ -78,6 +87,9 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/auth/recovery"
     return withSessionCookies(NextResponse.redirect(url))
   }
+
+  const affiliateHop = redirectForAffiliateParam(request)
+  if (affiliateHop) return withSessionCookies(affiliateHop)
 
   if (isAdminRoute && !userId) {
     const url = request.nextUrl.clone()
@@ -100,7 +112,38 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  if (isAffiliateRoute && !userId) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/login"
+    url.searchParams.set("next", `${path}${request.nextUrl.search}`)
+    return withSessionCookies(NextResponse.redirect(url))
+  }
+
+  if (isAffiliateRoute && userId) {
+    const { data: affiliateRow, error: affiliateError } = await supabase
+      .from("affiliates")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle()
+
+    if (affiliateError || !affiliateRow) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/member"
+      return withSessionCookies(NextResponse.redirect(url))
+    }
+  }
+
   if (userId && (isLoginRoute || isSignupRoute)) {
+    const { data: affiliateRow } = await supabase
+      .from("affiliates")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle()
+
+    if (affiliateRow) {
+      return withSessionCookies(NextResponse.redirect(new URL("/affiliate", request.url)))
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_completed_at")

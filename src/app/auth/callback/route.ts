@@ -5,6 +5,7 @@ import { enrollInPublishedProgram } from "@/app/programs/enroll-actions";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 import { redeemEarlyAccessPro } from "@/lib/pre-launch/early-access";
 import { redeemSignupOfferPro } from "@/lib/billing/signup-offer";
+import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 import {
   COURT_WARMUP_PROGRAM_SLUG,
   isCourtWarmupFunnelPath,
@@ -39,6 +40,13 @@ export async function GET(request: Request) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          await attachAffiliateToUser(user.id);
+        } catch (error) {
+          console.error("[affiliate] callback attach failed:", error);
+        }
+      }
       if (user?.email) {
         const tokenRaw = user.user_metadata?.early_access_token;
         const token = typeof tokenRaw === "string" ? tokenRaw.trim() : "";

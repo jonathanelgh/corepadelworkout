@@ -4,6 +4,7 @@ import { notifyAdminTrialStarted } from "@/lib/emails/notify-admin-trial-started
 import { sendProWelcomeEmailForCheckoutSession } from "@/lib/emails/send-pro-welcome-email";
 import { getStripeWebhookSecret } from "@/lib/stripe/config";
 import { getStripe } from "@/lib/stripe/server";
+import { lockAffiliateSubscription, recordAffiliateCommission } from "@/lib/affiliates/commissions";
 import {
   syncStripeSubscription,
   syncStripeSubscriptionFromCheckoutSession,
@@ -34,10 +35,24 @@ export async function POST(request: Request) {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode === "subscription") {
           await syncStripeSubscriptionFromCheckoutSession(session);
+          const userId = session.metadata?.user_id?.trim();
+          const subscriptionId =
+            typeof session.subscription === "string"
+              ? session.subscription
+              : session.subscription?.id;
+          if (userId && subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            await lockAffiliateSubscription(userId, subscription);
+          }
           // Never fail the webhook if email delivery fails.
           await sendProWelcomeEmailForCheckoutSession(session);
           await notifyAdminTrialStarted(session);
         }
+        break;
+      }
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await recordAffiliateCommission(invoice);
         break;
       }
       case "customer.subscription.created":
@@ -45,6 +60,10 @@ export async function POST(request: Request) {
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
         await syncStripeSubscription(sub);
+        const userId = sub.metadata.user_id?.trim();
+        if (userId && (sub.status === "trialing" || sub.status === "active")) {
+          await lockAffiliateSubscription(userId, sub);
+        }
         break;
       }
       default:

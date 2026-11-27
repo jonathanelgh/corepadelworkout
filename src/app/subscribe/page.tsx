@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { SubscribeButton } from "@/components/billing/subscribe-button";
 import { proMonthlyPriceLabel } from "@/lib/billing/format-subscription-price";
 import { PRO_TRIAL_DAYS, userEligibleForProTrial } from "@/lib/billing/pro-trial";
+import { userHasAffiliateAccount } from "@/lib/affiliates/tracking";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 import { PRO_PLAN_SLUG } from "@/lib/stripe/config";
@@ -31,6 +32,10 @@ export default async function SubscribePage({
 
   if (!user) {
     redirect(`/signup?next=${encodeURIComponent("/subscribe")}`);
+  }
+
+  if (await userHasAffiliateAccount(supabase, user.id)) {
+    redirect("/affiliate");
   }
 
   const { data: profile } = await supabase

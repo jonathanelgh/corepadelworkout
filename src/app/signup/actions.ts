@@ -11,6 +11,7 @@ import {
   redeemSignupOfferPro,
   validateSignupOfferCode,
 } from "@/lib/billing/signup-offer";
+import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 
 export type SignUpResult =
   | { ok: true; needsVerification: true }
@@ -78,6 +79,13 @@ export async function signUpWithPassword(input: {
   }
 
   const createdUserId = data.session?.user?.id ?? data.user?.id ?? null;
+  if (createdUserId) {
+    try {
+      await attachAffiliateToUser(createdUserId);
+    } catch (error) {
+      console.error("[affiliate] signup attach failed:", error);
+    }
+  }
   if (createdUserId && signupOfferCode) {
     const redeem = await redeemSignupOfferPro({
       userId: createdUserId,

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { userHasAffiliateAccount } from "@/lib/affiliates/tracking";
 import { getHasActivePro } from "@/lib/member/has-active-pro";
 import { createClient, getRequestUser } from "@/utils/supabase/server";
 
@@ -17,10 +18,12 @@ export default async function MemberLayout({ children }: { children: React.React
     .maybeSingle();
 
   if (!profile?.onboarding_completed_at) {
+    if (await userHasAffiliateAccount(supabase, user.id)) redirect("/affiliate");
     redirect("/onboarding");
   }
 
   if (!(await getHasActivePro(supabase, user.id))) {
+    if (await userHasAffiliateAccount(supabase, user.id)) redirect("/affiliate");
     redirect("/subscribe");
   }
 
