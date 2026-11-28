@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { addMonths } from "@/lib/affiliates/constants";
+import { claimAffiliateDiscountOnSubscription, commissionAfterDiscount, discountPercentForUser } from "@/lib/affiliates/discounts";
 import { getStripe } from "@/lib/stripe/server";
 import { createServiceClient } from "@/utils/supabase/service";
 
@@ -82,10 +83,13 @@ export async function recordAffiliateCommission(invoice: Stripe.Invoice): Promis
   const subscriptionId = subscriptionIdFromInvoice(invoice);
   if (!subscriptionId) return;
 
-  const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
+  const subscription = await getStripe().subscriptions.retrieve(subscriptionId, {
+    expand: ["discounts"],
+  });
   const userId = subscription.metadata.user_id?.trim();
   if (!userId) return;
 
+  await claimAffiliateDiscountOnSubscription(userId, subscription);
   await lockAffiliateSubscription(userId, subscription);
   const attribution = await loadAttribution(userId);
   if (!attribution?.subscription_started_at || !attribution.commission_ends_at) return;
@@ -100,8 +104,14 @@ export async function recordAffiliateCommission(invoice: Stripe.Invoice): Promis
   const earnedAt = new Date(earnedUnix * 1000);
   if (earnedAt.getTime() > new Date(attribution.commission_ends_at).getTime()) return;
 
-  const percent = attribution.commission_percent;
-  const commissionCents = Math.round((invoice.amount_paid * percent) / 100);
+  const discountPercent = await discountPercentForUser(userId, attribution.affiliate_id);
+  const priced = commissionAfterDiscount(
+    invoice.amount_paid,
+    attribution.commission_percent,
+    discountPercent
+  );
+  const percent = priced.percent;
+  const commissionCents = priced.cents;
   const supabase = createServiceClient();
   const { error } = await supabase.from("affiliate_commissions").insert({
     affiliate_id: attribution.affiliate_id,

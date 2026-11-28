@@ -4,6 +4,7 @@ import { notifyAdminTrialStarted } from "@/lib/emails/notify-admin-trial-started
 import { sendProWelcomeEmailForCheckoutSession } from "@/lib/emails/send-pro-welcome-email";
 import { getStripeWebhookSecret } from "@/lib/stripe/config";
 import { getStripe } from "@/lib/stripe/server";
+import { claimAffiliateDiscountOnSubscription } from "@/lib/affiliates/discounts";
 import { lockAffiliateSubscription, recordAffiliateCommission } from "@/lib/affiliates/commissions";
 import {
   syncStripeSubscription,
@@ -41,7 +42,10 @@ export async function POST(request: Request) {
               ? session.subscription
               : session.subscription?.id;
           if (userId && subscriptionId) {
-            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+              expand: ["discounts"],
+            });
+            await claimAffiliateDiscountOnSubscription(userId, subscription);
             await lockAffiliateSubscription(userId, subscription);
           }
           // Never fail the webhook if email delivery fails.
@@ -62,7 +66,9 @@ export async function POST(request: Request) {
         await syncStripeSubscription(sub);
         const userId = sub.metadata.user_id?.trim();
         if (userId && (sub.status === "trialing" || sub.status === "active")) {
-          await lockAffiliateSubscription(userId, sub);
+          const subscription = await stripe.subscriptions.retrieve(sub.id, { expand: ["discounts"] });
+          await claimAffiliateDiscountOnSubscription(userId, subscription);
+          await lockAffiliateSubscription(userId, subscription);
         }
         break;
       }

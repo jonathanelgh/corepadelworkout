@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
+import { sendAffiliateWelcomeEmail } from "@/lib/emails/send-affiliate-welcome";
 import { affiliateLink } from "@/lib/affiliates/links";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
@@ -12,9 +13,11 @@ export type CreateAffiliateState = {
   created?: {
     id: string;
     email: string;
-    password: string;
+    password: string | null;
     link: string;
     code: string;
+    existingAccount: boolean;
+    emailSent: boolean;
   };
 };
 
@@ -78,20 +81,55 @@ export async function createAffiliateAction(
     return { error: "Commission length must be between 1 and 60 months." };
   }
 
-  const password = passwordInput || randomFrom(PASSWORD_ALPHABET, 16);
   const supabase = createServiceClient();
-  const { data: created, error: createError } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: displayName },
-  });
-  if (createError || !created.user) {
-    const message = createError?.message.toLowerCase() ?? "";
-    if (message.includes("already") || message.includes("registered")) {
-      return { error: "An account with this email already exists." };
+  let existingUserId: string | null;
+  try {
+    existingUserId = await findUserIdByEmail(supabase, email);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not look up that email." };
+  }
+  if (existingUserId) {
+    const { data: existingAffiliate, error: existingError } = await supabase
+      .from("affiliates")
+      .select("id")
+      .eq("user_id", existingUserId)
+      .maybeSingle();
+    if (existingError) return { error: existingError.message };
+    if (existingAffiliate) return { error: "This account is already an affiliate." };
+  }
+
+  let userId = existingUserId;
+  let createdNewUser = false;
+  let password: string | null = existingUserId ? null : passwordInput || randomFrom(PASSWORD_ALPHABET, 16);
+  if (!userId) {
+    const { data: created, error: createError } = await supabase.auth.admin.createUser({
+      email,
+      password: password ?? undefined,
+      email_confirm: true,
+      user_metadata: { full_name: displayName },
+    });
+    if (createError || !created.user) {
+      const message = createError?.message.toLowerCase() ?? "";
+      const recoveredId =
+        message.includes("already") || message.includes("registered")
+          ? await findAuthUserIdByEmail(supabase, email)
+          : null;
+      if (!recoveredId) {
+        return { error: createError?.message || "Could not create the affiliate account." };
+      }
+      const { data: existingAffiliate, error: existingError } = await supabase
+        .from("affiliates")
+        .select("id")
+        .eq("user_id", recoveredId)
+        .maybeSingle();
+      if (existingError) return { error: existingError.message };
+      if (existingAffiliate) return { error: "This account is already an affiliate." };
+      userId = recoveredId;
+      password = null;
+    } else {
+      userId = created.user.id;
+      createdNewUser = true;
     }
-    return { error: createError?.message || "Could not create the affiliate account." };
   }
 
   let code = "";
@@ -102,7 +140,7 @@ export async function createAffiliateAction(
     const { data, error } = await supabase
       .from("affiliates")
       .insert({
-        user_id: created.user.id,
+        user_id: userId,
         code,
         display_name: displayName,
         email,
@@ -116,6 +154,7 @@ export async function createAffiliateAction(
         commission_percent: percent,
         commission_months: months,
         created_by: admin.id,
+        must_change_password: createdNewUser,
       })
       .select("id")
       .single();
@@ -129,9 +168,19 @@ export async function createAffiliateAction(
   }
 
   if (!affiliateId) {
-    await supabase.auth.admin.deleteUser(created.user.id);
+    if (createdNewUser) await supabase.auth.admin.deleteUser(userId);
     return { error: insertError || "Could not save the affiliate." };
   }
+
+  const link = affiliateLink(code);
+  const sent = await sendAffiliateWelcomeEmail({
+    to: email,
+    name: displayName,
+    password: createdNewUser ? password : null,
+    referralLink: link,
+  });
+  if (!sent.ok) console.error("[affiliate-welcome] send failed:", sent.error);
+  const emailSent = sent.ok;
 
   revalidatePath("/admin/affiliates");
   return {
@@ -140,9 +189,38 @@ export async function createAffiliateAction(
       email,
       password,
       code,
-      link: affiliateLink(code),
+      link,
+      existingAccount: !createdNewUser,
+      emailSent,
     },
   };
+}
+
+async function findUserIdByEmail(
+  supabase: ReturnType<typeof createServiceClient>,
+  email: string
+): Promise<string | null> {
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("email", email)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return profiles?.[0]?.id ?? null;
+}
+
+async function findAuthUserIdByEmail(
+  supabase: ReturnType<typeof createServiceClient>,
+  email: string
+): Promise<string | null> {
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+    if (error || data.users.length === 0) return null;
+    const match = data.users.find((user) => user.email?.toLowerCase() === email);
+    if (match) return match.id;
+    if (data.users.length < 200) return null;
+  }
+  return null;
 }
 
 export async function updateAffiliateAction(

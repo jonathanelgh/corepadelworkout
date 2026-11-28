@@ -178,9 +178,17 @@ function CreateAffiliateModal({ onClose }: { onClose: () => void }) {
 
         {state.created ? (
           <div className="overflow-y-auto px-5 py-5 text-sm">
-            <p className="font-medium text-zinc-950">Copy the password now. It is not shown again.</p>
+            <p className="font-medium text-zinc-950">
+              {state.created.existingAccount
+                ? state.created.emailSent
+                  ? "Welcome email sent. They sign in with the password they already use."
+                  : "This email already had an account. The welcome email could not be sent. They sign in with their current password."
+                : state.created.emailSent
+                  ? "Welcome email sent with the login link and temporary password. Copy the password here as well. It is not shown again."
+                  : "The welcome email could not be sent. Copy the password now. It is not shown again."}
+            </p>
             <p className="mt-3 text-zinc-700">Email: {state.created.email}</p>
-            <p className="text-zinc-700">Password: {state.created.password}</p>
+            {state.created.password ? <p className="text-zinc-700">Password: {state.created.password}</p> : null}
             <p className="mt-2 break-all text-zinc-700">Link: {state.created.link}</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link
@@ -203,7 +211,7 @@ function CreateAffiliateModal({ onClose }: { onClose: () => void }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Name" name="display_name" required />
               <Field label="Email" name="email" type="email" required />
-              <Field label="Password" name="password" type="text" placeholder="Leave blank to generate one" />
+              <Field label="Password" name="password" type="text" placeholder="New accounts only. Blank generates one" />
               <Field label="Phone" name="phone" />
               <Field label="Instagram" name="instagram" placeholder="@handle or URL" />
               <Field label="YouTube" name="youtube" placeholder="@handle or URL" />

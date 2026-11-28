@@ -190,8 +190,8 @@ function SignUpForm() {
 
               {promoCode && !verifySent && (
                 <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                  Promo <strong className="font-semibold">{promoCode}</strong> saved. It will be applied when you
-                  subscribe to Pro.
+                  Promo <strong className="font-semibold">{promoCode}</strong> saved. Enter it on the checkout
+                  page when you subscribe to Pro.
                 </div>
               )}
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/utils/supabase/service";
 
 export type AffiliateSettingsState = { error?: string; saved?: boolean };
 
@@ -39,5 +40,44 @@ export async function updateAffiliateSettings(
 
   revalidatePath("/affiliate");
   revalidatePath("/affiliate/settings");
+  return { saved: true };
+}
+
+export async function changeAffiliatePassword(
+  _prev: { error?: string; saved?: boolean },
+  formData: FormData
+): Promise<{ error?: string; saved?: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in again." };
+
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm_password") ?? "");
+  if (password.length < 8 || password.length > 72) {
+    return { error: "Use a password between 8 and 72 characters." };
+  }
+  if (password !== confirm) return { error: "Passwords do not match." };
+
+  const service = createServiceClient();
+  const { data: affiliate, error: lookupError } = await service
+    .from("affiliates")
+    .select("id, must_change_password")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (lookupError) return { error: lookupError.message };
+  if (!affiliate?.must_change_password) return { error: "Your password is already set." };
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) return { error: error.message };
+
+  const { error: updateError } = await service
+    .from("affiliates")
+    .update({ must_change_password: false, updated_at: new Date().toISOString() })
+    .eq("id", affiliate.id);
+  if (updateError) return { error: updateError.message };
+
+  revalidatePath("/affiliate");
   return { saved: true };
 }

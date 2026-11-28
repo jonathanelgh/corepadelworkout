@@ -11,6 +11,7 @@ import {
   redeemSignupOfferPro,
   validateSignupOfferCode,
 } from "@/lib/billing/signup-offer";
+import { claimAffiliateDiscount } from "@/lib/affiliates/discounts";
 import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 
 export type SignUpResult =
@@ -82,6 +83,7 @@ export async function signUpWithPassword(input: {
   if (createdUserId) {
     try {
       await attachAffiliateToUser(createdUserId);
+      await claimAffiliateDiscount(createdUserId);
     } catch (error) {
       console.error("[affiliate] signup attach failed:", error);
     }

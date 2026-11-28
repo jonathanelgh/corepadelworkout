@@ -9,6 +9,7 @@ import { createClient } from "@/utils/supabase/client";
 const links = [
   { href: "/affiliate", label: "Overview" },
   { href: "/affiliate/sales", label: "Sales" },
+  { href: "/affiliate/discounts", label: "Discounts" },
   { href: "/affiliate/analytics", label: "Analytics" },
   { href: "/affiliate/payouts", label: "Payouts" },
   { href: "/affiliate/settings", label: "Settings" },

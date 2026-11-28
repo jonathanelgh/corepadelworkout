@@ -101,6 +101,7 @@ export default async function SubscribePage({
             <SubscribeButton className="mt-8 w-full rounded-xl bg-zinc-900 py-3.5 text-sm font-semibold text-white hover:bg-zinc-800">
               {trialEligible ? `Start ${PRO_TRIAL_DAYS}-day trial` : "Subscribe with Stripe"}
             </SubscribeButton>
+            <p className="mt-3 text-center text-xs text-zinc-500">Have a discount code? Enter it on the checkout page.</p>
             <p className="mt-3 text-center text-xs text-zinc-500">
               {trialEligible
                 ? "Secure checkout by Stripe. Cancel from your profile before the trial ends and you will not be charged."

@@ -41,6 +41,7 @@ export type AffiliateDashboard = {
   days: AffiliateDayStat[];
   sales: AffiliateCommission[];
   payouts: AffiliatePayout[];
+  mustChangePassword: boolean;
 };
 
 function mapProfile(row: Record<string, unknown>): AffiliateProfile {
@@ -71,7 +72,7 @@ export async function loadAffiliateDashboard(
   const { data: profileRow, error } = await supabase
     .from("affiliates")
     .select(
-      "id, user_id, code, display_name, email, phone, instagram, youtube, facebook, tiktok, website, notes, status, commission_percent, commission_months, created_at"
+      "id, user_id, code, display_name, email, phone, instagram, youtube, facebook, tiktok, website, notes, status, commission_percent, commission_months, created_at, must_change_password"
     )
     .eq("user_id", userId)
     .maybeSingle();
@@ -172,6 +173,7 @@ export async function loadAffiliateDashboard(
     days,
     sales: (recentSales.data ?? []) as AffiliateCommission[],
     payouts: paidRows,
+    mustChangePassword: Boolean(profileRow.must_change_password),
   };
 }
 

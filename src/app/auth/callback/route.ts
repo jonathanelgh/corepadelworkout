@@ -5,6 +5,7 @@ import { enrollInPublishedProgram } from "@/app/programs/enroll-actions";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 import { redeemEarlyAccessPro } from "@/lib/pre-launch/early-access";
 import { redeemSignupOfferPro } from "@/lib/billing/signup-offer";
+import { claimAffiliateDiscount } from "@/lib/affiliates/discounts";
 import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 import {
   COURT_WARMUP_PROGRAM_SLUG,
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
       if (user) {
         try {
           await attachAffiliateToUser(user.id);
+          await claimAffiliateDiscount(user.id);
         } catch (error) {
           console.error("[affiliate] callback attach failed:", error);
         }

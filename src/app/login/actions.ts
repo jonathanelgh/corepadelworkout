@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { claimAffiliateDiscount } from "@/lib/affiliates/discounts";
 import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 import { createClient } from "@/utils/supabase/server";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
@@ -38,6 +39,7 @@ export async function signInWithPassword(input: {
 
   try {
     await attachAffiliateToUser(userId);
+    await claimAffiliateDiscount(userId);
   } catch (error) {
     console.error("[affiliate] login attach failed:", error);
   }

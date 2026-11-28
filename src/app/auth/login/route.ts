@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { claimAffiliateDiscount } from "@/lib/affiliates/discounts";
 import { attachAffiliateToUser } from "@/lib/affiliates/tracking";
 import { resolvePostAuthRedirect } from "@/lib/member/resolve-post-auth-redirect";
 
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
   if (userId) {
     try {
       await attachAffiliateToUser(userId);
+      await claimAffiliateDiscount(userId);
     } catch (error) {
       console.error("[affiliate] login attach failed:", error);
     }
